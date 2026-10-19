@@ -4,7 +4,7 @@
 **Branch authority:** `main` only  
 **Baseline:** `c5c5dbdc08304c7396cd865528364f4ff81ef3d3`  
 **Reviewed:** 2026-10-19  
-**Latest main re-review:** `c53aa773e3d95bfff81df10d58cdc714e36fc1df`  
+**Latest main re-review:** `28caf7ef266aeee39781a1dc5e1bbf6f3c71d0ac`  
 **Ledger status:** Source-grounded priority update; open release blockers remain open.
 
 ## Purpose
