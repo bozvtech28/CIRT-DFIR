@@ -131,6 +131,18 @@ function App() {
     (caseStatusFilter === "All" || item.status === caseStatusFilter)
   ), [filteredCases, caseSeverityFilter, caseStatusFilter]);
   const selectedCase = cases.find((item) => item.case_id === selectedCaseId) ?? null;
+  const authenticationRequired =
+    /authentication|sign.?in|access token|unauthorized|forbidden|not configured/i.test(error) ||
+    /API returned HTTP (401|403)\\b/.test(error);
+  const apiState = loading
+    ? "Loading"
+    : usingFallback
+      ? "Offline demo"
+      : error
+        ? authenticationRequired
+          ? "Auth required"
+          : "Unavailable"
+        : "Connected";
 
   return (
     <div className="shell">
@@ -185,7 +197,7 @@ function App() {
                 <article className="metric"><span>Cases returned</span><strong>{loading ? "â€¦" : cases.length}</strong><small>Current case-list response</small></article>
                 <article className="metric"><span>High severity</span><strong>{cases.filter((item) => item.severity.toLowerCase() === "high").length}</strong><small>Synthetic records only</small></article>
                 <article className="metric"><span>Investigating</span><strong>{cases.filter((item) => item.status.toLowerCase() === "investigating").length}</strong><small>Returned case data</small></article>
-                <article className="metric"><span>API state</span><strong>{loading ? "Loading" : usingFallback ? "Offline" : "Ready"}</strong><small>Local development endpoint</small></article>
+                <article className="metric"><span>API state</span><strong>{apiState}</strong><small>{error ? "Case API request did not succeed" : usingFallback ? "Local synthetic records only" : "Development endpoint"}</small></article>
               </div>
 
               {loading && <section className="panel" role="status">Loading synthetic cases from the development APIâ€¦</section>}
@@ -194,7 +206,13 @@ function App() {
                 <section className="panel" role="alert">
                   <h2>API connection notice</h2>
                   <p>{error}</p>
-                  <p>Showing clearly identified local synthetic fallback records.</p>
+                  {usingFallback ? (
+                    <p>Showing local synthetic demo records only. These are not API results or authenticated incident data.</p>
+                  ) : authenticationRequired ? (
+                    <p>No case data is being shown. Protected case access remains disabled until approved Entra settings and server-side token validation are configured.</p>
+                  ) : (
+                    <p>No case data is being shown because the API request failed. Check the backend terminal, then select Refresh to retry.</p>
+                  )}
                 </section>
               )}
 
@@ -254,7 +272,11 @@ function App() {
                 </div>
                 <p className="muted">
                   Showing {visibleCases.length} of {cases.length} synthetic cases.
-                  {" "}{usingFallback ? "Data source: local fallback; API unavailable." : "Data source: development API response."}
+                  {" "}{usingFallback
+                    ? "Data source: local synthetic fallback; API unavailable."
+                    : error
+                      ? "Data source: no case data returned."
+                      : "Data source: development API response (development data)."}
                 </p>
               </section>
 
