@@ -4,7 +4,7 @@
 **Branch authority:** `main` only  
 **Baseline:** `c5c5dbdc08304c7396cd865528364f4ff81ef3d3`  
 **Reviewed:** 2026-10-19  
-**Latest main re-review:** `28caf7ef266aeee39781a1dc5e1bbf6f3c71d0ac`  
+**Latest main re-review:** `57fef3faf4e5be85b3f55f4eb07dc68b3d3e2564`  
 **Ledger status:** Source-grounded priority update; open release blockers remain open.
 
 ## Purpose
@@ -30,7 +30,7 @@ The currently active phase documents available under `docs/` range from Phase 8B
 
 | Priority | Workstream | Status | Evidence / acceptance condition |
 |---|---|---|---|
-| P0-A | Case Manager filesystem containment | **OPEN — RELEASE BLOCKER / SOURCE NOT LOCATED IN ACTIVE TREE** | `Reports/Baseline_Report_20261015_223611.txt` records a parent-junction path acceptance. A full recursive path inventory of the reviewed `main` tree (`c53aa773e3d95bfff81df10d58cdc714e36fc1df`, 11,124 entries, not truncated) found no active path matching Case Manager, junction, reparse, containment, evidence-intake, or safe-path terms outside generated/vendor trees. Locate the authoritative implementation and provenance before patching; do not promote backups. Then add independent traversal, junction/reparse-point, race/concurrency, cleanup and finalization tests. |
+| P0-A | Case Manager filesystem containment | **OPEN — RELEASE BLOCKER / SOURCE NOT LOCATED IN ACTIVE TREE** | `Reports/Baseline_Report_20261015_223611.txt` records a parent-junction path acceptance. A full recursive path inventory of the reviewed `main` tree (`57fef3faf4e5be85b3f55f4eb07dc68b3d3e2564`, 11,124 entries, not truncated) found no active path matching Case Manager, junction, reparse, containment, evidence-intake, or safe-path terms outside generated/vendor trees. Locate the authoritative implementation and provenance before patching; do not promote backups. Then add independent traversal, junction/reparse-point, race/concurrency, cleanup and finalization tests. |
 | P0-B | Live API authentication and authorization | **BLOCKED — APPROVED CONFIGURATION REQUIRED** | The current screenshot confirms the frontend correctly displays `Auth required` and does not show protected case data. `platform/backend/app/auth_dependencies.py` always raises 401; `entra_authenticator.py` and `entra_bearer_adapter.py` explicitly are not wired into FastAPI. The 2026-10-17 configuration-readiness report says tenant ID, expected issuer and API audience were unset. Need approved issuer, tenant, audience, metadata/JWKS hosts, SPA client/scope/redirect URI, app roles, role mapping and identity/security approval before wiring. Keep fail-closed behavior. |
 | P0-C | Evidence intake and custody | **NOT IMPLEMENTED / RELEASE BLOCKER** | Requirements call for bounded authenticated upload, hash verification, preservation of originals, provenance and custody. No production ingest pipeline/storage service is active. Remains blocked on P0-A containment remediation/review and P0-B approved identity integration. |
 | P1 | Production identity integration | **PARTIAL / BLOCKED** | Isolated JWT verifier, metadata and JWKS primitives plus synthetic tests exist. Need approved configuration and reviewed FastAPI integration with actual dependency-level tests; no live Entra integration is verified. |
@@ -42,7 +42,7 @@ The currently active phase documents available under `docs/` range from Phase 8B
 
 ### Latest main review and local verification evidence (2026-10-19)
 
-- **Repository/source review:** main was re-resolved at `c53aa773e3d95bfff81df10d58cdc714e36fc1df`. The recursive tree inventory contained 11,124 entries and was not truncated. No active source path for the documented Case Manager/junction containment implementation was discoverable outside dependency/generated trees. This is a source/provenance blocker, not proof the defect is fixed or absent.
+- **Repository/source review:** main was re-resolved at `57fef3faf4e5be85b3f55f4eb07dc68b3d3e2564`. The recursive tree inventory contained 11,124 entries and was not truncated. No active source path for the documented Case Manager/junction containment implementation was discoverable outside dependency/generated trees. This is a source/provenance blocker, not proof the defect is fixed or absent.
 - **Frontend build:** user-provided PowerShell output reports `npm run build` passed (`tsc -b && vite build`; 200 modules transformed; Vite completed in 1.73 seconds). This is user-reported local evidence, not a run executed by this connector.
 - **Backend regression:** user-provided PowerShell output reports `python -m pytest` completed with 291 passed in 4.19 seconds. This does not establish live Entra sign-in or filesystem-junction safety.
 - **Rendered UI:** the latest user screenshot confirms the compact Entra setup notice, explicit `AUTH DISABLED` label, `Auth required` API state, and no protected case records shown. Review is based on the user-provided screenshot; no independent browser-control tool was available.
