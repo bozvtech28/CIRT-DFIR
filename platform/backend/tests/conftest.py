@@ -1,20 +1,18 @@
-﻿"""Test-only identity override for legacy API tests.
+"""Shared test fixtures for the backend suite.
 
-This fixture is confined to the test suite. It is not used by the application
-outside pytest and does not establish real user identity.
+Keep authentication overrides local to tests that explicitly need a synthetic
+principal. In particular, never install a global/autouse identity that can
+mask the application's fail-closed authentication behavior.
 """
-import pytest
-from fastapi.testclient import TestClient
 
-from app.auth_dependencies import get_current_principal
-from app.main import app
-from app.security import Principal, ROLE_ANALYST
+import pytest
+
 
 @pytest.fixture(autouse=True)
-def test_identity_override():
-    app.dependency_overrides[get_current_principal] = lambda: Principal(
-        subject="synthetic-test-analyst",
-        roles=frozenset({ROLE_ANALYST}),
-    )
+def clean_dependency_overrides():
+    """Prevent FastAPI dependency overrides leaking between tests."""
+    from app.main import app
+
+    app.dependency_overrides.clear()
     yield
     app.dependency_overrides.clear()
