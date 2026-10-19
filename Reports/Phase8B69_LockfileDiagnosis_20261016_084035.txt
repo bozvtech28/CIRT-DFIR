@@ -1,0 +1,17 @@
+﻿CIRT DFIR PROFESSIONAL - PHASE 8B.69
+Read-only package-lock diagnosis
+Timestamp: 2026-10-16T08:40:35.3918337+08:00
+package.json size: 469 bytes
+package-lock.json size: 61818 bytes
+No package files will be modified.
+
+Node JSON validation exit code: -1
+
+FAILED - A parameter cannot be found that matches parameter name 'AsHashtable'.
+
+package.json unchanged: True
+package-lock.json unchanged: True
+Node validation exit code: -1
+
+DIAGNOSIS: Node.js could not parse at least one JSON file. Review the error before considering repair.
+No packages installed. No network requests made.

@@ -1,0 +1,894 @@
+﻿CIRT-DFIR - PHASE 8B145
+Exact authentication interface and test-contract review
+Timestamp: 20261017_194441
+
+=== FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_authenticator.py ===
+  45:             raise ValueError(f"{field_name} must contain hostnames, not URLs")
+  46:         hosts.add(normalized)
+  47: 
+  48:     if not hosts:
+  49:         raise ValueError(f"{field_name} must not be empty")
+  50:     return frozenset(hosts)
+  51: 
+  52: 
+  53: @dataclass(frozen=True)
+  54: class EntraAuthConfig:
+  55:     """Explicit server-side trust configuration; never build from request data."""
+  56: 
+  57:     tenant_id: str
+  58:     expected_issuer: str
+  59:     expected_audience: str
+  60:     discovery_url: str
+  61:     trusted_metadata_hosts: frozenset[str]
+  62:     allowed_jwks_hosts: frozenset[str]
+  63:     approved_role_map: Mapping[str, str]
+  64:     jwks_ttl_seconds: float = 300.0
+  65:     timeout_seconds: float = 3.0
+  66:     max_response_bytes: int = 1_048_576
+  67: 
+  68:     def __post_init__(self) -> None:
+  69:         for name in (
+  70:             "tenant_id",
+  71:             "expected_issuer",
+  72:             "expected_audience",
+  73:             "discovery_url",
+  74:         ):
+  75:             value = getattr(self, name)
+  76:             if not isinstance(value, str) or not value.strip():
+  77:                 raise ValueError(f"{name} must be explicitly configured")
+  78: 
+  79:         try:
+  80:             issuer = urlparse(self.expected_issuer)
+  81:             issuer_port = issuer.port
+  82:         except ValueError as exc:
+  83:             raise ValueError("expected_issuer is malformed") from exc
+  84: 
+  85:         if (
+  86:             issuer.scheme.lower() != "https"
+  87:             or not issuer.hostname
+  88:             or issuer_port not in (None, 443)
+  89:             or issuer.username
+  90:             or issuer.password
+  91:             or issuer.query
+  92:             or issuer.fragment
+  93:         ):
+  94:             raise ValueError("expected_issuer must be a fixed, safe HTTPS URL")
+  95: 
+  96:         try:
+  97:             parsed = urlparse(self.discovery_url)
+  98:             port = parsed.port
+  99:         except ValueError as exc:
+ 100:             raise ValueError("discovery_url is malformed") from exc
+ 101: 
+ 102:         if (
+ 103:             parsed.scheme.lower() != "https"
+ 104:             or not parsed.hostname
+ 105:             or port not in (None, 443)
+ 106:             or parsed.username
+ 107:             or parsed.password
+ 108:             or parsed.query
+ 109:             or parsed.fragment
+ 110:         ):
+ 111:             raise ValueError("discovery_url must be a fixed, safe HTTPS URL")
+ 112: 
+ 113:         metadata_hosts = _normalized_hosts(
+ 114:             self.trusted_metadata_hosts, "trusted_metadata_hosts"
+ 115:         )
+ 116:         jwks_hosts = _normalized_hosts(
+ 117:             self.allowed_jwks_hosts, "allowed_jwks_hosts"
+ 118:         )
+ 119: 
+ 120:         if parsed.hostname.lower().rstrip(".") not in metadata_hosts:
+ 121:             raise ValueError("discovery_url host is not in trusted_metadata_hosts")
+ 122: 
+ 123:         if not isinstance(self.approved_role_map, Mapping) or not self.approved_role_map:
+ 124:             raise ValueError("approved_role_map must be a non-empty mapping")
+ 125: 
+ 126:         role_map: dict[str, str] = {}
+ 127:         for app_role, internal_role in self.approved_role_map.items():
+ 128:             if not isinstance(app_role, str) or not app_role.strip():
+ 129:                 raise ValueError("Application role names must be non-empty strings")
+ 130:             if not isinstance(internal_role, str) or internal_role not in KNOWN_ROLES:
+ 131:                 raise ValueError("Role map contains an unrecognized internal role")
+ 132:             role_map[app_role] = internal_role
+ 133: 
+ 134:         if not isinstance(self.jwks_ttl_seconds, (int, float)) or isinstance(
+ 135:             self.jwks_ttl_seconds, bool
+ 136:         ):
+ 137:             raise ValueError("jwks_ttl_seconds must be numeric")
+ 138:         if not 0 < self.jwks_ttl_seconds <= 3600:
+ 139:             raise ValueError("jwks_ttl_seconds must be greater than 0 and at most 3600")
+ 140: 
+ 141:         if not isinstance(self.timeout_seconds, (int, float)) or isinstance(
+ 142:             self.timeout_seconds, bool
+ 143:         ):
+ 144:             raise ValueError("timeout_seconds must be numeric")
+ 145:         if not 0 < self.timeout_seconds <= 10:
+ 146:             raise ValueError("timeout_seconds must be greater than 0 and at most 10")
+ 147: 
+ 148:         if not isinstance(self.max_response_bytes, int) or isinstance(
+ 149:             self.max_response_bytes, bool
+ 150:         ):
+ 151:             raise ValueError("max_response_bytes must be an integer")
+ 152:         if not 1 <= self.max_response_bytes <= 4 * 1024 * 1024:
+ 153:             raise ValueError("max_response_bytes must be between 1 byte and 4 MiB")
+ 154: 
+ 155:         object.__setattr__(self, "trusted_metadata_hosts", metadata_hosts)
+ 156:         object.__setattr__(self, "allowed_jwks_hosts", jwks_hosts)
+ 157:         object.__setattr__(self, "approved_role_map", MappingProxyType(role_map))
+ 158: 
+ 159: 
+ 160: class EntraAuthenticator:
+ 161:     """Authenticate bearer headers using the explicitly approved configuration."""
+ 162: 
+ 163:     def __init__(
+ 164:         self,
+ 165:         config: EntraAuthConfig,
+ 166:         metadata: TrustedMetadata,
+ 167:         jwks_cache: JWKSCache,
+ 168:     ) -> None:
+ 169:         self._config = config
+ 170:         self._metadata = metadata
+ 171:         self._jwks_cache = jwks_cache
+ 172: 
+ 173:     @property
+ 174:     def metadata(self) -> TrustedMetadata:
+ 175:         """Expose the validated issuer/JWKS URI, not unvalidated discovery data."""
+ 176:         return self._metadata
+ 177: 
+ 178:     def _trusted_key_resolver(self, token: str):
+ 179:         try:
+ 180:             document = self._jwks_cache.get()
+ 181:             resolver = build_jwks_resolver(document)
+ 182:             return resolver(token)
+ 183:         except JWKSCacheError as exc:
+ 184:             # The adapter converts InvalidTokenError into a generic auth failure.
+ 185:             raise InvalidTokenError("Trusted signing keys are unavailable.") from exc
+ 186: 
+ 187:     def authenticate(self, authorization: str | None) -> Principal:
+ 188:         """Return a principal only after complete token and role validation."""
+ 189:         return principal_from_authorization_header(
+ 190:             authorization,
+ 191:             trusted_key_resolver=self._trusted_key_resolver,
+ 192:             expected_issuer=self._config.expected_issuer,
+ 193:             expected_audience=self._config.expected_audience,
+ 194:             expected_tenant_id=self._config.tenant_id,
+ 195:             approved_role_map=self._config.approved_role_map,
+ 196:         )
+ 197: 
+ 198: 
+ 199: def create_entra_authenticator(
+ 200:     config: EntraAuthConfig,
+ 201:     *,
+ 202:     document_fetcher: DocumentFetcher = fetch_json_document,
+ 203: ) -> EntraAuthenticator:
+ 204:     """Compose trusted discovery, cached JWKS, JWT verification and role mapping.
+ 205: 
+ 206:     The discovery URL is fixed in config. Discovery's issuer must exactly match
+ 207:     expected_issuer, and its JWKS hostname must be in allowed_jwks_hosts.
+ 208:     document_fetcher is injectable for tests; production should use the default
+ 209:     bounded HTTPS transport.
+ 210:     """
+ 211:     if not callable(document_fetcher):
+ 212:         raise ValueError("document_fetcher must be callable")
+ 213: 
+ 214:     def fetch_document(url: str, allowed_hosts: frozenset[str]) -> dict[str, Any]:
+ 215:         return fetch_trusted_document(
+ 216:             url,
+ 217:             trusted_hosts=set(allowed_hosts),
+ 218:             timeout_seconds=config.timeout_seconds,
+ 219:             transport=lambda requested_url, timeout: document_fetcher(
+ 220:                 requested_url,
+ 221:                 trusted_hosts=set(allowed_hosts),
+ 222:                 timeout_seconds=timeout,
+ 223:                 max_response_bytes=config.max_response_bytes,
+ 224:             ),
+ 225:         )
+ 226: 
+ 227:     discovery = fetch_document(
+ 228:         config.discovery_url, config.trusted_metadata_hosts
+ 229:     )
+ 230:     metadata = validate_discovery_document(
+ 231:         discovery,
+ 232:         expected_issuer=config.expected_issuer,
+ 233:         allowed_jwks_hosts=set(config.allowed_jwks_hosts),
+ 234:     )
+ 235: 
+ 236:     def load_jwks() -> dict[str, Any]:
+ 237:         return fetch_document(metadata.jwks_uri, config.allowed_jwks_hosts)
+ 238: 
+ 239:     cache = JWKSCache(load_jwks, ttl_seconds=config.jwks_ttl_seconds)
+ 240:     return EntraAuthenticator(config, metadata, cache)
+
+=== FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_bearer_adapter.py ===
+   1: """Offline-tested bearer-token adapter for the CIRT DFIR Entra integration.
+   2: 
+   3: This module does not fetch metadata or JWKS and is not wired into FastAPI.
+   4: The caller must supply a trusted key resolver and approved server-side config.
+   5: """
+   6: from collections.abc import Mapping
+   7: from typing import Any
+   8: 
+   9: from jwt import InvalidTokenError
+  10: 
+  11: from app.entra_principal import (
+  12:     PrincipalMappingError,
+  13:     principal_from_verified_claims,
+  14: )
+  15: from app.entra_token_verifier import verify_entra_access_token
+  16: from app.security import Principal
+  17: 
+  18: 
+  19: class BearerAuthenticationError(Exception):
+  20:     """Raised when a bearer token cannot produce a trusted principal."""
+  21: 
+  22: 
+  23: def principal_from_authorization_header(
+  24:     authorization: str | None,
+  25:     *,
+  26:     trusted_key_resolver,
+  27:     expected_issuer: str,
+  28:     expected_audience: str,
+  29:     expected_tenant_id: str,
+  30:     approved_role_map: Mapping[str, str],
+  31: ) -> Principal:
+  32:     """Validate a Bearer header, verify its JWT, and map verified roles.
+  33: 
+  34:     This function deliberately performs no network requests. Do not pass
+  35:     untrusted JWKS data or configuration supplied by a browser/request body.
+  36:     """
+  37:     if not isinstance(authorization, str):
+  38:         raise BearerAuthenticationError("A Bearer authorization header is required.")
+  39: 
+  40:     scheme, separator, raw_token = authorization.partition(" ")
+  41:     token = raw_token.strip()
+  42: 
+  43:     if (
+  44:         not separator
+  45:         or scheme.lower() != "bearer"
+  46:         or not token
+  47:         or any(character.isspace() for character in token)
+  48:     ):
+  49:         raise BearerAuthenticationError("The authorization header is malformed.")
+  50: 
+  51:     try:
+  52:         claims = verify_entra_access_token(
+  53:             token,
+  54:             trusted_key_resolver=trusted_key_resolver,
+  55:             expected_issuer=expected_issuer,
+  56:             expected_audience=expected_audience,
+  57:             expected_tenant_id=expected_tenant_id,
+  58:         )
+  59:         return principal_from_verified_claims(
+  60:             claims,
+  61:             approved_role_map=approved_role_map,
+  62:         )
+  63:     except (InvalidTokenError, PrincipalMappingError, ValueError) as exc:
+  64:         raise BearerAuthenticationError(
+  65:             "Bearer token validation or role mapping failed."
+  66:         ) from exc
+
+=== FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\auth_dependencies.py ===
+   1: """Fail-closed authentication gate pending approved OIDC integration.
+   2: 
+   3: This module intentionally authenticates nobody. Replace the placeholder
+   4: identity provider integration only after the organization chooses a provider.
+   5: Never trust roles supplied by a browser or request body.
+   6: """
+   7: from fastapi import Depends, HTTPException
+   8: 
+   9: from app.security import (
+  10:     AuthenticationRequired,
+  11:     AuthorizationDenied,
+  12:     Principal,
+  13:     authorize,
+  14: )
+  15: 
+  16: def get_current_principal() -> Principal:
+  17:     """Reject all requests until real token/session validation is implemented."""
+  18:     raise HTTPException(
+  19:         status_code=401,
+  20:         detail="Authentication is not configured. Access is denied by default.",
+  21:         headers={"WWW-Authenticate": "Bearer"},
+  22:     )
+  23: 
+  24: def require_permission(permission: str):
+  25:     """Require a validated principal and enforce the RBAC permission."""
+  26:     def dependency(principal: Principal = Depends(get_current_principal)) -> Principal:
+  27:         try:
+  28:             authorize(principal, permission)
+  29:         except AuthenticationRequired as exc:
+  30:             raise HTTPException(
+  31:                 status_code=401,
+  32:                 detail="Authentication required.",
+  33:                 headers={"WWW-Authenticate": "Bearer"},
+  34:             ) from exc
+  35:         except AuthorizationDenied as exc:
+  36:             raise HTTPException(
+  37:                 status_code=403,
+  38:                 detail="Insufficient permission.",
+  39:             ) from exc
+  40:         return principal
+  41:     return dependency
+
+=== FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_entra_authenticator.py ===
+   1: import json
+   2: import time
+   3: 
+   4: import jwt
+   5: import pytest
+   6: from cryptography.hazmat.primitives.asymmetric import rsa
+   7: 
+   8: from app.entra_authenticator import (
+   9:     EntraAuthConfig,
+  10:     create_entra_authenticator,
+  11: )
+  12: from app.entra_bearer_adapter import BearerAuthenticationError
+  13: from app.entra_metadata_client import MetadataTrustError
+  14: from app.security import ROLE_ADMINISTRATOR, ROLE_ANALYST, ROLE_VIEWER
+  15: 
+  16: 
+  17: TENANT = "11111111-2222-4333-8444-555555555555"
+  18: ISSUER = f"https://login.microsoftonline.com/{TENANT}/v2.0"
+  19: AUDIENCE = "api://synthetic-cirt-dfir-api"
+  20: DISCOVERY_URL = (
+  21:     f"https://login.microsoftonline.com/{TENANT}/v2.0/"
+  22:     ".well-known/openid-configuration"
+  23: )
+  24: JWKS_URI = (
+  25:     f"https://login.microsoftonline.com/{TENANT}/discovery/v2.0/keys"
+  26: )
+  27: HOSTS = frozenset({"login.microsoftonline.com"})
+  28: ROLE_MAP = {
+  29:     "CIRT.DFIR.Viewer": ROLE_VIEWER,
+  30:     "CIRT.DFIR.Analyst": ROLE_ANALYST,
+  31:     "CIRT.DFIR.Administrator": ROLE_ADMINISTRATOR,
+  32: }
+  33: 
+  34: 
+  35: @pytest.fixture
+  36: def identity():
+  37:     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+  38:     public_jwk = json.loads(
+  39:         jwt.algorithms.RSAAlgorithm.to_jwk(private_key.public_key())
+  40:     )
+  41:     public_jwk.update({
+  42:         "kid": "synthetic-composition-key",
+  43:         "use": "sig",
+  44:         "alg": "RS256",
+  45:     })
+  46: 
+  47:     def issue_token(roles=None, **overrides):
+  48:         now = int(time.time())
+  49:         claims = {
+  50:             "iss": ISSUER,
+  51:             "aud": AUDIENCE,
+  52:             "sub": "synthetic-composition-user",
+  53:             "tid": TENANT,
+  54:             "iat": now,
+  55:             "nbf": now,
+  56:             "exp": now + 300,
+  57:             "roles": roles if roles is not None else ["CIRT.DFIR.Analyst"],
+  58:         }
+  59:         claims.update(overrides)
+  60:         return jwt.encode(
+  61:             claims,
+  62:             private_key,
+  63:             algorithm="RS256",
+  64:             headers={"kid": "synthetic-composition-key"},
+  65:         )
+  66: 
+  67:     return public_jwk, issue_token
+  68: 
+  69: 
+  70: def make_config(**overrides):
+  71:     values = {
+  72:         "tenant_id": TENANT,
+  73:         "expected_issuer": ISSUER,
+  74:         "expected_audience": AUDIENCE,
+  75:         "discovery_url": DISCOVERY_URL,
+  76:         "trusted_metadata_hosts": HOSTS,
+  77:         "allowed_jwks_hosts": HOSTS,
+  78:         "approved_role_map": ROLE_MAP,
+  79:     }
+  80:     values.update(overrides)
+  81:     return EntraAuthConfig(**values)
+  82: 
+  83: 
+  84: def make_fetcher(public_jwk, calls=None, *, fail_jwks=False, wrong_issuer=False):
+  85:     calls = calls if calls is not None else []
+  86: 
+  87:     def fetch(url, *, trusted_hosts, timeout_seconds, max_response_bytes):
+  88:         calls.append((url, frozenset(trusted_hosts), timeout_seconds, max_response_bytes))
+  89:         if url == DISCOVERY_URL:
+  90:             issuer = "https://attacker.example/issuer" if wrong_issuer else ISSUER
+  91:             return {"issuer": issuer, "jwks_uri": JWKS_URI}
+  92:         if url == JWKS_URI:
+  93:             if fail_jwks:
+  94:                 raise OSError("synthetic JWKS outage")
+  95:             return {"keys": [public_jwk]}
+  96:         raise AssertionError("Unexpected URL requested by composition")
+  97: 
+  98:     return fetch
+  99: 
+ 100: 
+ 101: def test_composition_authenticates_valid_synthetic_bearer(identity):
+ 102:     public_jwk, issue_token = identity
+ 103:     calls = []
+ 104:     authenticator = create_entra_authenticator(
+ 105:         make_config(),
+ 106:         document_fetcher=make_fetcher(public_jwk, calls),
+ 107:     )
+ 108: 
+ 109:     # Discovery is loaded at construction; JWKS is loaded on first authentication.
+ 110:     assert len(calls) == 1
+ 111:     assert authenticator.metadata.issuer == ISSUER
+ 112: 
+ 113:     principal = authenticator.authenticate("Bearer " + issue_token())
+ 114: 
+ 115:     assert principal.subject == "synthetic-composition-user"
+ 116:     assert principal.roles == frozenset({ROLE_ANALYST})
+ 117:     assert len(calls) == 2
+ 118: 
+ 119: 
+ 120: def test_composition_rejects_unapproved_application_role(identity):
+ 121:     public_jwk, issue_token = identity
+ 122:     authenticator = create_entra_authenticator(
+ 123:         make_config(),
+ 124:         document_fetcher=make_fetcher(public_jwk),
+ 125:     )
+ 126: 
+ 127:     with pytest.raises(BearerAuthenticationError):
+ 128:         authenticator.authenticate(
+ 129:             "Bearer " + issue_token(roles=["CIRT.DFIR.SuperUser"])
+ 130:         )
+ 131: 
+ 132: 
+ 133: def test_composition_rejects_wrong_audience(identity):
+ 134:     public_jwk, issue_token = identity
+ 135:     authenticator = create_entra_authenticator(
+ 136:         make_config(),
+ 137:         document_fetcher=make_fetcher(public_jwk),
+ 138:     )
+ 139: 
+ 140:     with pytest.raises(BearerAuthenticationError):
+ 141:         authenticator.authenticate(
+ 142:             "Bearer " + issue_token(aud="api://wrong-synthetic-audience")
+ 143:         )
+ 144: 
+ 145: 
+ 146: def test_composition_rejects_wrong_tenant(identity):
+ 147:     public_jwk, issue_token = identity
+ 148:     authenticator = create_entra_authenticator(
+ 149:         make_config(),
+ 150:         document_fetcher=make_fetcher(public_jwk),
+ 151:     )
+ 152: 
+ 153:     with pytest.raises(BearerAuthenticationError):
+ 154:         authenticator.authenticate(
+ 155:             "Bearer " + issue_token(tid="aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee")
+ 156:         )
+ 157: 
+ 158: 
+ 159: def test_composition_rejects_untrusted_discovery_issuer(identity):
+ 160:     public_jwk, _ = identity
+ 161: 
+ 162:     with pytest.raises(MetadataTrustError):
+ 163:         create_entra_authenticator(
+ 164:             make_config(),
+ 165:             document_fetcher=make_fetcher(public_jwk, wrong_issuer=True),
+ 166:         )
+ 167: 
+ 168: 
+ 169: def test_composition_rejects_discovery_host_not_allowlisted():
+ 170:     with pytest.raises(ValueError, match="trusted_metadata_hosts"):
+ 171:         make_config(
+ 172:             discovery_url="https://attacker.example/.well-known/openid-configuration"
+ 173:         )
+ 174: 
+ 175: 
+ 176: def test_invalid_header_does_not_load_jwks(identity):
+ 177:     public_jwk, _ = identity
+ 178:     calls = []
+ 179:     authenticator = create_entra_authenticator(
+ 180:         make_config(),
+ 181:         document_fetcher=make_fetcher(public_jwk, calls),
+ 182:     )
+ 183: 
+ 184:     with pytest.raises(BearerAuthenticationError):
+ 185:         authenticator.authenticate("Basic not-a-bearer-token")
+ 186: 
+ 187:     assert len(calls) == 1  # discovery only; no JWKS request
+ 188: 
+ 189: 
+ 190: def test_jwks_outage_fails_closed(identity):
+ 191:     public_jwk, issue_token = identity
+ 192:     authenticator = create_entra_authenticator(
+ 193:         make_config(),
+ 194:         document_fetcher=make_fetcher(public_jwk, fail_jwks=True),
+ 195:     )
+ 196: 
+ 197:     with pytest.raises(BearerAuthenticationError):
+ 198:         authenticator.authenticate("Bearer " + issue_token())
+ 199: 
+ 200: 
+ 201: def test_role_map_is_copied_and_immutable():
+ 202:     source = dict(ROLE_MAP)
+ 203:     config = make_config(approved_role_map=source)
+ 204:     source.clear()
+ 205: 
+ 206:     assert "CIRT.DFIR.Analyst" in config.approved_role_map
+ 207:     with pytest.raises(TypeError):
+ 208:         config.approved_role_map["CIRT.DFIR.SuperUser"] = ROLE_ADMINISTRATOR
+ 209: 
+ 210: 
+ 211: @pytest.mark.parametrize(
+ 212:     "overrides",
+ 213:     [
+ 214:         {"tenant_id": ""},
+ 215:         {"expected_issuer": ""},
+ 216:         {"expected_issuer": "https://user@login.microsoftonline.com/issuer"},
+ 217:         {"expected_issuer": "https://login.microsoftonline.com/issuer?x=1"},
+ 218:         {"expected_issuer": "https://login.microsoftonline.com/issuer#fragment"},
+ 219:         {"expected_issuer": "https://login.microsoftonline.com:444/issuer"},
+ 220:         {"expected_audience": ""},
+ 221:         {"discovery_url": "http://login.microsoftonline.com/discovery"},
+ 222:         {"trusted_metadata_hosts": frozenset()},
+ 223:         {"allowed_jwks_hosts": frozenset()},
+ 224:         {"approved_role_map": {}},
+ 225:         {"approved_role_map": {"CIRT.DFIR.Analyst": "SuperUser"}},
+ 226:         {"jwks_ttl_seconds": 0},
+ 227:         {"timeout_seconds": 11},
+ 228:         {"max_response_bytes": 0},
+ 229:     ],
+ 230: )
+ 231: def test_invalid_configuration_is_rejected(overrides):
+ 232:     with pytest.raises(ValueError):
+ 233:         make_config(**overrides)
+
+=== FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_entra_bearer_adapter.py ===
+   1: import json
+   2: import time
+   3: 
+   4: import jwt
+   5: import pytest
+   6: from cryptography.hazmat.primitives.asymmetric import rsa
+   7: 
+   8: from app.entra_bearer_adapter import (
+   9:     BearerAuthenticationError,
+  10:     principal_from_authorization_header,
+  11: )
+  12: from app.entra_jwks import build_jwks_resolver
+  13: from app.security import (
+  14:     ROLE_ADMINISTRATOR,
+  15:     ROLE_ANALYST,
+  16:     ROLE_VIEWER,
+  17:     AuthorizationDenied,
+  18:     authorize,
+  19: )
+  20: 
+  21: TENANT = "11111111-2222-4333-8444-555555555555"
+  22: ISSUER = f"https://login.microsoftonline.com/{TENANT}/v2.0"
+  23: AUDIENCE = "api://synthetic-cirt-dfir-api"
+  24: ROLE_MAP = {
+  25:     "CIRT.DFIR.Viewer": ROLE_VIEWER,
+  26:     "CIRT.DFIR.Analyst": ROLE_ANALYST,
+  27:     "CIRT.DFIR.Administrator": ROLE_ADMINISTRATOR,
+  28: }
+  29: 
+  30: 
+  31: @pytest.fixture
+  32: def identity():
+  33:     private_key = rsa.generate_private_key(
+  34:         public_exponent=65537,
+  35:         key_size=2048,
+  36:     )
+  37:     public_jwk = json.loads(
+  38:         jwt.algorithms.RSAAlgorithm.to_jwk(private_key.public_key())
+  39:     )
+  40:     public_jwk.update({
+  41:         "kid": "offline-adapter-test-key",
+  42:         "use": "sig",
+  43:         "alg": "RS256",
+  44:     })
+  45:     resolver = build_jwks_resolver({"keys": [public_jwk]})
+  46: 
+  47:     def issue_token(roles=None, **overrides):
+  48:         now = int(time.time())
+  49:         claims = {
+  50:             "iss": ISSUER,
+  51:             "aud": AUDIENCE,
+  52:             "sub": "synthetic-adapter-user",
+  53:             "tid": TENANT,
+  54:             "iat": now,
+  55:             "nbf": now,
+  56:             "exp": now + 300,
+  57:             "roles": roles if roles is not None else ["CIRT.DFIR.Analyst"],
+  58:         }
+  59:         claims.update(overrides)
+  60:         return jwt.encode(
+  61:             claims,
+  62:             private_key,
+  63:             algorithm="RS256",
+  64:             headers={"kid": "offline-adapter-test-key"},
+  65:         )
+  66: 
+  67:     return resolver, issue_token
+  68: 
+  69: 
+  70: def authenticate(header, resolver):
+  71:     return principal_from_authorization_header(
+  72:         header,
+  73:         trusted_key_resolver=resolver,
+  74:         expected_issuer=ISSUER,
+  75:         expected_audience=AUDIENCE,
+  76:         expected_tenant_id=TENANT,
+  77:         approved_role_map=ROLE_MAP,
+  78:     )
+  79: 
+  80: 
+  81: def test_valid_analyst_bearer_produces_principal(identity):
+  82:     resolver, issue = identity
+  83:     principal = authenticate("Bearer " + issue(), resolver)
+  84:     assert principal.subject == "synthetic-adapter-user"
+  85:     assert principal.roles == frozenset({ROLE_ANALYST})
+  86:     assert authorize(principal, "cases:read")
+  87:     assert authorize(principal, "cases:update")
+  88: 
+  89: 
+  90: def test_viewer_cannot_update(identity):
+  91:     resolver, issue = identity
+  92:     principal = authenticate(
+  93:         "Bearer " + issue(roles=["CIRT.DFIR.Viewer"]),
+  94:         resolver,
+  95:     )
+  96:     with pytest.raises(AuthorizationDenied):
+  97:         authorize(principal, "cases:update")
+  98: 
+  99: 
+ 100: def test_administrator_can_pass_admin_permission(identity):
+ 101:     resolver, issue = identity
+ 102:     principal = authenticate(
+ 103:         "Bearer " + issue(roles=["CIRT.DFIR.Administrator"]),
+ 104:         resolver,
+ 105:     )
+ 106:     assert authorize(principal, "users:manage")
+ 107:     assert authorize(principal, "audit:read")
+ 108: 
+ 109: 
+ 110: @pytest.mark.parametrize(
+ 111:     "header",
+ 112:     [
+ 113:         None,
+ 114:         "",
+ 115:         "Basic abc",
+ 116:         "Bearer",
+ 117:         "Bearer ",
+ 118:         "Bearer first second",
+ 119:     ],
+ 120: )
+ 121: def test_missing_or_malformed_header_is_rejected(identity, header):
+ 122:     resolver, _ = identity
+ 123:     with pytest.raises(BearerAuthenticationError):
+ 124:         authenticate(header, resolver)
+ 125: 
+ 126: 
+ 127: def test_tampered_token_is_rejected(identity):
+ 128:     resolver, issue = identity
+ 129:     token = issue()
+ 130:     header, payload, signature = token.split(".")
+ 131:     altered = ("A" if signature[0] != "A" else "B") + signature[1:]
+ 132:     with pytest.raises(BearerAuthenticationError):
+ 133:         authenticate(f"Bearer {header}.{payload}.{altered}", resolver)
+ 134: 
+ 135: 
+ 136: def test_wrong_tenant_is_rejected(identity):
+ 137:     resolver, issue = identity
+ 138:     with pytest.raises(BearerAuthenticationError):
+ 139:         authenticate(
+ 140:             "Bearer " + issue(tid="aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"),
+ 141:             resolver,
+ 142:         )
+ 143: 
+ 144: 
+ 145: def test_unapproved_role_is_rejected(identity):
+ 146:     resolver, issue = identity
+ 147:     with pytest.raises(BearerAuthenticationError):
+ 148:         authenticate(
+ 149:             "Bearer " + issue(roles=["CIRT.DFIR.Unapproved"]),
+ 150:             resolver,
+ 151:         )
+ 152: 
+ 153: 
+ 154: def test_empty_roles_are_rejected(identity):
+ 155:     resolver, issue = identity
+ 156:     with pytest.raises(BearerAuthenticationError):
+ 157:         authenticate("Bearer " + issue(roles=[]), resolver)
+ 158: 
+ 159: def test_wrong_audience_is_rejected(identity):
+ 160:     resolver, issue = identity
+ 161:     with pytest.raises(BearerAuthenticationError):
+ 162:         authenticate("Bearer " + issue(aud="api://wrong-synthetic-audience"), resolver)
+ 163: 
+ 164: 
+ 165: def test_wrong_issuer_is_rejected(identity):
+ 166:     resolver, issue = identity
+ 167:     with pytest.raises(BearerAuthenticationError):
+ 168:         authenticate("Bearer " + issue(iss="https://invalid.example/tenant/v2.0"), resolver)
+ 169: 
+ 170: 
+ 171: def test_expired_token_is_rejected(identity):
+ 172:     resolver, issue = identity
+ 173:     with pytest.raises(BearerAuthenticationError):
+ 174:         authenticate("Bearer " + issue(exp=int(time.time()) - 60), resolver)
+ 175: 
+ 176: 
+ 177: def test_future_issued_token_is_rejected(identity):
+ 178:     resolver, issue = identity
+ 179:     with pytest.raises(BearerAuthenticationError):
+ 180:         authenticate("Bearer " + issue(iat=int(time.time()) + 120), resolver)
+
+=== FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_api_auth_gate.py ===
+   1: """API access-control tests using synthetic identities only."""
+   2: from fastapi.testclient import TestClient
+   3: 
+   4: from app.auth_dependencies import get_current_principal
+   5: from app.main import app
+   6: from app.security import Principal, ROLE_ADMINISTRATOR, ROLE_VIEWER
+   7: 
+   8: client = TestClient(app)
+   9: 
+  10: def test_demo_cases_reject_unauthenticated_request():
+  11:     app.dependency_overrides.clear()
+  12:     try:
+  13:         response = client.get("/api/v1/demo/cases")
+  14:         assert response.status_code == 401
+  15:         assert "Authentication" in response.json()["detail"]
+  16:     finally:
+  17:         app.dependency_overrides.clear()
+  18: 
+  19: def test_case_update_rejects_unauthenticated_request():
+  20:     app.dependency_overrides.clear()
+  21:     try:
+  22:         response = client.patch(
+  23:             "/api/v1/cases/DEMO-2026-001",
+  24:             json={"status": "Contained"},
+  25:         )
+  26:         assert response.status_code == 401
+  27:     finally:
+  28:         app.dependency_overrides.clear()
+  29: 
+  30: def test_viewer_cannot_update_case():
+  31:     app.dependency_overrides[get_current_principal] = lambda: Principal(
+  32:         subject="synthetic-test-viewer",
+  33:         roles=frozenset({ROLE_VIEWER}),
+  34:     )
+  35:     try:
+  36:         response = client.patch(
+  37:             "/api/v1/cases/DEMO-2026-001",
+  38:             json={"status": "Contained"},
+  39:         )
+  40:         assert response.status_code == 403
+  41:     finally:
+  42:         app.dependency_overrides.clear()
+  43: 
+  44: def test_case_update_audit_actor_comes_from_principal(tmp_path, monkeypatch):
+  45:     import app.case_store as case_store
+  46:     from app.case_repository import connect, initialize, create_case, list_audit_events
+  47:     from app.security import ROLE_ANALYST
+  48: 
+  49:     database_path = tmp_path / "audit-attribution.sqlite"
+  50:     schema_path = __import__("pathlib").Path(__file__).resolve().parents[1] / "schema.sql"
+  51:     if not schema_path.is_file():
+  52:         # Find the project's schema file without touching the configured application database.
+  53:         candidates = list(__import__("pathlib").Path(__file__).resolve().parents[1].rglob("*.sql"))
+  54:         assert candidates, "No SQL schema file found for isolated test database."
+  55:         schema_path = candidates[0]
+  56: 
+  57:     initialize(database_path, schema_path)
+  58:     db = connect(database_path)
+  59:     try:
+  60:         create_case(
+  61:             db,
+  62:             case_id="TEST-AUDIT-001",
+  63:             title="Synthetic audit attribution test",
+  64:             severity="Medium",
+  65:             status="Triage",
+  66:             actor_id="synthetic-test-creator",
+  67:             timestamp="2026-01-01T00:00:00+00:00",
+  68:         )
+  69:     finally:
+  70:         db.close()
+  71: 
+  72:     monkeypatch.setattr(case_store, "DB_PATH", database_path)
+  73:     app.dependency_overrides[get_current_principal] = lambda: Principal(
+  74:         subject="synthetic-audit-analyst-117",
+  75:         roles=frozenset({ROLE_ANALYST}),
+  76:     )
+  77:     try:
+  78:         response = client.patch(
+  79:             "/api/v1/cases/TEST-AUDIT-001",
+  80:             json={"status": "Contained"},
+  81:         )
+  82:         assert response.status_code == 200, response.text
+  83: 
+  84:         db = connect(database_path)
+  85:         try:
+  86:             events = list_audit_events(db, "TEST-AUDIT-001")
+  87:         finally:
+  88:             db.close()
+  89: 
+  90:         update_events = [event for event in events if event["event_type"] == "CASE_UPDATED"]
+  91:         assert len(update_events) == 1
+  92:         assert update_events[0]["actor_id"] == "synthetic-audit-analyst-117"
+  93:     finally:
+  94:         app.dependency_overrides.clear()
+  95: 
+  96: def test_admin_can_pass_case_update_authorization_gate():
+  97:     # Dependency override represents an already validated synthetic principal.
+  98:     # This test checks authorization only; it does not perform a database update.
+  99:     from app.auth_dependencies import require_permission
+ 100:     from fastapi import Depends, FastAPI
+ 101:     from fastapi.testclient import TestClient as LocalClient
+ 102: 
+ 103:     test_app = FastAPI()
+ 104:     test_app.dependency_overrides[get_current_principal] = lambda: Principal(
+ 105:         subject="synthetic-test-admin",
+ 106:         roles=frozenset({ROLE_ADMINISTRATOR}),
+ 107:     )
+ 108: 
+ 109:     @test_app.get("/test-protected-update-permission")
+ 110:     def protected_permission_check(principal=Depends(require_permission("cases:update"))):
+ 111:         return {"authorized": True}
+ 112: 
+ 113:     response = LocalClient(test_app).get("/test-protected-update-permission")
+ 114:     assert response.status_code == 200
+ 115:     assert response.json()["authorized"] is True
+ 116: 
+
+=== FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_api_oidc_fail_closed.py ===
+   1: from fastapi.testclient import TestClient
+   2: 
+   3: from app.auth_dependencies import get_current_principal
+   4: from app.main import app
+   5: 
+   6: 
+   7: client = TestClient(app)
+   8: 
+   9: 
+  10: def test_missing_bearer_token_is_rejected():
+  11:     app.dependency_overrides.clear()
+  12:     try:
+  13:         response = client.get("/api/v1/demo/cases")
+  14:         assert response.status_code == 401
+  15:     finally:
+  16:         app.dependency_overrides.clear()
+  17: 
+  18: 
+  19: def test_malformed_bearer_token_is_rejected():
+  20:     app.dependency_overrides.clear()
+  21:     try:
+  22:         response = client.get(
+  23:             "/api/v1/demo/cases",
+  24:             headers={"Authorization": "Bearer not.a.valid.token"},
+  25:         )
+  26:         assert response.status_code == 401
+  27:     finally:
+  28:         app.dependency_overrides.clear()
+  29: 
+  30: 
+  31: def test_case_update_without_authentication_is_rejected():
+  32:     app.dependency_overrides.clear()
+  33:     try:
+  34:         response = client.patch(
+  35:             "/api/v1/cases/DEMO-2026-001",
+  36:             json={"status": "Contained"},
+  37:         )
+  38:         assert response.status_code == 401
+  39:     finally:
+  40:         app.dependency_overrides.clear()
+
+=== REVIEW STATUS ===
+Source and tests were read only.
+No source files or environment variables were changed.
+Do not expose tokens, secrets, or private key material in shared output.

@@ -1,0 +1,14 @@
+﻿CIRT DFIR PROFESSIONAL - PHASE 8B.48 RECOVERY
+Timestamp: 2026-10-16T01:46:23.0417725+08:00
+Installed PyJWT: 
+Installed cryptography: 
+PyJWT exact pin verified once: True
+cryptography exact pin verified once: True
+Original manifest backup: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\Phase8B48_Recovery_20261016_014622
+Requirements manifest: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\requirements.txt
+Packages installed: NO
+Server started: NO
+Microsoft endpoints contacted: NO
+Authentication gate changed: NO
+Production authentication enabled: NO
+Overall result: PASS - MANIFEST VERIFIED

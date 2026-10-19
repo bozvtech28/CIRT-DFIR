@@ -1,0 +1,239 @@
+﻿CIRT DFIR PROFESSIONAL - PHASE 8B.57
+Timestamp: 2026-10-16T01:57:29.2354691+08:00
+Scope: read-only source review
+Source modified: NO
+Network requests: NONE
+Production authentication changed: NO
+
+============================================================
+FILE: app\auth_dependencies.py
+============================================================
+Line count: 41
+5: Never trust roles supplied by a browser or request body.
+16: def get_current_principal() -> Principal:
+18: raise HTTPException(
+20: detail="Authentication is not configured. Access is denied by default.",
+21: headers={"WWW-Authenticate": "Bearer"},
+24: def require_permission(permission: str):
+25: """Require a validated principal and enforce the RBAC permission."""
+26: def dependency(principal: Principal = Depends(get_current_principal)) -> Principal:
+28: authorize(principal, permission)
+30: raise HTTPException(
+33: headers={"WWW-Authenticate": "Bearer"},
+36: raise HTTPException(
+38: detail="Insufficient permission.",
+
+============================================================
+FILE: app\entra_metadata_client.py
+============================================================
+Line count: 167
+1: """Provider-neutral Entra metadata/JWKS client primitives.
+5: approved tenant, issuer, discovery endpoint, and JWKS URI.
+18: class MetadataTrustError(ValueError):
+19: """Raised when discovery metadata or JWKS data is not trusted."""
+23: class TrustedMetadata:
+24: issuer: str
+25: jwks_uri: str
+28: def _require_https_url(value: str, field_name: str) -> str:
+46: def validate_discovery_document(
+49: expected_issuer: str,
+50: allowed_jwks_hosts: set[str],
+61: if not isinstance(expected_issuer, str) or not expected_issuer.strip():
+62: raise MetadataTrustError("Expected issuer is not configured")
+64: issuer = document.get("issuer")
+65: jwks_uri = document.get("jwks_uri")
+67: if not isinstance(issuer, str) or issuer != expected_issuer:
+68: raise MetadataTrustError("Discovery issuer does not match configuration")
+70: _require_https_url(issuer, "issuer")
+71: _require_https_url(jwks_uri, "jwks_uri")
+73: parsed_jwks = urlparse(jwks_uri)
+76: for host in allowed_jwks_hosts
+80: if (parsed_jwks.hostname or "").lower().rstrip(".") not in allowed_hosts:
+81: raise MetadataTrustError("JWKS hostname is not in the approved allowlist")
+83: if parsed_jwks.query:
+84: raise MetadataTrustError("JWKS URI query parameters are not allowed")
+85: if parsed_jwks.fragment:
+86: raise MetadataTrustError("JWKS URI fragments are not allowed")
+88: return TrustedMetadata(issuer=issuer, jwks_uri=jwks_uri)
+91: def fetch_trusted_document(
+96: timeout_seconds: float = 3.0,
+98: """Use an injected transport to fetch JSON from an allowlisted HTTPS host.
+100: The injected transport must enforce the timeout and validate every
+101: redirect destination. This function never follows redirects itself.
+106: if timeout_seconds <= 0 or timeout_seconds > 10:
+107: raise MetadataTrustError("Timeout must be greater than 0 and at most 10 seconds")
+117: raise MetadataTrustError("Request hostname is not in the approved allowlist")
+119: result = transport(url, timeout_seconds)
+127: def validate_jwks_document(document: Any) -> dict[str, Any]:
+128: """Perform structural checks before the existing offline JWKS resolver."""
+131: raise MetadataTrustError("JWKS document must be a JSON object")
+135: raise MetadataTrustError("JWKS must contain a non-empty keys array")
+141: raise MetadataTrustError("Each JWKS key must be a JSON object")
+145: raise MetadataTrustError("Each JWKS key must have a non-empty kid")
+148: raise MetadataTrustError("JWKS contains duplicate key IDs")
+154: raise MetadataTrustError("JWKS key must be designated for signatures")
+155: if key.get("alg", "RS256") != "RS256":
+156: raise MetadataTrustError("Only RS256 signing keys are accepted")
+160: raise MetadataTrustError("JWKS must not contain private key parameters")
+165: raise MetadataTrustError("RSA key exponent is missing")
+
+============================================================
+FILE: app\entra_jwks_cache.py
+============================================================
+Line count: 107
+1: """Bounded in-memory JWKS cache with explicit refresh.
+6: Expired keys are never returned by get(). A failed refresh does not
+7: extend the previous expiry time. Callers must provide trusted loading
+20: validate_jwks_document,
+24: class JWKSCacheError(RuntimeError):
+25: """Raised when trusted JWKS data cannot be loaded or validated."""
+28: class JWKSCache:
+29: """Thread-safe in-memory JWKS cache with bounded TTL."""
+31: def __init__(
+54: self._expires_at: float | None = None
+56: def _load_and_validate(self) -> dict[str, Any]:
+59: validated = validate_jwks_document(document)
+60: # Never expose the loader's mutable object to the cache.
+63: raise JWKSCacheError("Loaded JWKS failed validation") from exc
+65: raise JWKSCacheError("JWKS loader failed") from exc
+67: def get(self) -> dict[str, Any]:
+68: """Return a copy of cached keys, loading only when missing/expired."""
+74: and self._expires_at is not None
+75: and now < self._expires_at
+79: # Do not return expired keys if the loader fails.
+82: self._expires_at = self._clock() + self._ttl_seconds
+85: def refresh(self) -> dict[str, Any]:
+90: self._expires_at = self._clock() + self._ttl_seconds
+93: def invalidate(self) -> None:
+97: self._expires_at = None
+100: def is_valid(self) -> bool:
+101: """Whether a non-expired cache entry currently exists."""
+105: and self._expires_at is not None
+106: and self._clock() < self._expires_at
+
+============================================================
+FILE: app\entra_token_verifier.py
+============================================================
+Line count: 76
+6: OpenID Connect metadata/JWKS, with HTTPS and safe key-rotation handling.
+8: - Never use this verifier until tenant, issuer, and audience are approved.
+19: def verify_entra_access_token(
+23: expected_issuer: str,
+24: expected_audience: str,
+25: expected_tenant_id: str,
+27: """Verify an RS256 token against a trusted key resolver and fixed config.
+30: trusted JWKS source. This function deliberately performs no network access.
+33: raise InvalidTokenError("A non-empty bearer token is required.")
+36: ("expected_issuer", expected_issuer),
+37: ("expected_audience", expected_audience),
+38: ("expected_tenant_id", expected_tenant_id),
+46: # The key resolver must select a key from a trusted JWKS source.
+52: claims = jwt.decode(
+55: algorithms=["RS256"],
+56: issuer=expected_issuer,
+57: audience=expected_audience,
+59: "require": ["exp", "iat", "nbf", "iss", "aud", "sub", "tid"],
+61: "verify_exp": True,
+63: "verify_nbf": True,
+73: if claims.get("tid") != expected_tenant_id:
+
+============================================================
+FILE: app\entra_jwks.py
+============================================================
+Line count: 78
+1: """Offline JWKS key selector for the Entra verifier prototype.
+3: No HTTP calls are made by this module. The JWKS document must come from a
+14: def build_jwks_resolver(jwks: Mapping[str, Any]):
+15: """Build a resolver from a supplied JWKS document.
+18: does not establish that the supplied JWKS document is authentic.
+20: if not isinstance(jwks, Mapping):
+21: raise ValueError("JWKS must be a mapping.")
+23: keys = jwks.get("keys")
+25: raise ValueError("JWKS must contain a non-empty keys array.")
+31: raise ValueError("Every JWKS key must be an object.")
+35: raise ValueError("Every JWKS key must have a non-empty kid.")
+44: raise ValueError("JWKS key use must be sig.")
+46: if item.get("alg", "RS256") != "RS256":
+47: raise ValueError("Only RS256 JWKS keys are supported.")
+49: # A public JWKS must not include RSA private-key parameters.
+54: parsed = jwt.PyJWK.from_dict(dict(item), algorithm="RS256")
+59: def resolve(token: str):
+61: header = jwt.get_unverified_header(token)
+65: if header.get("alg") != "RS256":
+66: raise InvalidTokenError("Only RS256 tokens are accepted.")
+74: raise InvalidTokenError("JWT kid was not found in the trusted JWKS set.")
+
+============================================================
+FILE: app\oidc_claims.py
+============================================================
+Line count: 72
+6: already checked the signature, permitted algorithm, issuer metadata/JWKS,
+17: class InvalidOIDCClaims(ValueError):
+21: def validate_verified_claims(
+24: expected_issuer: str,
+25: expected_audience: str,
+32: if not expected_issuer or not expected_audience:
+33: raise ValueError("Expected issuer and audience must be configured.")
+35: issuer = claims.get("iss")
+36: if not isinstance(issuer, str) or issuer != expected_issuer:
+37: raise InvalidOIDCClaims("Token issuer is invalid.")
+39: audience = claims.get("aud")
+40: if isinstance(audience, str):
+41: audiences = [audience]
+42: elif isinstance(audience, list) and all(
+43: isinstance(item, str) and item for item in audience
+45: audiences = audience
+47: raise InvalidOIDCClaims("Token audience is missing or malformed.")
+49: if expected_audience not in audiences:
+50: raise InvalidOIDCClaims("Token audience is invalid.")
+56: expiry = claims.get("exp")
+57: if isinstance(expiry, bool) or not isinstance(expiry, (int, float)):
+58: raise InvalidOIDCClaims("Token expiry is missing or malformed.")
+61: if expiry <= current_time:
+62: raise InvalidOIDCClaims("Token has expired.")
+64: if "nbf" in claims:
+65: not_before = claims["nbf"]
+71: # Return a copy; do not manufacture roles or trust client-provided role data.
+
+============================================================
+FILE: app\security.py
+============================================================
+Line count: 83
+12: ROLE_ADMINISTRATOR = "Administrator"
+13: ROLE_ANALYST = "DFIR Analyst"
+14: ROLE_VIEWER = "Viewer"
+16: KNOWN_ROLES: FrozenSet[str] = frozenset({
+17: ROLE_ADMINISTRATOR,
+18: ROLE_ANALYST,
+19: ROLE_VIEWER,
+22: PERMISSIONS = {
+24: ROLE_ADMINISTRATOR,
+25: ROLE_ANALYST,
+26: ROLE_VIEWER,
+29: ROLE_ADMINISTRATOR,
+30: ROLE_ANALYST,
+33: ROLE_ADMINISTRATOR,
+36: ROLE_ADMINISTRATOR,
+42: class Principal:
+43: """Identity and roles supplied by a trusted authentication layer."""
+45: roles: FrozenSet[str]
+48: class AuthenticationRequired(PermissionError):
+52: class AuthorizationDenied(PermissionError):
+53: """Raised when the principal lacks the required permission."""
+56: def validate_principal(principal: Principal | None) -> Principal:
+63: if not principal.roles:
+64: raise AuthorizationDenied("Principal has no assigned roles.")
+65: if not principal.roles.issubset(KNOWN_ROLES):
+66: raise AuthorizationDenied("Principal contains an unknown role.")
+70: def authorize(principal: Principal | None, permission: str) -> bool:
+71: """Authorize a trusted principal for a named permission.
+78: allowed_roles = PERMISSIONS.get(permission)
+79: if allowed_roles is None:
+80: raise AuthorizationDenied("Unknown permission.")
+81: if trusted.roles.isdisjoint(allowed_roles):
+82: raise AuthorizationDenied("Permission denied.")
+
+=== REVIEW CONCLUSION ===
+This is a pattern-based source inventory, not a cryptographic audit.
+Do not enable production Entra authentication based on keyword matches.
+Production authentication remains fail-closed until implementation is reviewed.

@@ -1,0 +1,248 @@
+test_audit_event_cannot_be_deleted (test_case_repository.RepositoryTests.test_audit_event_cannot_be_deleted) ... ERROR
+test_audit_event_cannot_be_updated (test_case_repository.RepositoryTests.test_audit_event_cannot_be_updated) ... ERROR
+test_create_and_retrieve_case (test_case_repository.RepositoryTests.test_create_and_retrieve_case) ... ERROR
+test_creation_records_audit_event (test_case_repository.RepositoryTests.test_creation_records_audit_event) ... ERROR
+test_duplicate_case_id_is_rejected (test_case_repository.RepositoryTests.test_duplicate_case_id_is_rejected) ... ERROR
+test_empty_actor_is_rejected (test_case_repository.RepositoryTests.test_empty_actor_is_rejected) ... ERROR
+test_invalid_severity_is_rejected (test_case_repository.RepositoryTests.test_invalid_severity_is_rejected) ... ERROR
+test_list_cases (test_case_repository.RepositoryTests.test_list_cases) ... ERROR
+test_missing_case_returns_none (test_case_repository.RepositoryTests.test_missing_case_returns_none) ... ERROR
+
+======================================================================
+ERROR: test_audit_event_cannot_be_deleted (test_case_repository.RepositoryTests.test_audit_event_cannot_be_deleted)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\shutil.py", line 633, in _rmtree_unsafe
+    os.unlink(fullname)
+PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\BOZVLE~1\\AppData\\Local\\Temp\\tmpwng6eu8s\\synthetic-test.sqlite'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\test_case_repository.py", line 24, in tearDown
+    self.temp.cleanup()
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\tempfile.py", line 954, in cleanup
+    self._rmtree(self.name, ignore_errors=self._ignore_cleanup_errors)
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\tempfile.py", line 934, in _rmtree
+    _shutil.rmtree(name, onexc=onexc)
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\shutil.py", line 781, in rmtree
+    return _rmtree_unsafe(path, onexc)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\shutil.py", line 635, in _rmtree_unsafe
+    onexc(os.unlink, fullname, err)
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\tempfile.py", line 909, in onexc
+    _os.unlink(path)
+PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\BOZVLE~1\\AppData\\Local\\Temp\\tmpwng6eu8s\\synthetic-test.sqlite'
+
+======================================================================
+ERROR: test_audit_event_cannot_be_updated (test_case_repository.RepositoryTests.test_audit_event_cannot_be_updated)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\shutil.py", line 633, in _rmtree_unsafe
+    os.unlink(fullname)
+PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\BOZVLE~1\\AppData\\Local\\Temp\\tmpvqyn1_1o\\synthetic-test.sqlite'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\test_case_repository.py", line 24, in tearDown
+    self.temp.cleanup()
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\tempfile.py", line 954, in cleanup
+    self._rmtree(self.name, ignore_errors=self._ignore_cleanup_errors)
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\tempfile.py", line 934, in _rmtree
+    _shutil.rmtree(name, onexc=onexc)
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\shutil.py", line 781, in rmtree
+    return _rmtree_unsafe(path, onexc)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\shutil.py", line 635, in _rmtree_unsafe
+    onexc(os.unlink, fullname, err)
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\tempfile.py", line 909, in onexc
+    _os.unlink(path)
+PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\BOZVLE~1\\AppData\\Local\\Temp\\tmpvqyn1_1o\\synthetic-test.sqlite'
+
+======================================================================
+ERROR: test_create_and_retrieve_case (test_case_repository.RepositoryTests.test_create_and_retrieve_case)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\shutil.py", line 633, in _rmtree_unsafe
+    os.unlink(fullname)
+PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\BOZVLE~1\\AppData\\Local\\Temp\\tmpcou_0kgw\\synthetic-test.sqlite'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\test_case_repository.py", line 24, in tearDown
+    self.temp.cleanup()
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\tempfile.py", line 954, in cleanup
+    self._rmtree(self.name, ignore_errors=self._ignore_cleanup_errors)
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\tempfile.py", line 934, in _rmtree
+    _shutil.rmtree(name, onexc=onexc)
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\shutil.py", line 781, in rmtree
+    return _rmtree_unsafe(path, onexc)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\shutil.py", line 635, in _rmtree_unsafe
+    onexc(os.unlink, fullname, err)
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\tempfile.py", line 909, in onexc
+    _os.unlink(path)
+PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\BOZVLE~1\\AppData\\Local\\Temp\\tmpcou_0kgw\\synthetic-test.sqlite'
+
+======================================================================
+ERROR: test_creation_records_audit_event (test_case_repository.RepositoryTests.test_creation_records_audit_event)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\shutil.py", line 633, in _rmtree_unsafe
+    os.unlink(fullname)
+PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\BOZVLE~1\\AppData\\Local\\Temp\\tmphd0r1qvc\\synthetic-test.sqlite'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\test_case_repository.py", line 24, in tearDown
+    self.temp.cleanup()
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\tempfile.py", line 954, in cleanup
+    self._rmtree(self.name, ignore_errors=self._ignore_cleanup_errors)
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\tempfile.py", line 934, in _rmtree
+    _shutil.rmtree(name, onexc=onexc)
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\shutil.py", line 781, in rmtree
+    return _rmtree_unsafe(path, onexc)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\shutil.py", line 635, in _rmtree_unsafe
+    onexc(os.unlink, fullname, err)
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\tempfile.py", line 909, in onexc
+    _os.unlink(path)
+PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\BOZVLE~1\\AppData\\Local\\Temp\\tmphd0r1qvc\\synthetic-test.sqlite'
+
+======================================================================
+ERROR: test_duplicate_case_id_is_rejected (test_case_repository.RepositoryTests.test_duplicate_case_id_is_rejected)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\shutil.py", line 633, in _rmtree_unsafe
+    os.unlink(fullname)
+PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\BOZVLE~1\\AppData\\Local\\Temp\\tmp22zxwubb\\synthetic-test.sqlite'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\test_case_repository.py", line 24, in tearDown
+    self.temp.cleanup()
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\tempfile.py", line 954, in cleanup
+    self._rmtree(self.name, ignore_errors=self._ignore_cleanup_errors)
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\tempfile.py", line 934, in _rmtree
+    _shutil.rmtree(name, onexc=onexc)
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\shutil.py", line 781, in rmtree
+    return _rmtree_unsafe(path, onexc)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\shutil.py", line 635, in _rmtree_unsafe
+    onexc(os.unlink, fullname, err)
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\tempfile.py", line 909, in onexc
+    _os.unlink(path)
+PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\BOZVLE~1\\AppData\\Local\\Temp\\tmp22zxwubb\\synthetic-test.sqlite'
+
+======================================================================
+ERROR: test_empty_actor_is_rejected (test_case_repository.RepositoryTests.test_empty_actor_is_rejected)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\shutil.py", line 633, in _rmtree_unsafe
+    os.unlink(fullname)
+PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\BOZVLE~1\\AppData\\Local\\Temp\\tmpwizfptrp\\synthetic-test.sqlite'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\test_case_repository.py", line 24, in tearDown
+    self.temp.cleanup()
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\tempfile.py", line 954, in cleanup
+    self._rmtree(self.name, ignore_errors=self._ignore_cleanup_errors)
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\tempfile.py", line 934, in _rmtree
+    _shutil.rmtree(name, onexc=onexc)
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\shutil.py", line 781, in rmtree
+    return _rmtree_unsafe(path, onexc)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\shutil.py", line 635, in _rmtree_unsafe
+    onexc(os.unlink, fullname, err)
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\tempfile.py", line 909, in onexc
+    _os.unlink(path)
+PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\BOZVLE~1\\AppData\\Local\\Temp\\tmpwizfptrp\\synthetic-test.sqlite'
+
+======================================================================
+ERROR: test_invalid_severity_is_rejected (test_case_repository.RepositoryTests.test_invalid_severity_is_rejected)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\shutil.py", line 633, in _rmtree_unsafe
+    os.unlink(fullname)
+PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\BOZVLE~1\\AppData\\Local\\Temp\\tmprdxsju_b\\synthetic-test.sqlite'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\test_case_repository.py", line 24, in tearDown
+    self.temp.cleanup()
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\tempfile.py", line 954, in cleanup
+    self._rmtree(self.name, ignore_errors=self._ignore_cleanup_errors)
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\tempfile.py", line 934, in _rmtree
+    _shutil.rmtree(name, onexc=onexc)
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\shutil.py", line 781, in rmtree
+    return _rmtree_unsafe(path, onexc)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\shutil.py", line 635, in _rmtree_unsafe
+    onexc(os.unlink, fullname, err)
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\tempfile.py", line 909, in onexc
+    _os.unlink(path)
+PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\BOZVLE~1\\AppData\\Local\\Temp\\tmprdxsju_b\\synthetic-test.sqlite'
+
+======================================================================
+ERROR: test_list_cases (test_case_repository.RepositoryTests.test_list_cases)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\shutil.py", line 633, in _rmtree_unsafe
+    os.unlink(fullname)
+PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\BOZVLE~1\\AppData\\Local\\Temp\\tmpvp83dk4b\\synthetic-test.sqlite'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\test_case_repository.py", line 24, in tearDown
+    self.temp.cleanup()
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\tempfile.py", line 954, in cleanup
+    self._rmtree(self.name, ignore_errors=self._ignore_cleanup_errors)
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\tempfile.py", line 934, in _rmtree
+    _shutil.rmtree(name, onexc=onexc)
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\shutil.py", line 781, in rmtree
+    return _rmtree_unsafe(path, onexc)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\shutil.py", line 635, in _rmtree_unsafe
+    onexc(os.unlink, fullname, err)
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\tempfile.py", line 909, in onexc
+    _os.unlink(path)
+PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\BOZVLE~1\\AppData\\Local\\Temp\\tmpvp83dk4b\\synthetic-test.sqlite'
+
+======================================================================
+ERROR: test_missing_case_returns_none (test_case_repository.RepositoryTests.test_missing_case_returns_none)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\shutil.py", line 633, in _rmtree_unsafe
+    os.unlink(fullname)
+PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\BOZVLE~1\\AppData\\Local\\Temp\\tmpqc5ek6kq\\synthetic-test.sqlite'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\test_case_repository.py", line 24, in tearDown
+    self.temp.cleanup()
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\tempfile.py", line 954, in cleanup
+    self._rmtree(self.name, ignore_errors=self._ignore_cleanup_errors)
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\tempfile.py", line 934, in _rmtree
+    _shutil.rmtree(name, onexc=onexc)
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\shutil.py", line 781, in rmtree
+    return _rmtree_unsafe(path, onexc)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\shutil.py", line 635, in _rmtree_unsafe
+    onexc(os.unlink, fullname, err)
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\tempfile.py", line 909, in onexc
+    _os.unlink(path)
+PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\BOZVLE~1\\AppData\\Local\\Temp\\tmpqc5ek6kq\\synthetic-test.sqlite'
+
+----------------------------------------------------------------------
+Ran 9 tests in 0.372s
+
+FAILED (errors=9)

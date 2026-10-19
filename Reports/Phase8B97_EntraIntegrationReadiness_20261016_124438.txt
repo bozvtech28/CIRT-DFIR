@@ -1,0 +1,87 @@
+﻿Phase 8B.97 - Entra integration readiness
+Timestamp: 2026-10-16 12:44:38
+Mode: read-only source review plus backups
+No source files edited. No credentials created. No network requests.
+
+===== auth_dependencies.py =====
+Exists: True
+Backup: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\Phase8B97_20261016_124438\auth_dependencies.py
+Authentication gate review:
+16: def get_current_principal() -> Principal: 19: status_code=401, 20: detail="Authentication is not configured. Access is denied by default.", 24: def require_permission(permission: str): 26: def dependency(principal: Principal = Depends(get_current_principal)) -> Principal: 31: status_code=401,
+
+===== entra_bearer_adapter.py =====
+Exists: True
+Backup: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\Phase8B97_20261016_124438\entra_bearer_adapter.py
+Relevant functions:
+13: principal_from_verified_claims, 15: from app.entra_token_verifier import verify_entra_access_token 19: class BearerAuthenticationError(Exception): 23: def principal_from_authorization_header( 52: claims = verify_entra_access_token( 59: return principal_from_verified_claims(
+
+===== entra_token_verifier.py =====
+Exists: True
+Backup: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\Phase8B97_20261016_124438\entra_token_verifier.py
+Relevant functions:
+19: def verify_entra_access_token(
+
+===== entra_metadata_client.py =====
+Exists: True
+Backup: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\Phase8B97_20261016_124438\entra_metadata_client.py
+Relevant functions:
+18: class MetadataTrustError(ValueError): 23: class TrustedMetadata: 28: def _require_https_url(value: str, field_name: str) -> str: 46: def validate_discovery_document( 91: def fetch_trusted_document( 127: def validate_jwks_document(document: Any) -> dict[str, Any]:
+
+===== entra_http_transport.py =====
+Exists: True
+Backup: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\Phase8B97_20261016_124438\entra_http_transport.py
+Relevant functions:
+21: def fetch_json_document(
+
+===== entra_jwks.py =====
+Exists: True
+Backup: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\Phase8B97_20261016_124438\entra_jwks.py
+Relevant functions:
+14: def build_jwks_resolver(jwks: Mapping[str, Any]):
+
+===== entra_jwks_cache.py =====
+Exists: True
+Backup: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\Phase8B97_20261016_124438\entra_jwks_cache.py
+Relevant functions:
+20: validate_jwks_document, 24: class JWKSCacheError(RuntimeError): 28: class JWKSCache: 59: validated = validate_jwks_document(document) 63: raise JWKSCacheError("Loaded JWKS failed validation") from exc 65: raise JWKSCacheError("JWKS loader failed") from exc
+
+===== entra_principal.py =====
+Exists: True
+Backup: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\Phase8B97_20261016_124438\entra_principal.py
+Relevant functions:
+4: Only pass the claims returned by verify_entra_access_token after successful 17: class PrincipalMappingError(ValueError): 21: def principal_from_verified_claims(
+
+===== security.py =====
+Exists: True
+Backup: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\Phase8B97_20261016_124438\security.py
+
+===== main.py =====
+Exists: True
+Backup: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\Phase8B97_20261016_124438\main.py
+Protected routes and audit attribution:
+6: from app.auth_dependencies import require_permission 57: @app.get("/api/v1/health", response_model=HealthResponse) 64: @app.patch("/api/v1/cases/{case_id}", response_model=DemoCase, dependencies=[Depends(require_permission("cases:update"))]) 83: actor_id="DEVELOPMENT-API", 103: @app.get("/api/v1/demo/cases", response_model=list[DemoCase], dependencies=[Depends(require_permission("cases:read"))])
+
+===== Frontend configuration =====
+Example file exists: True
+Local .env exists: False
+Local .env contents were not read or displayed.
+
+===== Readiness status =====
+Existing API authentication gate remains fail-closed: True
+Live Entra authentication: NOT CONFIGURED
+Adapter connected to FastAPI: NOT YET
+Production readiness: NOT APPROVED
+
+Required organization-approved values:
+- Tenant ID
+- Exact issuer URL
+- API audience / Application ID URI
+- SPA client ID
+- API delegated scope
+- Exact application role values and role-to-permission mapping
+- Approved HTTPS discovery metadata and JWKS trust configuration
+- Redirect URI and authorized deployment origins
+
+Next action: obtain these values from the organization's Entra administrator.
+Do not put client secrets in VITE_ frontend variables.
+Do not disable fail-closed authentication to make the application appear operational.

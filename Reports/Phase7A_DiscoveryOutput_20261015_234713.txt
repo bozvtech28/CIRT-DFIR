@@ -1,0 +1,39 @@
+=== REPOSITORY FUNCTION ===
+update_case present: True
+
+=== TEST FILE STRUCTURE ===
+0015: indent=0 | class RepositoryTests(unittest.TestCase):
+0037: indent=4 |     def test_create_and_retrieve_case(self):
+0042: indent=4 |     def test_list_cases(self):
+0050: indent=4 |     def test_missing_case_returns_none(self):
+0053: indent=4 |     def test_creation_records_audit_event(self):
+0061: indent=4 |     def test_invalid_severity_is_rejected(self):
+0073: indent=4 |     def test_empty_actor_is_rejected(self):
+0085: indent=4 |     def test_duplicate_case_id_is_rejected(self):
+0090: indent=4 |     def test_audit_event_cannot_be_updated(self):
+0097: indent=4 |     def test_audit_event_cannot_be_deleted(self):
+0107: indent=4 |     def test_update_case_records_before_and_after_audit(self):
+0129: indent=4 |     def test_update_missing_case_returns_none(self):
+0140: indent=4 |     def test_update_rejects_invalid_status(self):
+0152: indent=4 |     def test_update_rejects_empty_actor(self):
+0164: indent=4 |     def test_update_rejects_no_change(self):
+
+=== UNITTEST DISCOVERY ===
+Top-level suite count: 9
+Class RepositoryTests: 9 tests
+  test_audit_event_cannot_be_deleted
+  test_audit_event_cannot_be_updated
+  test_create_and_retrieve_case
+  test_creation_records_audit_event
+  test_duplicate_case_id_is_rejected
+  test_empty_actor_is_rejected
+  test_invalid_severity_is_rejected
+  test_list_cases
+  test_missing_case_returns_none
+
+=== LIFECYCLE TEST DEFINITIONS ===
+test_update_case_records_before_and_after_audit: module-level function=False
+test_update_missing_case_returns_none: module-level function=False
+test_update_rejects_invalid_status: module-level function=False
+test_update_rejects_empty_actor: module-level function=False
+test_update_rejects_no_change: module-level function=False

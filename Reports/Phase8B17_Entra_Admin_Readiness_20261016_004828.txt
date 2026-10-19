@@ -1,0 +1,14 @@
+﻿CIRT DFIR PROFESSIONAL - PHASE 8B.17
+Timestamp: 2026-10-16T00:48:28.3540294+08:00
+Purpose: Entra administrator readiness checklist
+Checklist: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\docs\Phase8B17_Entra_Admin_Readiness_Checklist.md
+Previous preflight: Phase 8B.16
+Tenant ID configured: NO (previous preflight)
+API client ID configured: NO (previous preflight)
+Production OIDC verification: NOT IMPLEMENTED
+Trusted Entra role mapping: NOT IMPLEMENTED
+Server started: NO
+Microsoft endpoint contacted: NO
+Packages installed: NO
+Application source changed: NO
+Next action: obtain approved app-registration details and security requirements from the Entra administrator.

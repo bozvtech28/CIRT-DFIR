@@ -1,0 +1,130 @@
+﻿Phase 6E - Schema Reinitialization Diagnostic
+Timestamp: 2026-10-15 23:38:10
+Mode: Read-only source inspection
+Database opened or modified: No
+Source files modified: No
+
+=== case_repository.py: initialize() ===
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py:4:from typing import Any
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py:5:
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py:6:
+> C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py:7:def connect(database_path: str | Path) -> sqlite3.Connection:
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py:8:    connection = sqlite3.connect(str(database_path))
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py:9:    connection.row_factory = sqlite3.Row
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py:10:    connection.execute("PRAGMA foreign_keys = ON")
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py:11:    return connection
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py:12:
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py:13:
+  from typing import Any
+  
+  
+      connection = sqlite3.connect(str(database_path))
+      connection.row_factory = sqlite3.Row
+      connection.execute("PRAGMA foreign_keys = ON")
+      return connection
+  
+  
+  def initialize(database_path: str | Path, schema_path: str | Path) -> None:
+      schema = Path(schema_path).read_text(encoding="utf-8")
+
+> C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py:14:def initialize(database_path: str | Path, schema_path: str | Path) -> None:
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py:15:    schema = Path(schema_path).read_text(encoding="utf-8")
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py:16:    db = connect(database_path)
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py:17:    try:
+      return connection
+  
+  
+      schema = Path(schema_path).read_text(encoding="utf-8")
+      db = connect(database_path)
+      try:
+          db.executescript(schema)
+          db.commit()
+      finally:
+          db.close()
+  
+
+> C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py:18:        db.executescript(schema)
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py:19:        db.commit()
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py:20:    finally:
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py:21:        db.close()
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py:22:
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py:23:
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py:24:def create_case(
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py:25:    db: sqlite3.Connection,
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py:26:    *,
+      schema = Path(schema_path).read_text(encoding="utf-8")
+      db = connect(database_path)
+      try:
+          db.commit()
+      finally:
+          db.close()
+  
+  
+  def create_case(
+      db: sqlite3.Connection,
+      *,
+
+=== phase6_schema.sql: table and trigger definitions ===
+> C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\phase6_schema.sql:3:CREATE TABLE cases (
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\phase6_schema.sql:4:    case_id TEXT PRIMARY KEY NOT NULL,
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\phase6_schema.sql:5:    title TEXT NOT NULL CHECK (length(trim(title)) > 0),
+> C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\phase6_schema.sql:16:CREATE TABLE audit_events (
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\phase6_schema.sql:17:    event_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\phase6_schema.sql:18:    case_id TEXT NOT NULL,
+> C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\phase6_schema.sql:28:CREATE INDEX idx_cases_status ON cases(status);
+> C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\phase6_schema.sql:29:CREATE INDEX idx_cases_severity ON cases(severity);
+> C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\phase6_schema.sql:30:CREATE INDEX idx_audit_case_time ON audit_events(case_id, event_time);
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\phase6_schema.sql:31:
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\phase6_schema.sql:32:-- Basic database-level protection against ordinary audit-event edits/deletes.
+> C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\phase6_schema.sql:34:CREATE TRIGGER audit_events_no_update
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\phase6_schema.sql:35:BEFORE UPDATE ON audit_events
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\phase6_schema.sql:36:BEGIN
+> C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\phase6_schema.sql:40:CREATE TRIGGER audit_events_no_delete
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\phase6_schema.sql:41:BEFORE DELETE ON audit_events
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\phase6_schema.sql:42:BEGIN
+
+=== Full schema file ===
+PRAGMA foreign_keys = ON;
+
+CREATE TABLE cases (
+    case_id TEXT PRIMARY KEY NOT NULL,
+    title TEXT NOT NULL CHECK (length(trim(title)) > 0),
+    severity TEXT NOT NULL CHECK (severity IN ('Low', 'Medium', 'High', 'Critical')),
+    status TEXT NOT NULL CHECK (
+        status IN ('Triage', 'Investigating', 'Evidence review', 'Contained', 'Closed')
+    ),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    created_by TEXT NOT NULL,
+    version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1)
+);
+
+CREATE TABLE audit_events (
+    event_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    case_id TEXT NOT NULL,
+    event_type TEXT NOT NULL CHECK (length(trim(event_type)) > 0),
+    actor_id TEXT NOT NULL CHECK (length(trim(actor_id)) > 0),
+    event_time TEXT NOT NULL,
+    details_json TEXT NOT NULL CHECK (json_valid(details_json)),
+    previous_hash TEXT,
+    event_hash TEXT,
+    FOREIGN KEY (case_id) REFERENCES cases(case_id) ON DELETE RESTRICT
+);
+
+CREATE INDEX idx_cases_status ON cases(status);
+CREATE INDEX idx_cases_severity ON cases(severity);
+CREATE INDEX idx_audit_case_time ON audit_events(case_id, event_time);
+
+-- Basic database-level protection against ordinary audit-event edits/deletes.
+-- This does not protect against a database administrator or direct file tampering.
+CREATE TRIGGER audit_events_no_update
+BEFORE UPDATE ON audit_events
+BEGIN
+    SELECT RAISE(ABORT, 'Audit events are append-only');
+END;
+
+CREATE TRIGGER audit_events_no_delete
+BEFORE DELETE ON audit_events
+BEGIN
+    SELECT RAISE(ABORT, 'Audit events are append-only');
+END;

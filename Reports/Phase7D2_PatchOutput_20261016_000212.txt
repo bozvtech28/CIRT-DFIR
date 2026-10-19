@@ -1,0 +1,3 @@
+PASS: No-change ValueError now maps to HTTP 409.
+PASS: Other ValueError cases remain HTTP 422.
+PASS: Updated main.py syntax is valid.

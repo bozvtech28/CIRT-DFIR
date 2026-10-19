@@ -1,0 +1,48 @@
+CIRT DFIR PROFESSIONAL — PHASE 8B.6
+OIDC provider readiness and deployment safety validation
+Generated UTC: 2026-10-15T16:21:45.089524+00:00
+Identity provider: NOT DECIDED
+Deployment target: INTERNAL ORGANIZATION NETWORK
+Static validation only; no server or identity-provider connection.
+
+CHECK RESULTS
+[PASS] API source syntax — main.py parsed successfully
+[PASS] Expected API routes present — Discovered routes: [('GET', '/api/v1/demo/cases'), ('GET', '/api/v1/health'), ('PATCH', '/api/v1/cases/{case_id}')]
+[PASS] Demo case-list route requires cases:read — Route dependency inspected
+[PASS] Case-update route requires cases:update — Route dependency inspected
+[PASS] Health route remains outside case RBAC gate — Health is intended to remain public
+[PASS] Authentication gate denies by default — Default dependency returns unauthorized
+[PASS] RBAC dependency invokes authorization policy — Authorization policy and forbidden response detected
+[PASS] RBAC policy module declares permissions — RBAC policy declarations detected
+[PASS] Test file exists: test_api.py — C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_api.py
+[PASS] Test file exists: test_api_auth_gate.py — C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_api_auth_gate.py
+[PASS] Test file exists: test_security.py — C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_security.py
+[PASS] Test defined: test_demo_cases_reject_unauthenticated_request — Expected test function
+[PASS] Test defined: test_case_update_rejects_unauthenticated_request — Expected test function
+[PASS] Test defined: test_viewer_cannot_update_case — Expected test function
+[PASS] Test defined: test_admin_can_pass_case_update_authorization_gate — Expected test function
+[PASS] Phase 8B.5 backup folder exists — C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\Phase8B5_20261016_001906
+[PASS] Phase 8B.5 main.py backup exists — Pre-change source backup
+[PASS] Previous Phase 8B.5 report exists — C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase8B5_AuthGate_20261016_001906.txt
+
+IDENTITY PROVIDER DECISION MATRIX
+Microsoft Entra ID: consider if the organization already uses Microsoft Entra / Microsoft 365 for managed identities.
+Keycloak: consider if the organization operates or approves a self-hosted OIDC identity service.
+Other OIDC provider: require the official issuer, client registration, supported claims, and organizational approval.
+
+REQUIRED BEFORE PRODUCTION
+1. Obtain approval for the identity provider and account/role provisioning.
+2. Register the application and exact redirect URIs.
+3. Validate token signature, issuer, audience, expiry, and permitted algorithms.
+4. Map roles from validated claims or a server-controlled role store.
+5. Enforce authentication and RBAC on every protected API route.
+6. Test invalid, expired, wrong-issuer, wrong-audience, 401, and 403 cases.
+7. Use HTTPS and approved secret management for network deployment.
+
+SAFETY
+No application source files were changed by this validation script.
+No packages were installed. No server was started. No identity provider was contacted.
+Static checks do not prove runtime security or real authentication.
+
+Static checks passed: 18/18
+Static checks failed: 0

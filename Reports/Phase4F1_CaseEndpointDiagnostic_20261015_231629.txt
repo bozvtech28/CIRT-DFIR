@@ -1,0 +1,20 @@
+﻿Phase 4F.1 - Case endpoint diagnostic
+Timestamp: 2026-10-15 23:16:29
+
+URL: http://127.0.0.1:8000/api/v1/health
+HTTP: 200
+Body: {"status":"ok","mode":"development-scaffold"}
+
+URL: http://127.0.0.1:8000/api/v1/demo/cases
+HTTP: 200
+Body: [{"case_id":"DEMO-2026-001","title":"Endpoint Alert Review","severity":"High","status":"Investigating"},{"case_id":"DEMO-2026-002","title":"Suspicious Login Review","severity":"Medium","status":"Triage"},{"case_id":"DEMO-2026-003","title":"Mailbox Rule Assessment","severity":"Medium","status":"Evidence review"}]
+Parsed case count: 3
+
+URL: http://127.0.0.1:5173/api/v1/health
+HTTP: 200
+Body: {"status":"ok","mode":"development-scaffold"}
+
+URL: http://127.0.0.1:5173/api/v1/demo/cases
+HTTP: 200
+Body: [{"case_id":"DEMO-2026-001","title":"Endpoint Alert Review","severity":"High","status":"Investigating"},{"case_id":"DEMO-2026-002","title":"Suspicious Login Review","severity":"Medium","status":"Triage"},{"case_id":"DEMO-2026-003","title":"Mailbox Rule Assessment","severity":"Medium","status":"Evidence review"}]
+Parsed case count: 3

@@ -1,0 +1,240 @@
+CIRT-DFIR - PHASE 8B179
+Integration readiness and configuration contract
+READ-ONLY SOURCE INSPECTION
+Backend: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend
+
+============================================================================
+FILE: app/main.py
+============================================================================
+6: from app.auth_dependencies import require_permission
+15: class HealthResponse(BaseModel):
+22: class CaseUpdateRequest(BaseModel):
+28: class DemoCase(BaseModel):
+57: @app.get("/api/v1/health", response_model=HealthResponse)
+58: def health() -> HealthResponse:
+64: @app.patch("/api/v1/cases/{case_id}", response_model=DemoCase)
+65: def update_case_endpoint(
+68:     principal = Depends(require_permission("cases:update")),
+104: @app.get("/api/v1/demo/cases", response_model=list[DemoCase], dependencies=[Depends(require_permission("cases:read"))])
+105: def get_demo_cases() -> list[DemoCase]:
+Total source lines: 108
+
+============================================================================
+FILE: app/auth_dependencies.py
+============================================================================
+1: """Fail-closed authentication gate pending approved OIDC integration.
+16: def get_current_principal() -> Principal:
+19:         status_code=401,
+24: def require_permission(permission: str):
+26:     def dependency(principal: Principal = Depends(get_current_principal)) -> Principal:
+28:             authorize(principal, permission)
+31:                 status_code=401,
+37:                 status_code=403,
+Total source lines: 41
+
+============================================================================
+FILE: app/entra_config_preflight.py
+============================================================================
+14:     "tenant_id",
+15:     "expected_issuer",
+16:     "expected_audience",
+17:     "approved_role_map",
+21: def validate_entra_config(config: Mapping[str, object]) -> list[str]:
+32:     tenant_id = config.get("tenant_id")
+33:     if not isinstance(tenant_id, str) or not tenant_id.strip():
+34:         errors.append("tenant_id must be a non-empty string")
+37:             UUID(tenant_id)
+39:             errors.append("tenant_id must be a valid UUID")
+41:     issuer = config.get("expected_issuer")
+43:         errors.append("expected_issuer must be a non-empty string")
+61:                 "expected_issuer must be a fixed HTTPS URL without credentials, "
+65:     audience = config.get("expected_audience")
+67:         errors.append("expected_audience must be a non-empty string")
+69:     role_map = config.get("approved_role_map")
+71:         errors.append("approved_role_map must be a non-empty mapping")
+Total source lines: 89
+
+============================================================================
+FILE: app/entra_authenticator.py
+============================================================================
+35: def _normalized_hosts(value: frozenset[str], field_name: str) -> frozenset[str]:
+54: class EntraAuthConfig:
+57:     tenant_id: str
+58:     expected_issuer: str
+59:     expected_audience: str
+60:     discovery_url: str
+61:     trusted_metadata_hosts: frozenset[str]
+62:     allowed_jwks_hosts: frozenset[str]
+63:     approved_role_map: Mapping[str, str]
+68:     def __post_init__(self) -> None:
+70:             "tenant_id",
+71:             "expected_issuer",
+72:             "expected_audience",
+73:             "discovery_url",
+80:             issuer = urlparse(self.expected_issuer)
+83:             raise ValueError("expected_issuer is malformed") from exc
+94:             raise ValueError("expected_issuer must be a fixed, safe HTTPS URL")
+97:             parsed = urlparse(self.discovery_url)
+100:             raise ValueError("discovery_url is malformed") from exc
+111:             raise ValueError("discovery_url must be a fixed, safe HTTPS URL")
+114:             self.trusted_metadata_hosts, "trusted_metadata_hosts"
+117:             self.allowed_jwks_hosts, "allowed_jwks_hosts"
+121:             raise ValueError("discovery_url host is not in trusted_metadata_hosts")
+123:         if not isinstance(self.approved_role_map, Mapping) or not self.approved_role_map:
+124:             raise ValueError("approved_role_map must be a non-empty mapping")
+127:         for app_role, internal_role in self.approved_role_map.items():
+155:         object.__setattr__(self, "trusted_metadata_hosts", metadata_hosts)
+156:         object.__setattr__(self, "allowed_jwks_hosts", jwks_hosts)
+157:         object.__setattr__(self, "approved_role_map", MappingProxyType(role_map))
+160: class EntraAuthenticator:
+163:     def __init__(
+165:         config: EntraAuthConfig,
+174:     def metadata(self) -> TrustedMetadata:
+178:     def _trusted_key_resolver(self, token: str):
+187:     def authenticate(self, authorization: str | None) -> Principal:
+192:             expected_issuer=self._config.expected_issuer,
+193:             expected_audience=self._config.expected_audience,
+194:             expected_tenant_id=self._config.tenant_id,
+195:             approved_role_map=self._config.approved_role_map,
+199: def create_entra_authenticator(
+200:     config: EntraAuthConfig,
+207:     expected_issuer, and its JWKS hostname must be in allowed_jwks_hosts.
+214:     def fetch_document(url: str, allowed_hosts: frozenset[str]) -> dict[str, Any]:
+228:         config.discovery_url, config.trusted_metadata_hosts
+232:         expected_issuer=config.expected_issuer,
+233:         allowed_jwks_hosts=set(config.allowed_jwks_hosts),
+236:     def load_jwks() -> dict[str, Any]:
+237:         return fetch_document(metadata.jwks_uri, config.allowed_jwks_hosts)
+Total source lines: 240
+
+============================================================================
+FILE: tests/test_entra_config_preflight.py
+============================================================================
+6: class EntraConfigPreflightTests(unittest.TestCase):
+7:     def valid_config(self):
+9:             "tenant_id": "11111111-2222-4333-8444-555555555555",
+10:             "expected_issuer": "https://login.microsoftonline.com/example-tenant/v2.0",
+11:             "expected_audience": "api://example-api",
+12:             "approved_role_map": {
+19:     def test_valid_structure_returns_no_errors(self):
+22:     def test_missing_tenant_is_rejected(self):
+24:         del config["tenant_id"]
+25:         self.assertTrue(any("tenant_id is required" in e for e in validate_entra_config(config)))
+27:     def test_invalid_tenant_uuid_is_rejected(self):
+29:         config["tenant_id"] = "not-a-uuid"
+32:     def test_http_issuer_is_rejected(self):
+34:         config["expected_issuer"] = "http://login.example.test/tenant"
+37:     def test_issuer_credentials_are_rejected(self):
+39:         config["expected_issuer"] = "https://user:pass@login.example.test/tenant"
+42:     def test_issuer_query_is_rejected(self):
+44:         config["expected_issuer"] = "https://login.example.test/tenant?x=1"
+47:     def test_empty_audience_is_rejected(self):
+49:         config["expected_audience"] = " "
+50:         self.assertTrue(any("expected_audience" in e for e in validate_entra_config(config)))
+52:     def test_empty_role_map_is_rejected(self):
+54:         config["approved_role_map"] = {}
+57:     def test_unapproved_internal_role_is_rejected(self):
+59:         config["approved_role_map"] = {"Example.Root": "Superuser"}
+62:     def test_non_mapping_input_is_rejected(self):
+Total source lines: 67
+
+============================================================================
+FILE: tests/test_entra_authenticator.py
+============================================================================
+9:     EntraAuthConfig,
+10:     create_entra_authenticator,
+20: DISCOVERY_URL = (
+36: def identity():
+47:     def issue_token(roles=None, **overrides):
+70: def make_config(**overrides):
+72:         "tenant_id": TENANT,
+73:         "expected_issuer": ISSUER,
+74:         "expected_audience": AUDIENCE,
+75:         "discovery_url": DISCOVERY_URL,
+76:         "trusted_metadata_hosts": HOSTS,
+77:         "allowed_jwks_hosts": HOSTS,
+78:         "approved_role_map": ROLE_MAP,
+81:     return EntraAuthConfig(**values)
+84: def make_fetcher(public_jwk, calls=None, *, fail_jwks=False, wrong_issuer=False):
+87:     def fetch(url, *, trusted_hosts, timeout_seconds, max_response_bytes):
+89:         if url == DISCOVERY_URL:
+101: def test_composition_authenticates_valid_synthetic_bearer(identity):
+104:     authenticator = create_entra_authenticator(
+120: def test_composition_rejects_unapproved_application_role(identity):
+122:     authenticator = create_entra_authenticator(
+133: def test_composition_rejects_wrong_audience(identity):
+135:     authenticator = create_entra_authenticator(
+146: def test_composition_rejects_wrong_tenant(identity):
+148:     authenticator = create_entra_authenticator(
+159: def test_composition_rejects_untrusted_discovery_issuer(identity):
+163:         create_entra_authenticator(
+169: def test_composition_rejects_discovery_host_not_allowlisted():
+170:     with pytest.raises(ValueError, match="trusted_metadata_hosts"):
+172:             discovery_url="https://attacker.example/.well-known/openid-configuration"
+176: def test_invalid_header_does_not_load_jwks(identity):
+179:     authenticator = create_entra_authenticator(
+190: def test_jwks_outage_fails_closed(identity):
+192:     authenticator = create_entra_authenticator(
+201: def test_role_map_is_copied_and_immutable():
+203:     config = make_config(approved_role_map=source)
+206:     assert "CIRT.DFIR.Analyst" in config.approved_role_map
+208:         config.approved_role_map["CIRT.DFIR.SuperUser"] = ROLE_ADMINISTRATOR
+214:         {"tenant_id": ""},
+215:         {"expected_issuer": ""},
+216:         {"expected_issuer": "https://user@login.microsoftonline.com/issuer"},
+217:         {"expected_issuer": "https://login.microsoftonline.com/issuer?x=1"},
+218:         {"expected_issuer": "https://login.microsoftonline.com/issuer#fragment"},
+219:         {"expected_issuer": "https://login.microsoftonline.com:444/issuer"},
+220:         {"expected_audience": ""},
+221:         {"discovery_url": "http://login.microsoftonline.com/discovery"},
+222:         {"trusted_metadata_hosts": frozenset()},
+223:         {"allowed_jwks_hosts": frozenset()},
+224:         {"approved_role_map": {}},
+225:         {"approved_role_map": {"CIRT.DFIR.Analyst": "SuperUser"}},
+231: def test_invalid_configuration_is_rejected(overrides):
+Total source lines: 233
+
+============================================================================
+FILE: tests/test_api_auth_gate.py
+============================================================================
+2: from fastapi.testclient import TestClient
+4: from app.auth_dependencies import get_current_principal
+8: client = TestClient(app)
+10: def test_demo_cases_reject_unauthenticated_request():
+14:         assert response.status_code == 401
+19: def test_case_update_rejects_unauthenticated_request():
+26:         assert response.status_code == 401
+30: def test_viewer_cannot_update_case():
+31:     app.dependency_overrides[get_current_principal] = lambda: Principal(
+40:         assert response.status_code == 403
+44: def test_case_update_audit_actor_comes_from_principal(tmp_path, monkeypatch):
+72:     monkeypatch.setattr(case_store, "DB_PATH", database_path)
+73:     app.dependency_overrides[get_current_principal] = lambda: Principal(
+96: def test_admin_can_pass_case_update_authorization_gate():
+99:     from app.auth_dependencies import require_permission
+101:     from fastapi.testclient import TestClient as LocalClient
+104:     test_app.dependency_overrides[get_current_principal] = lambda: Principal(
+110:     def protected_permission_check(principal=Depends(require_permission("cases:update"))):
+Total source lines: 116
+
+============================================================================
+FILE: tests/test_api_oidc_fail_closed.py
+============================================================================
+1: from fastapi.testclient import TestClient
+3: from app.auth_dependencies import get_current_principal
+7: client = TestClient(app)
+10: def test_missing_bearer_token_is_rejected():
+14:         assert response.status_code == 401
+19: def test_malformed_bearer_token_is_rejected():
+26:         assert response.status_code == 401
+31: def test_case_update_without_authentication_is_rejected():
+38:         assert response.status_code == 401
+Total source lines: 40
+
+============================================================================
+INSPECTION SUMMARY
+============================================================================
+Missing files: None
+This is a text-marker review, not proof of runtime behavior.
+Do not enable production authentication from this report alone.
+STATUS: SOURCE MARKERS COLLECTED

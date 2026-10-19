@@ -1,0 +1,134 @@
+﻿CIRT DFIR PROFESSIONAL - PHASE 8B.101
+Timestamp: 20261016_125424
+Backend: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend
+Purpose: Read-only API entry-point and authentication review
+Source modifications: None
+Network requests: None
+Servers started: None
+
+ENTRY POINT CANDIDATES
+app\main.py
+
+PYTHON FILES
+app\auth_dependencies.py
+app\case_repository.py
+app\case_store.py
+app\entra_bearer_adapter.py
+app\entra_http_transport.py
+app\entra_jwks.py
+app\entra_jwks_cache.py
+app\entra_metadata_client.py
+app\entra_principal.py
+app\entra_token_verifier.py
+app\main.py
+app\oidc_claims.py
+app\security.py
+app\__init__.py
+synthetic_test_support\jwt_harness.py
+synthetic_test_support\rs256_harness.py
+synthetic_test_support\synthetic_role_mapping.py
+synthetic_test_support\__init__.py
+tests\conftest.py
+tests\test_api.py
+tests\test_api_auth_gate.py
+tests\test_api_oidc_fail_closed.py
+tests\test_entra_bearer_adapter.py
+tests\test_entra_end_to_end_offline.py
+tests\test_entra_http_transport.py
+tests\test_entra_jwks.py
+tests\test_entra_jwks_cache.py
+tests\test_entra_jwks_cache_hardening.py
+tests\test_entra_metadata_client.py
+tests\test_entra_principal.py
+tests\test_entra_principal_authorization.py
+tests\test_entra_token_verifier.py
+tests\test_entra_verifier_jwks_integration.py
+tests\test_oidc_claims.py
+tests\test_security.py
+tests\test_synthetic_jwt_harness.py
+tests\test_synthetic_role_mapping.py
+tests\test_synthetic_rs256_harness.py
+
+AUTHENTICATION REFERENCES
+app\auth_dependencies.py:16 : def get_current_principal() -> Principal:
+app\auth_dependencies.py:24 : def require_permission(permission: str):
+app\auth_dependencies.py:26 : def dependency(principal: Principal = Depends(get_current_principal)) -> Principal:
+app\entra_bearer_adapter.py:15 : from app.entra_token_verifier import verify_entra_access_token
+app\entra_bearer_adapter.py:23 : def principal_from_authorization_header(
+app\entra_bearer_adapter.py:52 : claims = verify_entra_access_token(
+app\entra_principal.py:4 : Only pass the claims returned by verify_entra_access_token after successful
+app\entra_token_verifier.py:19 : def verify_entra_access_token(
+app\main.py:6 : from app.auth_dependencies import require_permission
+app\main.py:8 : app = FastAPI(
+app\main.py:64 : @app.patch("/api/v1/cases/{case_id}", response_model=DemoCase, dependencies=[Depends(require_permission("cases:update"))])
+app\main.py:83 : actor_id="DEVELOPMENT-API",
+app\main.py:103 : @app.get("/api/v1/demo/cases", response_model=list[DemoCase], dependencies=[Depends(require_permission("cases:read"))])
+tests\conftest.py:9 : from app.auth_dependencies import get_current_principal
+tests\conftest.py:15 : app.dependency_overrides[get_current_principal] = lambda: Principal(
+tests\test_api_auth_gate.py:4 : from app.auth_dependencies import get_current_principal
+tests\test_api_auth_gate.py:31 : app.dependency_overrides[get_current_principal] = lambda: Principal(
+tests\test_api_auth_gate.py:47 : from app.auth_dependencies import require_permission
+tests\test_api_auth_gate.py:51 : test_app = FastAPI()
+tests\test_api_auth_gate.py:52 : test_app.dependency_overrides[get_current_principal] = lambda: Principal(
+tests\test_api_auth_gate.py:58 : def protected_permission_check(principal=Depends(require_permission("cases:update"))):
+tests\test_api_oidc_fail_closed.py:3 : from app.auth_dependencies import get_current_principal
+tests\test_entra_bearer_adapter.py:8 : from app.entra_bearer_adapter import (
+tests\test_entra_bearer_adapter.py:10 : principal_from_authorization_header,
+tests\test_entra_bearer_adapter.py:71 : return principal_from_authorization_header(
+tests\test_entra_end_to_end_offline.py:14 : from app.entra_token_verifier import verify_entra_access_token
+tests\test_entra_end_to_end_offline.py:74 : return verify_entra_access_token(
+tests\test_entra_token_verifier.py:8 : from app.entra_token_verifier import verify_entra_access_token
+tests\test_entra_token_verifier.py:40 : return verify_entra_access_token(
+tests\test_entra_token_verifier.py:140 : verify_entra_access_token(
+tests\test_entra_verifier_jwks_integration.py:10 : from app.entra_token_verifier import verify_entra_access_token
+tests\test_entra_verifier_jwks_integration.py:55 : return verify_entra_access_token(
+tests\test_entra_verifier_jwks_integration.py:200 : verify_entra_access_token(
+
+AUTH DEPENDENCY SOURCE
+app\auth_dependencies.py:1: """Fail-closed authentication gate pending approved OIDC integration.
+app\auth_dependencies.py:2: 
+app\auth_dependencies.py:3: This module intentionally authenticates nobody. Replace the placeholder
+app\auth_dependencies.py:4: identity provider integration only after the organization chooses a provider.
+app\auth_dependencies.py:5: Never trust roles supplied by a browser or request body.
+app\auth_dependencies.py:6: """
+app\auth_dependencies.py:7: from fastapi import Depends, HTTPException
+app\auth_dependencies.py:8: 
+app\auth_dependencies.py:9: from app.security import (
+app\auth_dependencies.py:10:     AuthenticationRequired,
+app\auth_dependencies.py:11:     AuthorizationDenied,
+app\auth_dependencies.py:12:     Principal,
+app\auth_dependencies.py:13:     authorize,
+app\auth_dependencies.py:14: )
+app\auth_dependencies.py:15: 
+app\auth_dependencies.py:16: def get_current_principal() -> Principal:
+app\auth_dependencies.py:17:     """Reject all requests until real token/session validation is implemented."""
+app\auth_dependencies.py:18:     raise HTTPException(
+app\auth_dependencies.py:19:         status_code=401,
+app\auth_dependencies.py:20:         detail="Authentication is not configured. Access is denied by default.",
+app\auth_dependencies.py:21:         headers={"WWW-Authenticate": "Bearer"},
+app\auth_dependencies.py:22:     )
+app\auth_dependencies.py:23: 
+app\auth_dependencies.py:24: def require_permission(permission: str):
+app\auth_dependencies.py:25:     """Require a validated principal and enforce the RBAC permission."""
+app\auth_dependencies.py:26:     def dependency(principal: Principal = Depends(get_current_principal)) -> Principal:
+app\auth_dependencies.py:27:         try:
+app\auth_dependencies.py:28:             authorize(principal, permission)
+app\auth_dependencies.py:29:         except AuthenticationRequired as exc:
+app\auth_dependencies.py:30:             raise HTTPException(
+app\auth_dependencies.py:31:                 status_code=401,
+app\auth_dependencies.py:32:                 detail="Authentication required.",
+app\auth_dependencies.py:33:                 headers={"WWW-Authenticate": "Bearer"},
+app\auth_dependencies.py:34:             ) from exc
+app\auth_dependencies.py:35:         except AuthorizationDenied as exc:
+app\auth_dependencies.py:36:             raise HTTPException(
+app\auth_dependencies.py:37:                 status_code=403,
+app\auth_dependencies.py:38:                 detail="Insufficient permission.",
+app\auth_dependencies.py:39:             ) from exc
+app\auth_dependencies.py:40:         return principal
+app\auth_dependencies.py:41:     return dependency
+
+REVIEW NOTES
+The earlier Phase 8B.100 script assumed platform\backend\main.py.
+The terminal output showed that exact path does not exist.
+Use the discovered paths above before planning any integration.
+Do not enable authentication until approved Entra settings are available.

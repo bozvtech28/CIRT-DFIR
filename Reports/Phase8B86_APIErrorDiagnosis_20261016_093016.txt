@@ -1,0 +1,335 @@
+﻿Phase 8B.86 - API Authentication Failure Diagnosis
+Timestamp: 20261016_093016
+Mode: Read-only
+Source: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\App.tsx
+
+=== STATIC CHECKS ===
+authenticatedFetch referenced: True
+fallbackCases referenced: True
+Explicit 401 literal present: False
+Explicit 403 literal present: False
+Response.ok referenced: True
+Response.status referenced: True
+Catch block referenced: True
+Footer markers present: True
+
+=== RELEVANT APP.TSX CONTEXT ===
+   1: import { authenticatedFetch } from "./auth/authenticatedFetch";
+   2: import { useEffect, useMemo, useState } from "react";
+   3: 
+   4: type DemoCase = {
+   5:   case_id: string;
+   6:   title: string;
+   7:   severity: string;
+   8:   status: string;
+   9: };
+  17:   "Response Actions",
+  18:   "Reports",
+  19:   "Administration",
+  20: ];
+  21: 
+  22: const fallbackCases: DemoCase[] = [
+  23:   { case_id: "DEMO-2026-001", title: "Endpoint Alert Review", severity: "High", status: "Investigating" },
+  24:   { case_id: "DEMO-2026-002", title: "Suspicious Login Review", severity: "Medium", status: "Triage" },
+  25:   { case_id: "DEMO-2026-003", title: "Mailbox Rule Assessment", severity: "Medium", status: "Evidence review" },
+  26: ];
+  27: 
+  28: const API_BASE = "";
+  29: 
+  30: function App() {
+  31:   const [page, setPage] = useState("Dashboard");
+  32:   const [search, setSearch] = useState("");
+  33:   const [cases, setCases] = useState<DemoCase[]>([]);
+  34:   const [loading, setLoading] = useState(true);
+  35:   const [error, setError] = useState("");
+  36:   const [usingFallback, setUsingFallback] = useState(false);
+  37:   const [refreshKey, setRefreshKey] = useState(0);
+  38:   const [caseSeverityFilter, setCaseSeverityFilter] = useState("All");
+  39:   const [caseStatusFilter, setCaseStatusFilter] = useState("All");
+  40:   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
+  41: 
+  42:   useEffect(() => {
+  43:     const controller = new AbortController();
+  44: 
+  45:     async function loadCases() {
+  46:       setLoading(true);
+  47:       setError("");
+  48:       setUsingFallback(false);
+  49: 
+  50:       try {
+  51:         const response = await authenticatedFetch(`${API_BASE}/api/v1/demo/cases`, {
+  52:           headers: { Accept: "application/json" },
+  53:           signal: controller.signal,
+  54:         });
+  55: 
+  56:         if (!response.ok) {
+  57:           throw new Error(`API returned HTTP ${response.status}`);
+  58:         }
+  59: 
+  60:         const payload: unknown = await response.json();
+  61: 
+  62:         if (
+  63:           !Array.isArray(payload) ||
+  64:           !payload.every(
+  65:             (item) =>
+  72:           )
+  73:         ) {
+  74:           throw new Error("Unexpected API response format.");
+  75:         }
+  76: 
+  77:         if (!controller.signal.aborted) setCases(payload as DemoCase[]);
+  78:       } catch (err) {
+  79:         if (controller.signal.aborted) return;
+  80: 
+  81:         const message = err instanceof Error ? err.message : "Unknown connection error";
+  82:         setError(`Could not load cases from the localhost development API: ${message}`);
+  83:         setCases(fallbackCases);
+  84:         setUsingFallback(true);
+  85:       } finally {
+  86:         if (!controller.signal.aborted) setLoading(false);
+  87:       }
+  88:     }
+  89: 
+  90:     void loadCases();
+  91:     return () => controller.abort();
+  92:   }, [refreshKey]);
+  93: 
+  94:   const filteredCases = useMemo(() => {
+  95:     const term = search.trim().toLowerCase();
+  96:     if (!term) return cases;
+  97: 
+  98:     return cases.filter((item) =>
+ 193:                       onChange={(event) => setSearch(event.target.value)}
+ 194:                     />
+ 195:                     <select
+ 196:                       aria-label="Filter cases by severity"
+ 197:                       value={caseSeverityFilter}
+ 198:                       onChange={(event) => setCaseSeverityFilter(event.target.value)}
+ 199:                     >
+ 200:                       {severityOptions.map((value) => <option key={value} value={value}>{value === "All" ? "All severities" : value}</option>)}
+ 201:                     </select>
+ 202:                     <select
+ 203:                       aria-label="Filter cases by status"
+ 204:                       value={caseStatusFilter}
+ 205:                       onChange={(event) => setCaseStatusFilter(event.target.value)}
+ 206:                     >
+ 207:                       {statusOptions.map((value) => <option key={value} value={value}>{value === "All" ? "All statuses" : value}</option>)}
+ 208:                     </select>
+ 209:                     <button type="button" onClick={() => setRefreshKey((value) => value + 1)} disabled={loading}>
+ 210:                       {loading ? "Loadingâ€¦" : "Refresh"}
+ 211:                     </button>
+ 212:                   </div>
+ 213:                 </div>
+
+=== authenticatedFetch.ts ===
+   1: // Uses the browser DOM RequestInfo and RequestInit types.
+   2: import { acquireEntraApiAccessToken } from "./entraToken";
+   3: import { getMsalInstance } from "./msalInstance";
+   4: 
+   5: /**
+   6:  * Sends a request with a freshly acquired Entra API access token.
+   7:  * No browser-supplied role or identity is treated as authorization.
+   8:  */
+   9: export async function authenticatedFetch(
+  10:   input: string | URL | Request,
+  11:   init: RequestInit = {}
+  12: ): Promise<Response> {
+  13:   const token = await acquireEntraApiAccessToken(getMsalInstance());
+  14:   const headers = new Headers(init.headers);
+  15:   headers.set("Accept", headers.get("Accept") ?? "application/json");
+  16:   headers.set("Authorization", `Bearer ${token}`);
+  17: 
+  18:   return fetch(input, { ...init, headers });
+  19: }
+  20: 
+
+=== AuthRoot.tsx ===
+   1: import { useEffect, useState } from "react";
+   2: import { MsalProvider, useMsal } from "@azure/msal-react";
+   3: import type { PublicClientApplication } from "@azure/msal-browser";
+   4: import App from "../App";
+   5: import {
+   6:   entraConfigurationErrors,
+   7:   getEntraApiScope,
+   8:   isEntraConfigured,
+   9: } from "./entraConfig";
+  10: import { initializeMsal } from "./msalInstance";
+  11: 
+  12: function AuthenticationControls() {
+  13:   const { instance, accounts, inProgress } = useMsal();
+  14:   const account = instance.getActiveAccount() ?? accounts[0] ?? null;
+  15:   const [actionError, setActionError] = useState("");
+  16: 
+  17:   async function signIn() {
+  18:     setActionError("");
+  19:     try {
+  20:       await instance.loginRedirect({ scopes: [getEntraApiScope()] });
+  21:     } catch (error) {
+  22:       setActionError(error instanceof Error ? error.message : "Sign-in could not start.");
+  23:     }
+  24:   }
+  25: 
+  26:   async function signOut() {
+  27:     setActionError("");
+  28:     try {
+  29:       await instance.logoutRedirect({ account });
+  30:     } catch (error) {
+  31:       setActionError(error instanceof Error ? error.message : "Sign-out could not start.");
+  32:     }
+  33:   }
+  34: 
+  35:   return (
+  36:     <section
+  37:       style={{
+  38:         padding: "12px 20px",
+  39:         borderBottom: "1px solid #d5dce5",
+  40:         display: "flex",
+  41:         alignItems: "center",
+  42:         justifyContent: "space-between",
+  43:         gap: "12px",
+  44:         flexWrap: "wrap",
+  45:       }}
+  46:       aria-label="Microsoft Entra authentication"
+  47:     >
+  48:       <div>
+  49:         <strong>Microsoft Entra authentication</strong>
+  50:         <div role="status" aria-live="polite">
+  51:           {inProgress !== "none"
+  52:             ? "Authentication in progress…"
+  53:             : account
+  54:               ? `Signed in: ${account.username}`
+  55:               : "Not signed in. Sign in to request protected API data."}
+  56:         </div>
+  57:         {actionError && <p role="alert">{actionError}</p>}
+  58:       </div>
+  59:       {account ? (
+  60:         <button type="button" onClick={() => void signOut()} disabled={inProgress !== "none"}>
+  61:           Sign out
+  62:         </button>
+  63:       ) : (
+  64:         <button type="button" onClick={() => void signIn()} disabled={inProgress !== "none"}>
+  65:           Sign in with Microsoft
+  66:         </button>
+  67:       )}
+  68:     </section>
+  69:   );
+  70: }
+  71: 
+  72: function AuthenticatedApplication() {
+  73:   return (
+  74:     <>
+  75:       <AuthenticationControls />
+  76:       <App />
+  77:     </>
+  78:   );
+  79: }
+  80: 
+  81: export default function AuthRoot() {
+  82:   const [client, setClient] = useState<PublicClientApplication | null>(null);
+  83:   const [initializationError, setInitializationError] = useState("");
+  84: 
+  85:   useEffect(() => {
+  86:     let mounted = true;
+  87: 
+  88:     if (isEntraConfigured) {
+  89:       void initializeMsal()
+  90:         .then((initializedClient) => {
+  91:           if (mounted) setClient(initializedClient);
+  92:         })
+  93:         .catch((error: unknown) => {
+  94:           if (mounted) {
+  95:             setInitializationError(
+  96:               error instanceof Error ? error.message : "MSAL initialization failed."
+  97:             );
+  98:           }
+  99:         });
+ 100:     }
+ 101: 
+ 102:     return () => {
+ 103:       mounted = false;
+ 104:     };
+ 105:   }, []);
+ 106: 
+ 107:   if (!isEntraConfigured) {
+ 108:     return (
+ 109:       <>
+ 110:         <section role="status" style={{ padding: 16, borderBottom: "1px solid #d5dce5" }}>
+ 111:           <strong>Authentication not configured</strong>
+ 112:           <ul>
+ 113:             {entraConfigurationErrors.map((message) => <li key={message}>{message}</li>)}
+ 114:           </ul>
+ 115:           <p>Live Entra sign-in is disabled until approved settings are supplied.</p>
+ 116:           <p>Do not treat demonstration data as authenticated incident data.</p>
+ 117:         </section>
+ 118:         <App />
+ 119:       </>
+ 120:     );
+ 121:   }
+ 122: 
+ 123:   if (initializationError) {
+ 124:     return <section role="alert" style={{ padding: 16 }}>
+ 125:       Microsoft Entra initialization failed: {initializationError}
+ 126:     </section>;
+ 127:   }
+ 128: 
+ 129:   if (!client) {
+ 130:     return <section role="status" style={{ padding: 16 }}>
+ 131:       Initializing Microsoft Entra authentication…
+ 132:     </section>;
+ 133:   }
+ 134: 
+ 135:   return (
+ 136:     <MsalProvider instance={client}>
+ 137:       <AuthenticatedApplication />
+ 138:     </MsalProvider>
+ 139:   );
+ 140: }
+
+=== auth_dependencies.py ===
+   1: """Fail-closed authentication gate pending approved OIDC integration.
+   2: 
+   3: This module intentionally authenticates nobody. Replace the placeholder
+   4: identity provider integration only after the organization chooses a provider.
+   5: Never trust roles supplied by a browser or request body.
+   6: """
+   7: from fastapi import Depends, HTTPException
+   8: 
+   9: from app.security import (
+  10:     AuthenticationRequired,
+  11:     AuthorizationDenied,
+  12:     Principal,
+  13:     authorize,
+  14: )
+  15: 
+  16: def get_current_principal() -> Principal:
+  17:     """Reject all requests until real token/session validation is implemented."""
+  18:     raise HTTPException(
+  19:         status_code=401,
+  20:         detail="Authentication is not configured. Access is denied by default.",
+  21:         headers={"WWW-Authenticate": "Bearer"},
+  22:     )
+  23: 
+  24: def require_permission(permission: str):
+  25:     """Require a validated principal and enforce the RBAC permission."""
+  26:     def dependency(principal: Principal = Depends(get_current_principal)) -> Principal:
+  27:         try:
+  28:             authorize(principal, permission)
+  29:         except AuthenticationRequired as exc:
+  30:             raise HTTPException(
+  31:                 status_code=401,
+  32:                 detail="Authentication required.",
+  33:                 headers={"WWW-Authenticate": "Bearer"},
+  34:             ) from exc
+  35:         except AuthorizationDenied as exc:
+  36:             raise HTTPException(
+  37:                 status_code=403,
+  38:                 detail="Insufficient permission.",
+  39:             ) from exc
+  40:         return principal
+  41:     return dependency
+
+=== INTERPRETATION ===
+If a 401 or 403 response falls into the same catch path as a network error, the UI may display synthetic fallback cases.
+A successful frontend build does not prove API authentication succeeds.
+The backend must continue denying requests until trusted token verification and role mapping are integrated.
+No source files were modified.

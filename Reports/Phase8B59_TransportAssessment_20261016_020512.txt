@@ -1,0 +1,774 @@
+﻿CIRT DFIR PROFESSIONAL - PHASE 8B.59
+Timestamp: 2026-10-16T02:05:12.5631475+08:00
+Purpose: assess trusted metadata transport prerequisites
+Source modified: NO
+Network requests: NONE
+Production authentication changed: NO
+
+=== BACKEND FILES ===
+app\entra_metadata_client.py : EXISTS=True
+--- app\entra_metadata_client.py ---
+"""Provider-neutral Entra metadata/JWKS client primitives.
+
+This module intentionally performs no network I/O.
+A caller must inject a trusted transport and must validate the
+approved tenant, issuer, discovery endpoint, and JWKS URI.
+
+Do not use token-provided URLs to select a metadata endpoint.
+This module is not wired into the production authentication gate.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any, Callable
+from urllib.parse import urlparse
+
+
+class MetadataTrustError(ValueError):
+    """Raised when discovery metadata or JWKS data is not trusted."""
+
+
+@dataclass(frozen=True)
+class TrustedMetadata:
+    issuer: str
+    jwks_uri: str
+
+
+def _require_https_url(value: str, field_name: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise MetadataTrustError(f"{field_name} must be a non-empty URL")
+
+    parsed = urlparse(value)
+
+    if parsed.scheme.lower() != "https":
+        raise MetadataTrustError(f"{field_name} must use HTTPS")
+    if not parsed.hostname:
+        raise MetadataTrustError(f"{field_name} must include a hostname")
+    if parsed.username or parsed.password:
+        raise MetadataTrustError(f"{field_name} must not contain URL credentials")
+    if parsed.fragment:
+        raise MetadataTrustError(f"{field_name} must not contain a fragment")
+
+    return value
+
+
+def validate_discovery_document(
+    document: Any,
+    *,
+    expected_issuer: str,
+    allowed_jwks_hosts: set[str],
+) -> TrustedMetadata:
+    """Validate discovery metadata against caller-approved trust settings.
+
+    The caller is responsible for obtaining the document from the
+    approved, fixed discovery URL over a trusted HTTPS transport.
+    """
+
+    if not isinstance(document, dict):
+        raise MetadataTrustError("Discovery document must be a JSON object")
+
+    if not isinstance(expected_issuer, str) or not expected_issuer.strip():
+        raise MetadataTrustError("Expected issuer is not configured")
+
+    issuer = document.get("issuer")
+    jwks_uri = document.get("jwks_uri")
+
+    if not isinstance(issuer, str) or issuer != expected_issuer:
+        raise MetadataTrustError("Discovery issuer does not match configuration")
+
+    _require_https_url(issuer, "issuer")
+    _require_https_url(jwks_uri, "jwks_uri")
+
+    parsed_jwks = urlparse(jwks_uri)
+    allowed_hosts = {
+        host.lower().rstrip(".")
+        for host in allowed_jwks_hosts
+        if isinstance(host, str) and host.strip()
+    }
+
+    if (parsed_jwks.hostname or "").lower().rstrip(".") not in allowed_hosts:
+        raise MetadataTrustError("JWKS hostname is not in the approved allowlist")
+
+    if parsed_jwks.query:
+        raise MetadataTrustError("JWKS URI query parameters are not allowed")
+    if parsed_jwks.fragment:
+        raise MetadataTrustError("JWKS URI fragments are not allowed")
+
+    return TrustedMetadata(issuer=issuer, jwks_uri=jwks_uri)
+
+
+def fetch_trusted_document(
+    url: str,
+    *,
+    trusted_hosts: set[str],
+    transport: Callable[[str, float], Any],
+    timeout_seconds: float = 3.0,
+) -> Any:
+    """Use an injected transport to fetch JSON from an allowlisted HTTPS host.
+
+    The injected transport must enforce the timeout and validate every
+    redirect destination. This function never follows redirects itself.
+    """
+
+    _require_https_url(url, "request URL")
+
+    if timeout_seconds <= 0 or timeout_seconds > 10:
+        raise MetadataTrustError("Timeout must be greater than 0 and at most 10 seconds")
+
+    host = (urlparse(url).hostname or "").lower().rstrip(".")
+    allowed = {
+        item.lower().rstrip(".")
+        for item in trusted_hosts
+        if isinstance(item, str) and item.strip()
+    }
+
+    if host not in allowed:
+        raise MetadataTrustError("Request hostname is not in the approved allowlist")
+
+    result = transport(url, timeout_seconds)
+
+    if not isinstance(result, dict):
+        raise MetadataTrustError("Transport must return a decoded JSON object")
+
+    return result
+
+
+def validate_jwks_document(document: Any) -> dict[str, Any]:
+    """Perform structural checks before the existing offline JWKS resolver."""
+
+    if not isinstance(document, dict):
+        raise MetadataTrustError("JWKS document must be a JSON object")
+
+    keys = document.get("keys")
+    if not isinstance(keys, list) or not keys:
+        raise MetadataTrustError("JWKS must contain a non-empty keys array")
+
+    seen_kids: set[str] = set()
+
+    for key in keys:
+        if not isinstance(key, dict):
+            raise MetadataTrustError("Each JWKS key must be a JSON object")
+
+        kid = key.get("kid")
+        if not isinstance(kid, str) or not kid.strip():
+            raise MetadataTrustError("Each JWKS key must have a non-empty kid")
+
+        if kid in seen_kids:
+            raise MetadataTrustError("JWKS contains duplicate key IDs")
+        seen_kids.add(kid)
+
+        if key.get("kty") != "RSA":
+            raise MetadataTrustError("Only RSA signing keys are accepted")
+        if key.get("use", "sig") != "sig":
+            raise MetadataTrustError("JWKS key must be designated for signatures")
+        if key.get("alg", "RS256") != "RS256":
+            raise MetadataTrustError("Only RS256 signing keys are accepted")
+
+        private_parameters = {"d", "p", "q", "dp", "dq", "qi", "oth"}
+        if private_parameters.intersection(key):
+            raise MetadataTrustError("JWKS must not contain private key parameters")
+
+        if not isinstance(key.get("n"), str) or not key["n"]:
+            raise MetadataTrustError("RSA key modulus is missing")
+        if not isinstance(key.get("e"), str) or not key["e"]:
+            raise MetadataTrustError("RSA key exponent is missing")
+
+    return document
+
+app\entra_jwks_cache.py : EXISTS=True
+--- app\entra_jwks_cache.py ---
+"""Bounded in-memory JWKS cache with explicit refresh.
+
+The loader is injected by the caller. This module performs no network
+requests and is not wired into production authentication.
+
+Expired keys are never returned by get(). A failed refresh does not
+extend the previous expiry time. Callers must provide trusted loading
+and transport logic before using this cache in an application.
+"""
+
+from __future__ import annotations
+
+from copy import deepcopy
+from threading import RLock
+from time import monotonic
+from typing import Any, Callable
+
+from app.entra_metadata_client import (
+    MetadataTrustError,
+    validate_jwks_document,
+)
+
+
+class JWKSCacheError(RuntimeError):
+    """Raised when trusted JWKS data cannot be loaded or validated."""
+
+
+class JWKSCache:
+    """Thread-safe in-memory JWKS cache with bounded TTL."""
+
+    def __init__(
+        self,
+        loader: Callable[[], Any],
+        *,
+        ttl_seconds: float = 300.0,
+        clock: Callable[[], float] = monotonic,
+    ) -> None:
+        if not callable(loader):
+            raise ValueError("loader must be callable")
+        if not isinstance(ttl_seconds, (int, float)) or isinstance(
+            ttl_seconds, bool
+        ):
+            raise ValueError("ttl_seconds must be numeric")
+        if not 0 < ttl_seconds <= 3600:
+            raise ValueError("ttl_seconds must be greater than 0 and at most 3600")
+        if not callable(clock):
+            raise ValueError("clock must be callable")
+
+        self._loader = loader
+        self._ttl_seconds = float(ttl_seconds)
+        self._clock = clock
+        self._lock = RLock()
+        self._document: dict[str, Any] | None = None
+        self._expires_at: float | None = None
+
+    def _load_and_validate(self) -> dict[str, Any]:
+        try:
+            document = self._loader()
+            validated = validate_jwks_document(document)
+            # Never expose the loader's mutable object to the cache.
+            return deepcopy(validated)
+        except (MetadataTrustError, TypeError, ValueError) as exc:
+            raise JWKSCacheError("Loaded JWKS failed validation") from exc
+        except Exception as exc:
+            raise JWKSCacheError("JWKS loader failed") from exc
+
+    def get(self) -> dict[str, Any]:
+        """Return a copy of cached keys, loading only when missing/expired."""
+        with self._lock:
+            now = self._clock()
+
+            if (
+                self._document is not None
+                and self._expires_at is not None
+                and now < self._expires_at
+            ):
+                return deepcopy(self._document)
+
+            # Do not return expired keys if the loader fails.
+            document = self._load_and_validate()
+            self._document = document
+            self._expires_at = self._clock() + self._ttl_seconds
+            return deepcopy(document)
+
+    def refresh(self) -> dict[str, Any]:
+        """Force a fresh load and replace the cache only after validation."""
+        with self._lock:
+            document = self._load_and_validate()
+            self._document = document
+            self._expires_at = self._clock() + self._ttl_seconds
+            return deepcopy(document)
+
+    def invalidate(self) -> None:
+        """Discard cached keys so the next get() must reload."""
+        with self._lock:
+            self._document = None
+            self._expires_at = None
+
+    @property
+    def is_valid(self) -> bool:
+        """Whether a non-expired cache entry currently exists."""
+        with self._lock:
+            return (
+                self._document is not None
+                and self._expires_at is not None
+                and self._clock() < self._expires_at
+            )
+
+tests\test_entra_metadata_client.py : EXISTS=True
+--- tests\test_entra_metadata_client.py ---
+import pytest
+
+from app.entra_metadata_client import (
+    MetadataTrustError,
+    fetch_trusted_document,
+    validate_discovery_document,
+    validate_jwks_document,
+)
+
+
+ISSUER = "https://login.microsoftonline.com/tenant-test/v2.0"
+JWKS_URI = "https://login.microsoftonline.com/tenant-test/discovery/v2.0/keys"
+HOSTS = {"login.microsoftonline.com"}
+
+
+def valid_discovery():
+    return {"issuer": ISSUER, "jwks_uri": JWKS_URI}
+
+
+def valid_jwks():
+    return {
+        "keys": [
+            {
+                "kid": "synthetic-key-1",
+                "kty": "RSA",
+                "use": "sig",
+                "alg": "RS256",
+                "n": "synthetic-modulus",
+                "e": "AQAB",
+            }
+        ]
+    }
+
+
+def test_accepts_expected_discovery_document():
+    metadata = validate_discovery_document(
+        valid_discovery(),
+        expected_issuer=ISSUER,
+        allowed_jwks_hosts=HOSTS,
+    )
+    assert metadata.issuer == ISSUER
+    assert metadata.jwks_uri == JWKS_URI
+
+
+def test_rejects_wrong_issuer():
+    document = valid_discovery()
+    document["issuer"] = "https://attacker.example/issuer"
+    with pytest.raises(MetadataTrustError):
+        validate_discovery_document(
+            document,
+            expected_issuer=ISSUER,
+            allowed_jwks_hosts=HOSTS,
+        )
+
+
+def test_rejects_http_jwks_url():
+    document = valid_discovery()
+    document["jwks_uri"] = "http://login.microsoftonline.com/keys"
+    with pytest.raises(MetadataTrustError):
+        validate_discovery_document(
+            document,
+            expected_issuer=ISSUER,
+            allowed_jwks_hosts=HOSTS,
+        )
+
+
+def test_rejects_unapproved_jwks_host():
+    document = valid_discovery()
+    document["jwks_uri"] = "https://attacker.example/keys"
+    with pytest.raises(MetadataTrustError):
+        validate_discovery_document(
+            document,
+            expected_issuer=ISSUER,
+            allowed_jwks_hosts=HOSTS,
+        )
+
+
+def test_rejects_missing_expected_issuer():
+    with pytest.raises(MetadataTrustError):
+        validate_discovery_document(
+            valid_discovery(),
+            expected_issuer="",
+            allowed_jwks_hosts=HOSTS,
+        )
+
+
+def test_transport_is_injected_and_receives_timeout():
+    calls = []
+
+    def fake_transport(url, timeout):
+        calls.append((url, timeout))
+        return valid_discovery()
+
+    result = fetch_trusted_document(
+        "https://login.microsoftonline.com/discovery",
+        trusted_hosts=HOSTS,
+        transport=fake_transport,
+        timeout_seconds=2.0,
+    )
+
+    assert result["issuer"] == ISSUER
+    assert calls == [
+        ("https://login.microsoftonline.com/discovery", 2.0)
+    ]
+
+
+def test_rejects_unapproved_fetch_host_before_transport():
+    calls = []
+
+    def fake_transport(url, timeout):
+        calls.append(url)
+        return {}
+
+    with pytest.raises(MetadataTrustError):
+        fetch_trusted_document(
+            "https://attacker.example/discovery",
+            trusted_hosts=HOSTS,
+            transport=fake_transport,
+        )
+
+    assert calls == []
+
+
+def test_rejects_non_https_fetch_url():
+    with pytest.raises(MetadataTrustError):
+        fetch_trusted_document(
+            "http://login.microsoftonline.com/discovery",
+            trusted_hosts=HOSTS,
+            transport=lambda url, timeout: {},
+        )
+
+
+def test_rejects_timeout_outside_bound():
+    with pytest.raises(MetadataTrustError):
+        fetch_trusted_document(
+            "https://login.microsoftonline.com/discovery",
+            trusted_hosts=HOSTS,
+            transport=lambda url, timeout: {},
+            timeout_seconds=30,
+        )
+
+
+def test_rejects_non_object_transport_response():
+    with pytest.raises(MetadataTrustError):
+        fetch_trusted_document(
+            "https://login.microsoftonline.com/discovery",
+            trusted_hosts=HOSTS,
+            transport=lambda url, timeout: [],
+        )
+
+
+def test_accepts_structurally_valid_jwks():
+    result = validate_jwks_document(valid_jwks())
+    assert result["keys"][0]["kid"] == "synthetic-key-1"
+
+
+@pytest.mark.parametrize("document", [None, [], {}, {"keys": []}])
+def test_rejects_invalid_jwks_container(document):
+    with pytest.raises(MetadataTrustError):
+        validate_jwks_document(document)
+
+
+def test_rejects_duplicate_key_ids():
+    document = valid_jwks()
+    document["keys"].append(dict(document["keys"][0]))
+    with pytest.raises(MetadataTrustError):
+        validate_jwks_document(document)
+
+
+def test_rejects_non_rsa_key():
+    document = valid_jwks()
+    document["keys"][0]["kty"] = "EC"
+    with pytest.raises(MetadataTrustError):
+        validate_jwks_document(document)
+
+
+def test_rejects_private_key_material():
+    document = valid_jwks()
+    document["keys"][0]["d"] = "synthetic-private-value"
+    with pytest.raises(MetadataTrustError):
+        validate_jwks_document(document)
+
+
+def test_rejects_wrong_algorithm():
+    document = valid_jwks()
+    document["keys"][0]["alg"] = "HS256"
+    with pytest.raises(MetadataTrustError):
+        validate_jwks_document(document)
+
+
+def test_rejects_encryption_key():
+    document = valid_jwks()
+    document["keys"][0]["use"] = "enc"
+    with pytest.raises(MetadataTrustError):
+        validate_jwks_document(document)
+
+
+def test_rejects_missing_key_id():
+    document = valid_jwks()
+    document["keys"][0].pop("kid")
+    with pytest.raises(MetadataTrustError):
+        validate_jwks_document(document)
+
+tests\test_entra_jwks_cache.py : EXISTS=True
+--- tests\test_entra_jwks_cache.py ---
+import pytest
+
+from app.entra_jwks_cache import JWKSCache, JWKSCacheError
+
+
+def make_jwks(kid="synthetic-key-1"):
+    return {
+        "keys": [
+            {
+                "kid": kid,
+                "kty": "RSA",
+                "use": "sig",
+                "alg": "RS256",
+                "n": "synthetic-modulus-" + kid,
+                "e": "AQAB",
+            }
+        ]
+    }
+
+
+class FakeClock:
+    def __init__(self, start=100.0):
+        self.now = start
+
+    def __call__(self):
+        return self.now
+
+    def advance(self, seconds):
+        self.now += seconds
+
+
+def test_first_get_loads_and_caches_document():
+    calls = []
+    source = make_jwks()
+
+    def loader():
+        calls.append(1)
+        return source
+
+    cache = JWKSCache(loader, ttl_seconds=30)
+    assert cache.get() == source
+    assert cache.get() == source
+    assert len(calls) == 1
+    assert cache.is_valid
+
+
+def test_cache_expires_at_ttl_boundary():
+    clock = FakeClock()
+    calls = []
+
+    def loader():
+        calls.append(1)
+        return make_jwks()
+
+    cache = JWKSCache(loader, ttl_seconds=10, clock=clock)
+    cache.get()
+    clock.advance(9.99)
+    cache.get()
+    assert len(calls) == 1
+
+    clock.advance(0.01)
+    cache.get()
+    assert len(calls) == 2
+
+
+def test_expired_entry_is_reloaded():
+    clock = FakeClock()
+    calls = []
+
+    def loader():
+        calls.append(1)
+        return make_jwks(f"synthetic-key-{len(calls)}")
+
+    cache = JWKSCache(loader, ttl_seconds=5, clock=clock)
+    assert cache.get()["keys"][0]["kid"] == "synthetic-key-1"
+
+    clock.advance(6)
+    assert cache.get()["keys"][0]["kid"] == "synthetic-key-2"
+
+
+def test_refresh_replaces_keys_after_rotation():
+    current = {"value": make_jwks("synthetic-old-key")}
+
+    cache = JWKSCache(lambda: current["value"])
+    assert cache.get()["keys"][0]["kid"] == "synthetic-old-key"
+
+    current["value"] = make_jwks("synthetic-new-key")
+    refreshed = cache.refresh()
+
+    assert refreshed["keys"][0]["kid"] == "synthetic-new-key"
+    assert cache.get()["keys"][0]["kid"] == "synthetic-new-key"
+
+
+def test_invalidate_forces_next_load():
+    calls = []
+
+    def loader():
+        calls.append(1)
+        return make_jwks()
+
+    cache = JWKSCache(loader)
+    cache.get()
+    cache.invalidate()
+
+    assert not cache.is_valid
+    cache.get()
+    assert len(calls) == 2
+
+
+def test_mutating_returned_document_does_not_mutate_cache():
+    cache = JWKSCache(lambda: make_jwks())
+    first = cache.get()
+    first["keys"][0]["kid"] = "tampered"
+
+    second = cache.get()
+    assert second["keys"][0]["kid"] == "synthetic-key-1"
+
+
+def test_mutating_loader_source_does_not_mutate_cache():
+    source = make_jwks()
+    cache = JWKSCache(lambda: source)
+    cache.get()
+
+    source["keys"][0]["kid"] = "tampered"
+    assert cache.get()["keys"][0]["kid"] == "synthetic-key-1"
+
+
+def test_expired_keys_not_returned_if_loader_fails():
+    clock = FakeClock()
+    state = {"fail": False}
+
+    def loader():
+        if state["fail"]:
+            raise OSError("synthetic loader failure")
+        return make_jwks()
+
+    cache = JWKSCache(loader, ttl_seconds=2, clock=clock)
+    cache.get()
+
+    clock.advance(3)
+    state["fail"] = True
+
+    with pytest.raises(JWKSCacheError):
+        cache.get()
+
+    assert not cache.is_valid
+
+
+def test_invalid_refresh_does_not_replace_valid_unexpired_cache():
+    state = {"document": make_jwks("synthetic-original")}
+
+    def loader():
+        return state["document"]
+
+    cache = JWKSCache(loader, ttl_seconds=30)
+    cache.get()
+
+    state["document"] = {"keys": []}
+    with pytest.raises(JWKSCacheError):
+        cache.refresh()
+
+    # The previous entry is still unexpired, but refresh reported failure.
+    # It must not be extended by the failed refresh.
+    assert cache.get()["keys"][0]["kid"] == "synthetic-original"
+
+
+@pytest.mark.parametrize("ttl", [0, -1, 3601, True, "5"])
+def test_rejects_invalid_ttl(ttl):
+    with pytest.raises(ValueError):
+        JWKSCache(lambda: make_jwks(), ttl_seconds=ttl)
+
+
+def test_rejects_non_callable_loader():
+    with pytest.raises(ValueError):
+        JWKSCache(None)
+
+
+def test_rejects_non_callable_clock():
+    with pytest.raises(ValueError):
+        JWKSCache(lambda: make_jwks(), clock=None)
+
+
+def test_invalid_loaded_jwks_is_rejected():
+    cache = JWKSCache(lambda: {"keys": []})
+    with pytest.raises(JWKSCacheError):
+        cache.get()
+
+
+def test_loader_exception_is_wrapped():
+    def loader():
+        raise OSError("synthetic transport failure")
+
+    cache = JWKSCache(loader)
+    with pytest.raises(JWKSCacheError):
+        cache.get()
+
+
+def test_refresh_loads_even_when_cache_is_valid():
+    calls = []
+
+    def loader():
+        calls.append(1)
+        return make_jwks(f"synthetic-key-{len(calls)}")
+
+    cache = JWKSCache(loader)
+    assert cache.get()["keys"][0]["kid"] == "synthetic-key-1"
+    assert cache.refresh()["keys"][0]["kid"] == "synthetic-key-2"
+    assert len(calls) == 2
+
+
+def test_cache_ttl_is_bounded_to_one_hour():
+    with pytest.raises(ValueError):
+        JWKSCache(lambda: make_jwks(), ttl_seconds=3600.01)
+
+
+def test_cache_is_initially_invalid():
+    cache = JWKSCache(lambda: make_jwks())
+    assert not cache.is_valid
+
+
+def test_get_returns_a_dict_copy():
+    cache = JWKSCache(lambda: make_jwks())
+    result = cache.get()
+    assert isinstance(result, dict)
+    assert result is not cache._document
+
+requirements.txt : EXISTS=True
+--- requirements.txt ---
+fastapi>=0.115,<1.0
+uvicorn[standard]>=0.34,<1.0
+pydantic>=2.10,<3.0
+pytest>=8.3,<9.0
+httpx>=0.28,<1.0
+PyJWT==2.15.1
+
+# Phase 8B.48 - versions verified in the project virtual environment
+cryptography==50.0.2
+
+=== FRONTEND AUTHENTICATION DEPENDENCIES ===
+{
+  "name": "cirt-dfir-platform-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "typescript": "~5.8.3",
+    "vite": "^7.0.0"
+  }
+}
+
+MSAL package indicator: False
+MSAL React indicator: False
+
+=== INSTALLED BACKEND DEPENDENCIES ===
+PyJWT: 2.15.1
+cryptography: 50.0.2
+httpx: 0.28.1
+requests: NOT INSTALLED
+urllib3: NOT INSTALLED
+Dependency inspection exit code: 0
+
+=== RECOMMENDED NEXT ENGINEERING TASK ===
+Implement and test a bounded HTTPS metadata transport only after reviewing these files.
+Required controls: certificate validation, exact host allowlisting, bounded timeouts,
+redirect rejection or per-hop validation, response-size limits, JSON validation,
+and safe failure behavior. Do not use token-provided URLs.
+Do not connect the transport to production authentication in this assessment phase.

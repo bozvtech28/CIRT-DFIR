@@ -1,0 +1,24 @@
+﻿CIRT DFIR Upgrade - Baseline Inventory
+Timestamp: 2026-10-15 22:37:52
+Project root: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Collector_Tools
+New upgrade workspace: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Collector_Tools\Upgrade-Workspace\CIRT_DFIR_Upgrade_20261015_223611
+
+Source/documentation files inventoried: 3661
+Files with SHA-256 recorded: 3661
+Files skipped because they exceed 25 MB: 0
+Hash errors: 0
+Inventory CSV: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Collector_Tools\Upgrade-Workspace\CIRT_DFIR_Upgrade_20261015_223611\Reports\Baseline_Inventory_20261015_223611.csv
+
+Scope notes:
+- Inventory is limited to selected source and documentation extensions.
+- Evidence directories, case archives, virtual environments and common dependency folders were excluded.
+- This is a baseline inventory, not a complete forensic integrity assessment.
+- Existing project files were not edited or executed by this script.
+- The upgrade workspace is separate from existing application source.
+
+Known security gate:
+- Case Manager filesystem containment remains OPEN.
+- The current native review prototype accepted a path through a parent junction.
+- Do not integrate that prototype as a production security fix.
+
+Next development step: review the synthetic-data frontend and requirements before backend integration.

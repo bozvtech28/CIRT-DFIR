@@ -1,0 +1,69 @@
+1st ChatL
+https://chatgpt.com/c/6acde194-06f4-83ec-985a-f6dd2f56fa39
+
+Project Location:
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional
+
+
+
+What Next
+please give me complete powershell command
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+================================================================
+Google Drive CIRT DFIR Collector Tools Link:
+https://drive.google.com/drive/folders/1QhijYpPI6FTLtthvkT97wCP9AfLqMVL9
+
+Filename: 
+CIRT_DFIR_Collector_Tools_v1.0.zip
+
+Password to extract: CIRT@DFIR2026
+
+Requirements install the 7zip to extract the file:
+https://www.7-zip.org/download.html
+
+================================================================
+
+Google Drive Link:
+https://drive.google.com/drive/folders/1QhijYpPI6FTLtthvkT97wCP9AfLqMVL9?usp=sharing
+
+
+1st Chat:
+https://chatgpt.com/c/6acde194-06f4-83ec-985a-f6dd2f56fa39
+
+Location of Project:
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Collector_Tools
+
+What Next
+please give me complete powershell command
+
+i want you to update and upgrade this project, this project used for Containment, Eradication and Recovery of Incident Response life cycle. This project will used for the purpose of CIRT tools as Digital Forensic and i want you make this professional software web application running via online, offline or intranet local network. this digital forensic tools have the application to run as executable file and enable to scan the entire allege compromise desktop, laptop, tablet and mobile and have the customized to scan specific target and the collective data will store in the web application of Digital Forensic database. this project have the dashboard of backend and frontend simple 1 scanner, 2. backend and frontend.
+
+now provide the complete setup of architectures, Tec stack, professional GUI/UX, documentation and users manual. 
+

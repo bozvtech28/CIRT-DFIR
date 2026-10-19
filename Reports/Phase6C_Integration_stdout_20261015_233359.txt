@@ -1,0 +1,5 @@
+PASS: test_health_endpoint
+PASS: test_demo_cases_are_synthetic
+
+Ran 2 API tests
+Failures: 0

@@ -1,0 +1,364 @@
+﻿CIRT-DFIR - PHASE 8B177
+Authentication boundary source review
+Generated: 2026-10-19 09:13:20
+Mode: READ-ONLY
+
+========================================================================
+FILE: app\auth_dependencies.py
+========================================================================
+   1: """Fail-closed authentication gate pending approved OIDC integration.
+   2: 
+   3: This module intentionally authenticates nobody. Replace the placeholder
+   4: identity provider integration only after the organization chooses a provider.
+   5: Never trust roles supplied by a browser or request body.
+   6: """
+   7: from fastapi import Depends, HTTPException
+   8: 
+   9: from app.security import (
+  10:     AuthenticationRequired,
+  11:     AuthorizationDenied,
+  12:     Principal,
+  13:     authorize,
+  14: )
+  15: 
+  16: def get_current_principal() -> Principal:
+  17:     """Reject all requests until real token/session validation is implemented."""
+  18:     raise HTTPException(
+  19:         status_code=401,
+  20:         detail="Authentication is not configured. Access is denied by default.",
+  21:         headers={"WWW-Authenticate": "Bearer"},
+  22:     )
+  23: 
+  24: def require_permission(permission: str):
+  25:     """Require a validated principal and enforce the RBAC permission."""
+  26:     def dependency(principal: Principal = Depends(get_current_principal)) -> Principal:
+  27:         try:
+  28:             authorize(principal, permission)
+  29:         except AuthenticationRequired as exc:
+  30:             raise HTTPException(
+  31:                 status_code=401,
+  32:                 detail="Authentication required.",
+  33:                 headers={"WWW-Authenticate": "Bearer"},
+  34:             ) from exc
+  35:         except AuthorizationDenied as exc:
+  36:             raise HTTPException(
+  37:                 status_code=403,
+  38:                 detail="Insufficient permission.",
+  39:             ) from exc
+  40:         return principal
+  41:     return dependency
+
+========================================================================
+FILE: app\entra_bearer_adapter.py
+========================================================================
+   1: """Offline-tested bearer-token adapter for the CIRT DFIR Entra integration.
+   2: 
+   3: This module does not fetch metadata or JWKS and is not wired into FastAPI.
+   4: The caller must supply a trusted key resolver and approved server-side config.
+   5: """
+   6: from collections.abc import Mapping
+   7: from typing import Any
+   8: 
+   9: from jwt import InvalidTokenError
+  10: 
+  11: from app.entra_principal import (
+  12:     PrincipalMappingError,
+  13:     principal_from_verified_claims,
+  14: )
+  15: from app.entra_token_verifier import verify_entra_access_token
+  16: from app.security import Principal
+  17: 
+  18: 
+  19: class BearerAuthenticationError(Exception):
+  20:     """Raised when a bearer token cannot produce a trusted principal."""
+  21: 
+  22: 
+  23: def principal_from_authorization_header(
+  24:     authorization: str | None,
+  25:     *,
+  26:     trusted_key_resolver,
+  27:     expected_issuer: str,
+  28:     expected_audience: str,
+  29:     expected_tenant_id: str,
+  30:     approved_role_map: Mapping[str, str],
+  31: ) -> Principal:
+  32:     """Validate a Bearer header, verify its JWT, and map verified roles.
+  33: 
+  34:     This function deliberately performs no network requests. Do not pass
+  35:     untrusted JWKS data or configuration supplied by a browser/request body.
+  36:     """
+  37:     if not isinstance(authorization, str):
+  38:         raise BearerAuthenticationError("A Bearer authorization header is required.")
+  39: 
+  40:     scheme, separator, raw_token = authorization.partition(" ")
+  41:     token = raw_token.strip()
+  42: 
+  43:     if (
+  44:         not separator
+  45:         or scheme.lower() != "bearer"
+  46:         or not token
+  47:         or any(character.isspace() for character in token)
+  48:     ):
+  49:         raise BearerAuthenticationError("The authorization header is malformed.")
+  50: 
+  51:     try:
+  52:         claims = verify_entra_access_token(
+  53:             token,
+  54:             trusted_key_resolver=trusted_key_resolver,
+  55:             expected_issuer=expected_issuer,
+  56:             expected_audience=expected_audience,
+  57:             expected_tenant_id=expected_tenant_id,
+  58:         )
+  59:         return principal_from_verified_claims(
+  60:             claims,
+  61:             approved_role_map=approved_role_map,
+  62:         )
+  63:     except (InvalidTokenError, PrincipalMappingError, ValueError) as exc:
+  64:         raise BearerAuthenticationError(
+  65:             "Bearer token validation or role mapping failed."
+  66:         ) from exc
+
+========================================================================
+FILE: app\entra_authenticator.py
+========================================================================
+   1: """Isolated composition of the CIRT DFIR Microsoft Entra auth primitives.
+   2: 
+   3: This module is deliberately NOT wired into FastAPI. Configuration must be
+   4: approved by the deployment owner and supplied explicitly by trusted code.
+   5: """
+   6: from __future__ import annotations
+   7: 
+   8: from collections.abc import Mapping
+   9: from dataclasses import dataclass
+  10: from types import MappingProxyType
+  11: from typing import Any, Callable
+  12: from urllib.parse import urlparse
+  13: 
+  14: from jwt import InvalidTokenError
+  15: 
+  16: from app.entra_bearer_adapter import (
+  17:     BearerAuthenticationError,
+  18:     principal_from_authorization_header,
+  19: )
+  20: from app.entra_http_transport import fetch_json_document
+  21: from app.entra_jwks import build_jwks_resolver
+  22: from app.entra_jwks_cache import JWKSCache, JWKSCacheError
+  23: from app.entra_metadata_client import (
+  24:     MetadataTrustError,
+  25:     TrustedMetadata,
+  26:     fetch_trusted_document,
+  27:     validate_discovery_document,
+  28: )
+  29: from app.security import KNOWN_ROLES, Principal
+  30: 
+  31: 
+  32: DocumentFetcher = Callable[..., dict[str, Any]]
+  33: 
+  34: 
+  35: def _normalized_hosts(value: frozenset[str], field_name: str) -> frozenset[str]:
+  36:     if not isinstance(value, (set, frozenset)) or not value:
+  37:         raise ValueError(f"{field_name} must be a non-empty set of hostnames")
+  38: 
+  39:     hosts: set[str] = set()
+  40:     for host in value:
+  41:         if not isinstance(host, str) or not host.strip():
+  42:             raise ValueError(f"{field_name} contains an invalid hostname")
+  43:         normalized = host.strip().lower().rstrip(".")
+  44:         if "/" in normalized or ":" in normalized or "@" in normalized:
+  45:             raise ValueError(f"{field_name} must contain hostnames, not URLs")
+  46:         hosts.add(normalized)
+  47: 
+  48:     if not hosts:
+  49:         raise ValueError(f"{field_name} must not be empty")
+  50:     return frozenset(hosts)
+  51: 
+  52: 
+  53: @dataclass(frozen=True)
+  54: class EntraAuthConfig:
+  55:     """Explicit server-side trust configuration; never build from request data."""
+  56: 
+  57:     tenant_id: str
+  58:     expected_issuer: str
+  59:     expected_audience: str
+  60:     discovery_url: str
+  61:     trusted_metadata_hosts: frozenset[str]
+  62:     allowed_jwks_hosts: frozenset[str]
+  63:     approved_role_map: Mapping[str, str]
+  64:     jwks_ttl_seconds: float = 300.0
+  65:     timeout_seconds: float = 3.0
+  66:     max_response_bytes: int = 1_048_576
+  67: 
+  68:     def __post_init__(self) -> None:
+  69:         for name in (
+  70:             "tenant_id",
+  71:             "expected_issuer",
+  72:             "expected_audience",
+  73:             "discovery_url",
+  74:         ):
+  75:             value = getattr(self, name)
+  76:             if not isinstance(value, str) or not value.strip():
+  77:                 raise ValueError(f"{name} must be explicitly configured")
+  78: 
+  79:         try:
+  80:             issuer = urlparse(self.expected_issuer)
+  81:             issuer_port = issuer.port
+  82:         except ValueError as exc:
+  83:             raise ValueError("expected_issuer is malformed") from exc
+  84: 
+  85:         if (
+  86:             issuer.scheme.lower() != "https"
+  87:             or not issuer.hostname
+  88:             or issuer_port not in (None, 443)
+  89:             or issuer.username
+  90:             or issuer.password
+  91:             or issuer.query
+  92:             or issuer.fragment
+  93:         ):
+  94:             raise ValueError("expected_issuer must be a fixed, safe HTTPS URL")
+  95: 
+  96:         try:
+  97:             parsed = urlparse(self.discovery_url)
+  98:             port = parsed.port
+  99:         except ValueError as exc:
+ 100:             raise ValueError("discovery_url is malformed") from exc
+ 101: 
+ 102:         if (
+ 103:             parsed.scheme.lower() != "https"
+ 104:             or not parsed.hostname
+ 105:             or port not in (None, 443)
+ 106:             or parsed.username
+ 107:             or parsed.password
+ 108:             or parsed.query
+ 109:             or parsed.fragment
+ 110:         ):
+ 111:             raise ValueError("discovery_url must be a fixed, safe HTTPS URL")
+ 112: 
+ 113:         metadata_hosts = _normalized_hosts(
+ 114:             self.trusted_metadata_hosts, "trusted_metadata_hosts"
+ 115:         )
+ 116:         jwks_hosts = _normalized_hosts(
+ 117:             self.allowed_jwks_hosts, "allowed_jwks_hosts"
+ 118:         )
+ 119: 
+ 120:         if parsed.hostname.lower().rstrip(".") not in metadata_hosts:
+ 121:             raise ValueError("discovery_url host is not in trusted_metadata_hosts")
+ 122: 
+ 123:         if not isinstance(self.approved_role_map, Mapping) or not self.approved_role_map:
+ 124:             raise ValueError("approved_role_map must be a non-empty mapping")
+ 125: 
+ 126:         role_map: dict[str, str] = {}
+ 127:         for app_role, internal_role in self.approved_role_map.items():
+ 128:             if not isinstance(app_role, str) or not app_role.strip():
+ 129:                 raise ValueError("Application role names must be non-empty strings")
+ 130:             if not isinstance(internal_role, str) or internal_role not in KNOWN_ROLES:
+ 131:                 raise ValueError("Role map contains an unrecognized internal role")
+ 132:             role_map[app_role] = internal_role
+ 133: 
+ 134:         if not isinstance(self.jwks_ttl_seconds, (int, float)) or isinstance(
+ 135:             self.jwks_ttl_seconds, bool
+ 136:         ):
+ 137:             raise ValueError("jwks_ttl_seconds must be numeric")
+ 138:         if not 0 < self.jwks_ttl_seconds <= 3600:
+ 139:             raise ValueError("jwks_ttl_seconds must be greater than 0 and at most 3600")
+ 140: 
+ 141:         if not isinstance(self.timeout_seconds, (int, float)) or isinstance(
+ 142:             self.timeout_seconds, bool
+ 143:         ):
+ 144:             raise ValueError("timeout_seconds must be numeric")
+ 145:         if not 0 < self.timeout_seconds <= 10:
+ 146:             raise ValueError("timeout_seconds must be greater than 0 and at most 10")
+ 147: 
+ 148:         if not isinstance(self.max_response_bytes, int) or isinstance(
+ 149:             self.max_response_bytes, bool
+ 150:         ):
+ 151:             raise ValueError("max_response_bytes must be an integer")
+ 152:         if not 1 <= self.max_response_bytes <= 4 * 1024 * 1024:
+ 153:             raise ValueError("max_response_bytes must be between 1 byte and 4 MiB")
+ 154: 
+ 155:         object.__setattr__(self, "trusted_metadata_hosts", metadata_hosts)
+ 156:         object.__setattr__(self, "allowed_jwks_hosts", jwks_hosts)
+ 157:         object.__setattr__(self, "approved_role_map", MappingProxyType(role_map))
+ 158: 
+ 159: 
+ 160: class EntraAuthenticator:
+ 161:     """Authenticate bearer headers using the explicitly approved configuration."""
+ 162: 
+ 163:     def __init__(
+ 164:         self,
+ 165:         config: EntraAuthConfig,
+ 166:         metadata: TrustedMetadata,
+ 167:         jwks_cache: JWKSCache,
+ 168:     ) -> None:
+ 169:         self._config = config
+ 170:         self._metadata = metadata
+ 171:         self._jwks_cache = jwks_cache
+ 172: 
+ 173:     @property
+ 174:     def metadata(self) -> TrustedMetadata:
+ 175:         """Expose the validated issuer/JWKS URI, not unvalidated discovery data."""
+ 176:         return self._metadata
+ 177: 
+ 178:     def _trusted_key_resolver(self, token: str):
+ 179:         try:
+ 180:             document = self._jwks_cache.get()
+ 181:             resolver = build_jwks_resolver(document)
+ 182:             return resolver(token)
+ 183:         except JWKSCacheError as exc:
+ 184:             # The adapter converts InvalidTokenError into a generic auth failure.
+ 185:             raise InvalidTokenError("Trusted signing keys are unavailable.") from exc
+ 186: 
+ 187:     def authenticate(self, authorization: str | None) -> Principal:
+ 188:         """Return a principal only after complete token and role validation."""
+ 189:         return principal_from_authorization_header(
+ 190:             authorization,
+ 191:             trusted_key_resolver=self._trusted_key_resolver,
+ 192:             expected_issuer=self._config.expected_issuer,
+ 193:             expected_audience=self._config.expected_audience,
+ 194:             expected_tenant_id=self._config.tenant_id,
+ 195:             approved_role_map=self._config.approved_role_map,
+ 196:         )
+ 197: 
+ 198: 
+ 199: def create_entra_authenticator(
+ 200:     config: EntraAuthConfig,
+ 201:     *,
+ 202:     document_fetcher: DocumentFetcher = fetch_json_document,
+ 203: ) -> EntraAuthenticator:
+ 204:     """Compose trusted discovery, cached JWKS, JWT verification and role mapping.
+ 205: 
+ 206:     The discovery URL is fixed in config. Discovery's issuer must exactly match
+ 207:     expected_issuer, and its JWKS hostname must be in allowed_jwks_hosts.
+ 208:     document_fetcher is injectable for tests; production should use the default
+ 209:     bounded HTTPS transport.
+ 210:     """
+ 211:     if not callable(document_fetcher):
+ 212:         raise ValueError("document_fetcher must be callable")
+ 213: 
+ 214:     def fetch_document(url: str, allowed_hosts: frozenset[str]) -> dict[str, Any]:
+ 215:         return fetch_trusted_document(
+ 216:             url,
+ 217:             trusted_hosts=set(allowed_hosts),
+ 218:             timeout_seconds=config.timeout_seconds,
+ 219:             transport=lambda requested_url, timeout: document_fetcher(
+ 220:                 requested_url,
+ 221:                 trusted_hosts=set(allowed_hosts),
+ 222:                 timeout_seconds=timeout,
+ 223:                 max_response_bytes=config.max_response_bytes,
+ 224:             ),
+ 225:         )
+ 226: 
+ 227:     discovery = fetch_document(
+ 228:         config.discovery_url, config.trusted_metadata_hosts
+ 229:     )
+ 230:     metadata = validate_discovery_document(
+ 231:         discovery,
+ 232:         expected_issuer=config.expected_issuer,
+ 233:         allowed_jwks_hosts=set(config.allowed_jwks_hosts),
+ 234:     )
+ 235: 
+ 236:     def load_jwks() -> dict[str, Any]:
+ 237:         return fetch_document(metadata.jwks_uri, config.allowed_jwks_hosts)
+ 238: 
+ 239:     cache = JWKSCache(load_jwks, ttl_seconds=config.jwks_ttl_seconds)
+ 240:     return EntraAuthenticator(config, metadata, cache)
+

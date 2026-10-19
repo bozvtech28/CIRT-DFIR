@@ -1,0 +1,18 @@
+﻿# CIRT DFIR - Entra configuration worksheet
+# Fill this in locally using administrator-approved information.
+# Do not add secrets, passwords, private keys, or access tokens.
+
+TENANT_ID=<pending-admin-confirmation>
+FRONTEND_CLIENT_ID=<pending-admin-confirmation>
+BACKEND_API_CLIENT_ID_OR_AUDIENCE=<pending-admin-confirmation>
+BACKEND_API_SCOPE=<pending-admin-confirmation>
+FRONTEND_REDIRECT_URI=<pending-admin-confirmation>
+POST_LOGOUT_REDIRECT_URI=<pending-admin-confirmation>
+APPROVED_TENANT_ISSUER=<pending-admin-confirmation>
+ADMINISTRATOR_APP_ROLE=<pending-admin-confirmation>
+ANALYST_APP_ROLE=<pending-admin-confirmation>
+VIEWER_APP_ROLE=<pending-admin-confirmation>
+
+# These are documentation placeholders, not ready-to-use environment settings.
+# Do not load this file into the application.
+# Do not use placeholder values to enable authentication.

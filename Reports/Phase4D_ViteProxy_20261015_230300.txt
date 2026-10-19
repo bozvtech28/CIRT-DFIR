@@ -1,0 +1,12 @@
+﻿Phase 4D - Vite local API proxy
+Timestamp: 2026-10-15 23:03:04
+Backup: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\Phase4D_ViteProxy_20261015_230300
+Frontend build exit code: 0
+Backend test exit code: 0
+Failure: 
+Rollback verified: False
+Vite proxy target: http://127.0.0.1:8000
+Frontend API path: /api/v1/demo/cases
+Server started: No
+Evidence accessed: No
+Production collector modified: No

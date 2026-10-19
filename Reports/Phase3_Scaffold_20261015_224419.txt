@@ -1,0 +1,27 @@
+﻿CIRT DFIR Phase 3 Scaffold Report
+Timestamp: 2026-10-15 22:44:20 +08:00
+Workspace: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Collector_Tools\Upgrade-Workspace\CIRT_DFIR_Upgrade_20261015_223611
+App root: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Collector_Tools\Upgrade-Workspace\CIRT_DFIR_Upgrade_20261015_223611\platform
+
+Created files: 15
+CREATED: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Collector_Tools\Upgrade-Workspace\CIRT_DFIR_Upgrade_20261015_223611\platform\frontend\package.json
+CREATED: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Collector_Tools\Upgrade-Workspace\CIRT_DFIR_Upgrade_20261015_223611\platform\frontend\index.html
+CREATED: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Collector_Tools\Upgrade-Workspace\CIRT_DFIR_Upgrade_20261015_223611\platform\frontend\vite.config.ts
+CREATED: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Collector_Tools\Upgrade-Workspace\CIRT_DFIR_Upgrade_20261015_223611\platform\frontend\tsconfig.json
+CREATED: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Collector_Tools\Upgrade-Workspace\CIRT_DFIR_Upgrade_20261015_223611\platform\frontend\tsconfig.app.json
+CREATED: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Collector_Tools\Upgrade-Workspace\CIRT_DFIR_Upgrade_20261015_223611\platform\frontend\tsconfig.node.json
+CREATED: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Collector_Tools\Upgrade-Workspace\CIRT_DFIR_Upgrade_20261015_223611\platform\frontend\src\main.tsx
+CREATED: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Collector_Tools\Upgrade-Workspace\CIRT_DFIR_Upgrade_20261015_223611\platform\frontend\src\App.tsx
+CREATED: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Collector_Tools\Upgrade-Workspace\CIRT_DFIR_Upgrade_20261015_223611\platform\frontend\src\style.css
+CREATED: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Collector_Tools\Upgrade-Workspace\CIRT_DFIR_Upgrade_20261015_223611\platform\backend\requirements.txt
+CREATED: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Collector_Tools\Upgrade-Workspace\CIRT_DFIR_Upgrade_20261015_223611\platform\backend\app\__init__.py
+CREATED: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Collector_Tools\Upgrade-Workspace\CIRT_DFIR_Upgrade_20261015_223611\platform\backend\app\main.py
+CREATED: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Collector_Tools\Upgrade-Workspace\CIRT_DFIR_Upgrade_20261015_223611\platform\backend\tests\test_api.py
+CREATED: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Collector_Tools\Upgrade-Workspace\CIRT_DFIR_Upgrade_20261015_223611\platform\backend\.gitignore
+CREATED: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Collector_Tools\Upgrade-Workspace\CIRT_DFIR_Upgrade_20261015_223611\platform\README.md
+
+Preserved existing files: 0
+
+No production files modified.
+No collector executed; no server started; no evidence accessed.
+Dependencies have not yet been installed.

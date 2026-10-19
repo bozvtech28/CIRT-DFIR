@@ -1,0 +1,9 @@
+PASS: API health contract: HTTP 200; development scaffold
+PASS: Synthetic demo-case endpoint: HTTP 200; 3 synthetic cases
+PASS: Repository and audit-event consistency: 3 demo cases and 3 corresponding creation audit events
+PASS: Audit protection triggers: Both audit update/delete protection triggers exist
+PASS: API repository wiring: Demo-case endpoint is wired to the repository-backed store
+FAIL: Repository unit tests: ModuleNotFoundError: No module named 'case_repository'
+
+Phase 6F Python checks: 5 passed, 1 failed
+FAILED CHECK: Repository unit tests

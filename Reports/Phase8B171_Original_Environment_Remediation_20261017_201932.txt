@@ -1,0 +1,54 @@
+﻿CIRT-DFIR - PHASE 8B171
+Controlled Original Environment Remediation
+Timestamp: 2026-10-17 20:19:33
+Original Python: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\.venv\Scripts\python.exe
+Trial Python: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\.venv_phase8b166\Scripts\python.exe
+Package change intended: httpx2==2.13.1
+Original environment will not be deleted or replaced.
+
+Original package snapshot: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase8B171_Original_PipFreeze_20261017_201932.txt
+httpx2: NOT INSTALLED
+httpcore2: NOT INSTALLED
+truststore: NOT INSTALLED
+
+--- INSTALL VERIFIED HTTPX2 VERSION ---
+Collecting httpx2==2.13.1
+  Using cached httpx2-2.13.1-py3-none-any.whl.metadata (9.8 kB)
+Requirement already satisfied: anyio>=4.10 in .\.venv\Lib\site-packages (from httpx2==2.13.1) (4.15.1)
+Collecting httpcore2==2.13.1 (from httpx2==2.13.1)
+  Using cached httpcore2-2.13.1-py3-none-any.whl.metadata (26 kB)
+Requirement already satisfied: idna>=3.18 in .\.venv\Lib\site-packages (from httpx2==2.13.1) (3.20)
+Collecting truststore>=0.10 (from httpx2==2.13.1)
+  Using cached truststore-0.10.5-py3-none-any.whl.metadata (4.5 kB)
+Requirement already satisfied: typing-extensions>=4.5.0 in .\.venv\Lib\site-packages (from httpx2==2.13.1) (4.16.0)
+Requirement already satisfied: h11>=0.16 in .\.venv\Lib\site-packages (from httpcore2==2.13.1->httpx2==2.13.1) (0.16.0)
+Using cached httpx2-2.13.1-py3-none-any.whl (95 kB)
+Using cached httpcore2-2.13.1-py3-none-any.whl (83 kB)
+Using cached truststore-0.10.5-py3-none-any.whl (19 kB)
+Installing collected packages: truststore, httpcore2, httpx2
+
+Successfully installed httpcore2-2.13.1 httpx2-2.13.1 truststore-0.10.5
+EXIT_CODE=0
+
+--- DEPENDENCY INTEGRITY ---
+No broken requirements found.
+EXIT_CODE=0
+
+--- TESTCLIENT WARNING PROBE ---
+TestClient import succeeded.
+EXIT_CODE=0
+
+--- FULL REGRESSION TEST SUITE ---
+........................................................................ [ 24%]
+........................................................................ [ 49%]
+........................................................................ [ 74%]
+........................................................................ [ 99%]
+..                                                                       [100%]
+290 passed in 3.88s
+EXIT_CODE=0
+PHASE 8B171 RESULT: PASS
+
+Verified: True
+Rollback attempted: False
+Rollback succeeded: False
+Completed: 2026-10-17 20:19:45

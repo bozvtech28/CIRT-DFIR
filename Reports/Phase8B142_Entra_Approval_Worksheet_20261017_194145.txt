@@ -1,0 +1,110 @@
+﻿CIRT-DFIR - PHASE 8B142
+MICROSOFT ENTRA ID CONFIGURATION APPROVAL WORKSHEET
+
+PURPOSE
+Collect verified, administrator-approved configuration before production
+authentication is connected to FastAPI.
+
+Do not enter client secrets, private keys, access tokens, refresh tokens,
+passwords, or other credentials in this worksheet.
+
+1. TENANT CONFIGURATION
+[ ] Tenant ID confirmed by Entra administrator
+    Approved value:
+
+[ ] Exact expected issuer ("iss" claim) confirmed for the intended token version
+    Approved value:
+
+[ ] API audience ("aud" claim) confirmed from the API app registration
+    Approved value:
+
+[ ] Token version and issuer format confirmed
+    Approved value / evidence reference:
+
+2. APPLICATION AND PERMISSIONS
+[ ] API app registration identified
+    Application name:
+
+[ ] Application ID URI / audience confirmed
+    Approved value:
+
+[ ] Required API permissions and consent reviewed
+    Approval reference:
+
+[ ] Token acquisition flow for the intended client confirmed
+    Flow / documentation reference:
+
+3. APPLICATION ROLES AND RBAC
+Confirm the exact application role values issued in the token's "roles" claim.
+The server must map only explicitly approved role values.
+
+[ ] Administrator role value approved
+    Exact role value:
+
+[ ] DFIR Analyst role value approved
+    Exact role value:
+
+[ ] Viewer role value approved
+    Exact role value:
+
+[ ] Unrecognized roles are denied by default
+[ ] Missing roles do not grant permissions
+[ ] User/group assignment policy reviewed
+[ ] Required permissions mapped to approved roles
+    Mapping approval reference:
+
+4. VALIDATION AND SECURITY REVIEW
+[ ] Issuer and audience values independently verified
+[ ] Tenant restriction verified
+[ ] Signature validation uses trusted signing keys
+[ ] Expiration and time-based claims validated
+[ ] Invalid, expired, wrong-issuer, and wrong-audience tokens rejected
+[ ] Missing credentials receive an authentication failure
+[ ] Insufficient permissions receive an authorization failure
+[ ] Key rotation and metadata/JWKS refresh behavior reviewed
+[ ] Authentication and authorization tests approved
+[ ] Logs do not expose tokens or credentials
+
+5. PRODUCTION APPROVAL
+Entra administrator:
+Name / team:
+
+Security reviewer:
+Name / team:
+
+Approval or change-ticket reference:
+
+Approved environment:
+[ ] Development
+[ ] Test
+[ ] Production
+
+Approval date:
+
+Outstanding issues:
+
+6. IMPLEMENTATION GATE
+Do not wire Entra authentication into FastAPI until:
+- Required values are confirmed from the actual tenant and API registration.
+- The application role mapping is explicitly approved.
+- Configuration is supplied through the approved deployment secret/configuration
+  mechanism; credentials must never be committed to source control.
+- The implementation and negative security tests are reviewed.
+
+Required environment variable names:
+CIRT_DFIR_ENTRA_TENANT_ID
+CIRT_DFIR_ENTRA_EXPECTED_ISSUER
+CIRT_DFIR_ENTRA_AUDIENCE
+
+This worksheet intentionally contains no actual tenant configuration.
+Do not use placeholder values as production configuration.
+
+Current baseline from Phase 8B141:
+- Pytest: 280 passed
+- auth_dependencies.py unchanged
+- main.py unchanged
+- Required Entra environment variables: not configured
+- Production authentication wiring: BLOCKED pending approved configuration
+
+No application source files or environment variables were changed by
+creating this worksheet.

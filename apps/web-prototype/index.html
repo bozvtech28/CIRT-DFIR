@@ -1,0 +1,264 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>CIRT DFIR | Incident Response Console</title>
+<style>
+:root {
+  --bg:#0b1220; --panel:#111c2e; --panel2:#16243a; --line:#26364d;
+  --text:#edf3fb; --muted:#9aacc4; --blue:#5ba3ff; --cyan:#56d5d0;
+  --amber:#f4c36a; --red:#ff8585; --green:#65d6a0;
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--text); font:14px/1.5 "Segoe UI",Arial,sans-serif; }
+button,input,select { font:inherit; }
+button { cursor:pointer; }
+.app { min-height:100vh; display:grid; grid-template-columns:245px minmax(0,1fr); }
+.sidebar { background:#0e192a; border-right:1px solid var(--line); padding:22px 14px; }
+.brand { display:flex; align-items:center; gap:12px; padding:4px 8px 25px; }
+.brand-mark { display:grid; place-items:center; width:42px; height:42px; border-radius:12px; background:#18385f; color:var(--cyan); font-size:22px; font-weight:800; }
+.brand h1 { margin:0; font-size:18px; letter-spacing:.5px; }
+.brand small { display:block; color:var(--muted); font-size:10px; letter-spacing:1.2px; }
+.nav-label { margin:16px 10px 7px; color:#7185a0; font-size:10px; letter-spacing:1.5px; text-transform:uppercase; }
+.nav { width:100%; border:0; background:transparent; color:#afc0d7; text-align:left; padding:11px 12px; border-radius:8px; margin:2px 0; display:flex; gap:11px; align-items:center; }
+.nav:hover,.nav.active { background:#1b2d46; color:white; }
+.nav.active { box-shadow:inset 3px 0 var(--blue); }
+.sidebar-note { margin:28px 5px 0; padding:12px; border:1px solid var(--line); border-radius:10px; color:var(--muted); font-size:11px; }
+main { min-width:0; }
+.topbar { display:flex; justify-content:space-between; align-items:center; gap:16px; padding:17px 28px; border-bottom:1px solid var(--line); background:#0e1726; }
+.crumb { color:var(--muted); font-size:12px; }
+.top-actions { display:flex; align-items:center; gap:10px; }
+.pill { border:1px solid var(--line); border-radius:999px; padding:5px 10px; color:var(--muted); font-size:11px; }
+.pill.demo { color:var(--amber); border-color:#65502e; background:#2a2419; }
+.avatar { width:32px; height:32px; display:grid; place-items:center; background:#24456b; border-radius:50%; font-weight:700; }
+.content { max-width:1500px; margin:auto; padding:28px; }
+.page-head { display:flex; justify-content:space-between; align-items:flex-start; gap:18px; margin-bottom:22px; }
+h2 { margin:0 0 5px; font-size:25px; letter-spacing:-.5px; }
+h3 { margin:0; font-size:14px; }
+.sub { color:var(--muted); margin:0; }
+.button { border:1px solid var(--line); border-radius:8px; padding:9px 13px; background:var(--panel2); color:var(--text); }
+.button.primary { background:#2868bb; border-color:#367fd7; }
+.button:hover { filter:brightness(1.12); }
+.grid { display:grid; gap:15px; }
+.metrics { grid-template-columns:repeat(4,minmax(0,1fr)); margin-bottom:17px; }
+.panel { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:17px; min-width:0; }
+.metric-label { color:var(--muted); font-size:12px; }
+.metric-value { font-size:29px; font-weight:700; margin:7px 0 3px; }
+.metric-foot { color:var(--muted); font-size:11px; }
+.blue { color:var(--blue); } .cyan { color:var(--cyan); } .amber { color:var(--amber); } .red { color:var(--red); } .green { color:var(--green); }
+.two-col { grid-template-columns:minmax(0,1.4fr) minmax(280px,1fr); margin-bottom:17px; }
+.panel-head { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:15px; }
+.panel-head span { color:var(--muted); font-size:11px; }
+.phase { margin:15px 0; }
+.phase-line { display:flex; justify-content:space-between; gap:10px; font-size:12px; margin-bottom:7px; }
+.track { height:7px; background:#243249; border-radius:9px; overflow:hidden; }
+.fill { height:100%; border-radius:9px; background:var(--blue); }
+.fill.teal { background:var(--cyan); } .fill.gold { background:var(--amber); } .fill.greenfill { background:var(--green); }
+.activity { display:grid; grid-template-columns:35px 1fr; gap:10px; padding:10px 0; border-bottom:1px solid #223148; }
+.activity:last-child { border-bottom:0; }
+.activity-icon { width:30px; height:30px; display:grid; place-items:center; background:#1a304a; border-radius:8px; color:var(--cyan); }
+.activity small { display:block; color:var(--muted); margin-top:3px; }
+.table-wrap { overflow:auto; }
+table { border-collapse:collapse; width:100%; min-width:650px; }
+th { color:#8fa4bf; font-size:10px; text-transform:uppercase; letter-spacing:.8px; font-weight:600; text-align:left; }
+th,td { padding:12px 10px; border-bottom:1px solid #25354b; }
+td { font-size:12px; }
+tbody tr:last-child td { border-bottom:0; }
+.status { display:inline-block; padding:4px 8px; border-radius:999px; font-size:10px; white-space:nowrap; }
+.status.review { background:#382d1b; color:var(--amber); }
+.status.active { background:#19344c; color:#8bc5ff; }
+.status.done { background:#17372f; color:var(--green); }
+.status.high { background:#3b2228; color:var(--red); }
+.status.medium { background:#382d1b; color:var(--amber); }
+.filters { display:flex; flex-wrap:wrap; gap:9px; margin-bottom:14px; }
+.filters input,.filters select { background:#0c1727; border:1px solid var(--line); color:var(--text); border-radius:8px; padding:9px 11px; }
+.filters input { min-width:230px; flex:1; }
+.notice { margin-bottom:17px; padding:11px 13px; border:1px solid #65502e; background:#282319; color:#f3d59a; border-radius:9px; font-size:12px; }
+.view { display:none; } .view.active { display:block; }
+.empty { padding:25px; color:var(--muted); text-align:center; }
+.footer { color:#7185a0; font-size:10px; padding:22px 0 8px; }
+@media(max-width:1050px) { .metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.two-col{grid-template-columns:1fr} }
+@media(max-width:720px) {
+ .app{grid-template-columns:1fr}.sidebar{padding:10px;border-right:0;border-bottom:1px solid var(--line)}
+ .brand{padding:5px 8px 12px}.nav-label,.sidebar-note{display:none}
+ .nav-list{display:flex;overflow:auto;gap:4px}.nav{width:auto;white-space:nowrap;font-size:12px;padding:9px}
+ .topbar{padding:13px 16px}.content{padding:18px 14px}.page-head{flex-direction:column}
+ .metrics{gap:9px}.panel{padding:13px}.metric-value{font-size:24px}
+}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="sidebar">
+  <div class="brand"><div class="brand-mark">C</div><div><h1>CIRT DFIR</h1><small>INCIDENT RESPONSE</small></div></div>
+  <div class="nav-label">Workspace</div>
+  <div class="nav-list">
+    <button class="nav active" data-view="dashboard">▦ &nbsp; Dashboard</button>
+    <button class="nav" data-view="cases">▣ &nbsp; Cases</button>
+    <button class="nav" data-view="scans">⌕ &nbsp; Assets &amp; Scans</button>
+    <button class="nav" data-view="findings">⚑ &nbsp; Findings</button>
+    <button class="nav" data-view="evidence">▤ &nbsp; Evidence Vault</button>
+    <button class="nav" data-view="response">⬡ &nbsp; Response Actions</button>
+    <button class="nav" data-view="reports">▧ &nbsp; Reports</button>
+  </div>
+  <div class="nav-label">System</div>
+  <button class="nav" data-view="admin">⚙ &nbsp; Administration</button>
+  <div class="sidebar-note">Prototype mode<br><br>All records are fictional. No scanner, API, upload or database is connected.</div>
+</aside>
+<main>
+<header class="topbar">
+  <div><strong>Incident Response Console</strong><div class="crumb">CIRT / Operations / <span id="crumb">Dashboard</span></div></div>
+  <div class="top-actions"><span class="pill demo">● DEMO DATA</span><span class="pill">Offline prototype</span><div class="avatar">IR</div></div>
+</header>
+<div class="content">
+<div class="notice">DEMONSTRATION ONLY — fictional records, no live scanning, no evidence upload, and no backend connection.</div>
+
+<section class="view active" id="dashboard">
+  <div class="page-head"><div><h2>Operations Dashboard</h2><p class="sub">Incident response status and case workload</p></div><button class="button primary" data-goto="cases">View cases →</button></div>
+  <div class="grid metrics">
+    <div class="panel"><div class="metric-label">Active cases</div><div class="metric-value">12</div><div class="metric-foot">Fictional demonstration</div></div>
+    <div class="panel"><div class="metric-label">Scans running</div><div class="metric-value blue">03</div><div class="metric-foot">Simulated job status</div></div>
+    <div class="panel"><div class="metric-label">Findings to review</div><div class="metric-value amber">27</div><div class="metric-foot">Synthetic findings</div></div>
+    <div class="panel"><div class="metric-label">Evidence pending</div><div class="metric-value cyan">04</div><div class="metric-foot">Not real evidence</div></div>
+  </div>
+  <div class="grid two-col">
+    <div class="panel"><div class="panel-head"><h3>Incident Response Lifecycle</h3><span>Illustrative progress</span></div>
+      <div class="phase"><div class="phase-line"><span>Detection &amp; Analysis</span><b>82%</b></div><div class="track"><div class="fill" style="width:82%"></div></div></div>
+      <div class="phase"><div class="phase-line"><span>Containment</span><b>55%</b></div><div class="track"><div class="fill teal" style="width:55%"></div></div></div>
+      <div class="phase"><div class="phase-line"><span>Eradication</span><b>25%</b></div><div class="track"><div class="fill gold" style="width:25%"></div></div></div>
+      <div class="phase"><div class="phase-line"><span>Recovery validation</span><b>10%</b></div><div class="track"><div class="fill greenfill" style="width:10%"></div></div></div>
+    </div>
+    <div class="panel"><div class="panel-head"><h3>Recent Activity</h3><span>Sample feed</span></div>
+      <div class="activity"><div class="activity-icon">✓</div><div>Collection manifest verified<small>CASE-2026-014 · 10 minutes ago · simulated</small></div></div>
+      <div class="activity"><div class="activity-icon">!</div><div>Finding requires analyst review<small>CASE-2026-012 · 34 minutes ago · simulated</small></div></div>
+      <div class="activity"><div class="activity-icon">↻</div><div>Recovery verification queued<small>CASE-2026-009 · 1 hour ago · simulated</small></div></div>
+    </div>
+  </div>
+  <div class="panel"><div class="panel-head"><h3>Priority Cases</h3><button class="button" data-goto="cases">All cases</button></div><div class="table-wrap"><table><thead><tr><th>Case ID</th><th>Incident</th><th>Severity</th><th>Owner</th><th>Status</th></tr></thead><tbody>
+    <tr><td>CASE-2026-014</td><td>Endpoint triage exercise</td><td><span class="status high">High</span></td><td>Analyst A</td><td><span class="status review">Review</span></td></tr>
+    <tr><td>CASE-2026-012</td><td>Suspicious persistence exercise</td><td><span class="status medium">Medium</span></td><td>Analyst B</td><td><span class="status active">Analysis</span></td></tr>
+    <tr><td>CASE-2026-009</td><td>Recovery validation exercise</td><td><span class="status">Low</span></td><td>Analyst C</td><td><span class="status active">Recovery</span></td></tr>
+  </tbody></table></div></div>
+</section>
+
+<section class="view" id="cases">
+  <div class="page-head"><div><h2>Case Management</h2><p class="sub">Fictional incident records for layout review</p></div><button class="button" id="exportCases">Export demo CSV</button></div>
+  <div class="panel"><div class="filters"><input id="caseSearch" placeholder="Search case ID or incident name"><select id="caseStatus"><option value="">All statuses</option><option>Review</option><option>Analysis</option><option>Recovery</option></select></div>
+  <div class="table-wrap"><table id="caseTable"><thead><tr><th>Case ID</th><th>Incident</th><th>Severity</th><th>Lead</th><th>Status</th><th>Phase</th></tr></thead><tbody>
+  <tr><td>CASE-2026-014</td><td>Endpoint triage exercise</td><td><span class="status high">High</span></td><td>Analyst A</td><td>Review</td><td>Detection</td></tr>
+  <tr><td>CASE-2026-012</td><td>Suspicious persistence exercise</td><td><span class="status medium">Medium</span></td><td>Analyst B</td><td>Analysis</td><td>Analysis</td></tr>
+  <tr><td>CASE-2026-009</td><td>Recovery validation exercise</td><td><span class="status">Low</span></td><td>Analyst C</td><td>Recovery</td><td>Recovery</td></tr>
+  <tr><td>CASE-2026-007</td><td>Log integrity tabletop</td><td><span class="status medium">Medium</span></td><td>Analyst D</td><td>Analysis</td><td>Detection</td></tr>
+  </tbody></table></div></div>
+</section>
+
+<section class="view" id="scans">
+  <div class="page-head"><div><h2>Assets &amp; Scans</h2><p class="sub">Sample endpoint inventory and simulated jobs</p></div><button class="button" id="scanInfo">Scan workflow info</button></div>
+  <div class="panel"><div class="table-wrap"><table><thead><tr><th>Asset ID</th><th>Hostname</th><th>Platform</th><th>Profile</th><th>Job status</th><th>Scope</th></tr></thead><tbody>
+  <tr><td>AST-001</td><td>WS-DEMO-01</td><td>Windows 11</td><td>Authorized triage</td><td><span class="status active">Running (simulated)</span></td><td>Approved artifacts</td></tr>
+  <tr><td>AST-002</td><td>LT-DEMO-02</td><td>Windows 10</td><td>Targeted</td><td><span class="status review">Review required</span></td><td>Selected paths</td></tr>
+  <tr><td>AST-003</td><td>VM-DEMO-03</td><td>Linux</td><td>Inventory</td><td><span class="status done">Completed (simulated)</span></td><td>Inventory only</td></tr>
+  </tbody></table></div><p class="sub">No device has been contacted or scanned. These rows are sample data only.</p></div>
+</section>
+
+<section class="view" id="findings">
+  <div class="page-head"><div><h2>Findings</h2><p class="sub">Synthetic detections for interface testing</p></div></div>
+  <div class="panel"><div class="table-wrap"><table><thead><tr><th>Finding ID</th><th>Case</th><th>Category</th><th>Severity</th><th>Confidence</th><th>Disposition</th></tr></thead><tbody>
+  <tr><td>FND-DEMO-101</td><td>CASE-2026-014</td><td>Persistence indicator</td><td><span class="status high">High</span></td><td>Medium</td><td>Needs review</td></tr>
+  <tr><td>FND-DEMO-102</td><td>CASE-2026-012</td><td>Unusual startup entry</td><td><span class="status medium">Medium</span></td><td>Low</td><td>Unconfirmed</td></tr>
+  <tr><td>FND-DEMO-103</td><td>CASE-2026-009</td><td>Recovery verification</td><td><span class="status">Informational</span></td><td>High</td><td>Verification pending</td></tr>
+  </tbody></table></div></div>
+</section>
+
+<section class="view" id="evidence">
+  <div class="page-head"><div><h2>Evidence Vault</h2><p class="sub">Metadata preview only; no evidence files are stored here</p></div></div>
+  <div class="panel"><div class="table-wrap"><table><thead><tr><th>Evidence ID</th><th>Case</th><th>Artifact</th><th>Integrity</th><th>Custody state</th></tr></thead><tbody>
+  <tr><td>EVD-DEMO-001</td><td>CASE-2026-014</td><td>sample_manifest.json</td><td><span class="status done">Demo only</span></td><td>Intake simulation</td></tr>
+  <tr><td>EVD-DEMO-002</td><td>CASE-2026-012</td><td>sample_eventlog.evtx</td><td><span class="status">Not verified</span></td><td>Pending review</td></tr>
+  </tbody></table></div><p class="sub">No hash here represents a real evidence object. Production evidence requires verified hashes and custody records.</p></div>
+</section>
+
+<section class="view" id="response">
+  <div class="page-head"><div><h2>Response Actions</h2><p class="sub">Approval-oriented workflow mock-up</p></div></div>
+  <div class="panel"><div class="table-wrap"><table><thead><tr><th>Action ID</th><th>Case</th><th>Action</th><th>Approval</th><th>Status</th></tr></thead><tbody>
+  <tr><td>ACT-DEMO-01</td><td>CASE-2026-014</td><td>Propose host isolation</td><td>Pending approver</td><td><span class="status review">Not executed</span></td></tr>
+  <tr><td>ACT-DEMO-02</td><td>CASE-2026-012</td><td>Recovery verification</td><td>Approved in exercise</td><td><span class="status done">Simulated</span></td></tr>
+  </tbody></table></div><p class="sub">This prototype cannot isolate hosts, terminate processes, delete files or execute remediation.</p></div>
+</section>
+
+<section class="view" id="reports">
+  <div class="page-head"><div><h2>Reports</h2><p class="sub">Planned report types</p></div></div>
+  <div class="grid metrics">
+    <div class="panel"><div class="metric-label">Case summary</div><div class="metric-value blue">PDF</div><div class="metric-foot">Planned</div></div>
+    <div class="panel"><div class="metric-label">Evidence register</div><div class="metric-value cyan">CSV</div><div class="metric-foot">Planned</div></div>
+    <div class="panel"><div class="metric-label">Collection manifest</div><div class="metric-value">JSON</div><div class="metric-foot">Planned</div></div>
+    <div class="panel"><div class="metric-label">Audit export</div><div class="metric-value">CSV</div><div class="metric-foot">Planned</div></div>
+  </div>
+  <div class="panel"><p class="sub">Report generation is not connected in this prototype. Export available on the Cases page produces only fictional demo rows.</p></div>
+</section>
+
+<section class="view" id="admin">
+  <div class="page-head"><div><h2>Administration</h2><p class="sub">Planned platform controls</p></div></div>
+  <div class="grid two-col">
+    <div class="panel"><h3>Identity &amp; Access</h3><p class="sub">MFA, role-based access, session policy and separation of duties.</p></div>
+    <div class="panel"><h3>Evidence &amp; Retention</h3><p class="sub">Retention schedules, custody policy, storage integrity and export approvals.</p></div>
+    <div class="panel"><h3>Scanner Trust</h3><p class="sub">Signed builds, enrollment, update verification and credential revocation.</p></div>
+    <div class="panel"><h3>System Audit</h3><p class="sub">Append-only or tamper-evident records, backups and health checks.</p></div>
+  </div>
+</section>
+
+<div class="footer">CIRT DFIR Upgrade Workspace · Synthetic-data UI prototype · No live backend connected</div>
+</div>
+</main>
+</div>
+<script>
+(function () {
+  const navButtons = Array.from(document.querySelectorAll('[data-view]'));
+  const views = Array.from(document.querySelectorAll('.view'));
+  const crumb = document.getElementById('crumb');
+  function showView(name) {
+    views.forEach(v => v.classList.toggle('active', v.id === name));
+    navButtons.forEach(b => b.classList.toggle('active', b.dataset.view === name));
+    const selected = navButtons.find(b => b.dataset.view === name);
+    crumb.textContent = selected ? selected.textContent.trim() : name;
+    window.scrollTo({top:0, behavior:'smooth'});
+  }
+  navButtons.forEach(b => b.addEventListener('click', () => showView(b.dataset.view)));
+  document.querySelectorAll('[data-goto]').forEach(b => b.addEventListener('click', () => showView(b.dataset.goto)));
+
+  const search = document.getElementById('caseSearch');
+  const status = document.getElementById('caseStatus');
+  function filterCases() {
+    const q = search.value.toLowerCase();
+    const st = status.value.toLowerCase();
+    document.querySelectorAll('#caseTable tbody tr').forEach(row => {
+      const text = row.textContent.toLowerCase();
+      const statusCell = row.cells[4].textContent.toLowerCase();
+      row.style.display = text.includes(q) && (!st || statusCell === st) ? '' : 'none';
+    });
+  }
+  search.addEventListener('input', filterCases);
+  status.addEventListener('change', filterCases);
+
+  document.getElementById('exportCases').addEventListener('click', function () {
+    const rows = [['Case ID','Incident','Severity','Lead','Status','Phase']];
+    document.querySelectorAll('#caseTable tbody tr').forEach(row => {
+      if (row.style.display === 'none') return;
+      rows.push(Array.from(row.cells).map(c => c.textContent.trim()));
+    });
+    const csv = rows.map(r => r.map(v => '"' + v.replace(/"/g,'""') + '"').join(',')).join('\r\n');
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'CIRT_DFIR_Demo_Cases.csv'; a.click();
+    URL.revokeObjectURL(url);
+  });
+  document.getElementById('scanInfo').addEventListener('click', function () {
+    alert('Prototype only: a production scan workflow must require case authorization, explicit scope, approval, a signed scanner, resource limits and an auditable manifest. No scan is started here.');
+  });
+})();
+</script>
+</body>
+</html>

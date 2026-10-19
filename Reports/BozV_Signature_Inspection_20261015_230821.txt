@@ -1,0 +1,6 @@
+﻿BozV signature placement inspection
+Timestamp: 2026-10-15 23:08:21
+Signature line 1: Developed by: BozV
+Signature line 2: Powered by: BozV
+Source files modified: No
+Report: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\BozV_Signature_Inspection_20261015_230821.txt

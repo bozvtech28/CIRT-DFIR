@@ -1,0 +1,12 @@
+FAIL | Repository source parity | design=e0e247773a734f2344d82720709c71c0b4083adc340ec1042ba63f8429857e8e; backend=a30b3039420a01b3567d29357c388bf329ad78a679918f63b45c1c62984f374a
+PASS | Schema source parity | design=69347622f6553ed288ed9db39215c7b5bfed5c4323c90bc93e2e333e55f9e915; backend=69347622f6553ed288ed9db39215c7b5bfed5c4323c90bc93e2e333e55f9e915
+PASS | Repository update function exists | Design repository update_case() definition checked
+PASS | Audit update event exists | Repository source checked for CASE_UPDATED event
+PASS | Audit append-only triggers exist | Design schema checked for update/delete protection triggers
+PASS | Backend uses case store | Current API wiring inspected; no source changed
+PASS | Case store has database path override | Environment-based database path override checked
+FAIL | Frontend uses relative API paths | Frontend source checked for relative demo-case endpoint
+PASS | BozV footer signature preserved | Both signature labels found in frontend source
+
+SUMMARY | Passed=7 | Failed=2 | Total=9
+NOTE | A failed parity check is a review item, not an automatic instruction to overwrite files.

@@ -1,0 +1,35 @@
+﻿CIRT DFIR PROFESSIONAL - PHASE 8B.43
+Timestamp: 2026-10-16T01:40:35.8441994+08:00
+Mode: READ-ONLY CONFIGURATION VALIDATION
+Worksheet: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\docs\Phase8B34_Entra_Config_Worksheet.txt
+
+=== FIELD PRESENCE ===
+PRESENT - Tenant ID
+PRESENT - API audience
+PRESENT - Expected issuer
+PRESENT - Frontend client ID
+PRESENT - API application scope
+PRESENT - Scope identifier
+MISSING / REVIEW - Application roles
+PRESENT - Frontend redirect URI
+PRESENT - Logout redirect URI
+PRESENT - Token version
+PRESENT - Deployment origin
+
+Placeholder occurrences: 15
+Fields requiring review: 1
+
+=== SECURITY STATUS ===
+Worksheet changed: NO
+Application source changed: NO
+Authentication gate changed: NO
+Packages installed: NO
+Server started: NO
+Microsoft endpoints contacted: NO
+Secrets or tokens displayed: NO
+Production authentication enabled: NO
+
+Overall result: REVIEW REQUIRED
+A present field is not proof that its value is valid or approved.
+Obtain and verify values with the authorized Microsoft Entra administrator.
+Do not put client secrets, private keys, passwords, or access tokens in this worksheet.

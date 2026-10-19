@@ -1,0 +1,234 @@
+﻿Phase 4B frontend inspection
+Timestamp: 2026-10-15 22:56:53
+Backup: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\Phase4B_PreAPI_20261015_225653
+Source modified: No
+Server started: No
+
+src\App.tsx SHA256=2491F247554F75D24C504D2EAEBF8C83594927B011CF4286BE88722EF2F09080
+import { useState } from "react";
+
+const navigation = [
+  "Dashboard",
+  "Cases",
+  "Assets & Scans",
+  "Findings",
+  "Evidence Vault",
+  "Response Actions",
+  "Reports",
+  "Administration",
+];
+
+const demoCases = [
+  { id: "DEMO-2026-001", title: "Endpoint Alert Review", severity: "High", status: "Investigating" },
+  { id: "DEMO-2026-002", title: "Suspicious Login Review", severity: "Medium", status: "Triage" },
+  { id: "DEMO-2026-003", title: "Mailbox Rule Assessment", severity: "Medium", status: "Evidence review" },
+  { id: "DEMO-2026-004", title: "Policy Compliance Check", severity: "Low", status: "Monitoring" },
+];
+
+function App() {
+  const [page, setPage] = useState("Dashboard");
+  const [search, setSearch] = useState("");
+
+  const filteredCases = demoCases.filter((item) =>
+    `${item.id} ${item.title} ${item.status}`
+      .toLowerCase()
+      .includes(search.toLowerCase()),
+  );
+
+  return (
+    <div className="shell">
+      <aside className="sidebar">
+        <div className="brand">
+          <div className="brand-mark">DFIR</div>
+          <div><strong>CIRT RESPONSE</strong><small>Investigation Platform</small></div>
+        </div>
+        <p className="nav-label">WORKSPACE</p>
+        <nav aria-label="Main navigation">
+          {navigation.map((item) => (
+            <button
+              className={`nav-item ${page === item ? "active" : ""}`}
+              key={item}
+              onClick={() => setPage(item)}
+            >
+              <span aria-hidden="true">{item === "Dashboard" ? "▦" : "◇"}</span>
+              {item}
+            </button>
+          ))}
+        </nav>
+        <div className="side-note">
+          <span className="status-dot" /> Prototype mode
+          <small>Fictional records only. No live systems connected.</small>
+        </div>
+      </aside>
+
+      <main className="main">
+        <header className="topbar">
+          <span>CIRT / DFIR <span className="muted"> / {page}</span></span>
+          <span className="demo-label">DEVELOPMENT SCAFFOLD</span>
+        </header>
+
+        <div className="content">
+          <div className="page-heading">
+            <div>
+              <span className="eyebrow">SECURITY OPERATIONS</span>
+              <h1>{page === "Dashboard" ? "Incident Response Overview" : page}</h1>
+              <p className="muted">Case management and forensic workflow development.</p>
+            </div>
+          </div>
+
+          <div className="notice">
+            DEVELOPMENT ONLY — all displayed records are synthetic. This frontend is
+            not connected to a scanner, production API, or evidence repository.
+          </div>
+
+          {page === "Dashboard" || page === "Cases" ? (
+            <>
+              <div className="metrics">
+                <article className="metric"><span>Open Cases</span><strong>08</strong><small>Demo metric</small></article>
+                <article className="metric"><span>Assets in Scope</span><strong>24</strong><small>Fictional inventory</small></article>
+                <article className="metric"><span>Priority Findings</span><strong>05</strong><small>Sample metric</small></article>
+                <article className="metric"><span>Evidence Items</span><strong>37</strong><small>Demo records only</small></article>
+              </div>
+
+              <section className="panel">
+                <div className="panel-heading">
+                  <h2>Case Register</h2>
+                  <input
+                    aria-label="Search demo cases"
+                    placeholder="Search demo cases..."
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                  />
+                </div>
+                <div className="table-wrap">
+                  <table>
+                    <thead><tr><th>Case ID</th><th>Incident</th><th>Severity</th><th>Status</th></tr></thead>
+                    <tbody>
+                      {filteredCases.map((item) => (
+                        <tr key={item.id}>
+                          <td>{item.id}</td><td>{item.title}</td>
+                          <td><span className={`pill ${item.severity.toLowerCase()}`}>{item.severity}</span></td>
+                          <td>{item.status}</td>
+                        </tr>
+                      ))}
+                      {filteredCases.length === 0 && (
+                        <tr><td colSpan={4}>No matching demo cases.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            </>
+          ) : (
+            <section className="panel placeholder">
+              <h2>{page}</h2>
+              <p>This module is a scaffold only. API integration is not implemented.</p>
+              <p>Production access controls, audit logging, and security review are required before operational use.</p>
+            </section>
+          )}
+        </div>
+        <footer> CIRT DFIR · Development scaffold · Synthetic data · Not for operational use</footer>
+      </main>
+    </div>
+  );
+}
+
+export default App;
+src\main.tsx SHA256=42E90C8A9973F6138D7B1E339E4247D08E1735AD83B7EF84AD390B3548EB251A
+import React from "react";
+import { createRoot } from "react-dom/client";
+import App from "./App";
+import "./style.css";
+
+createRoot(document.getElementById("root")!).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
+);
+src\style.css SHA256=DCAFC7941CEF8A107BD5BD5464C2E5053E805F04C3C65C1A1CDA017D6FCF5AE4
+:root{font-family:Inter,"Segoe UI",Arial,sans-serif;color:#e6edf7;background:#0b1120;font-synthesis:none;text-rendering:optimizeLegibility}
+*{box-sizing:border-box}
+body{margin:0;min-width:320px;min-height:100vh}
+button,input{font:inherit}
+.shell{min-height:100vh;display:grid;grid-template-columns:245px minmax(0,1fr)}
+.sidebar{background:#0d1627;border-right:1px solid #26354d;padding:22px 14px}
+.brand{display:flex;align-items:center;gap:11px;padding:0 7px 23px;border-bottom:1px solid #26354d}
+.brand-mark{background:#1b3c70;border:1px solid #3767a8;color:#a9ceff;padding:10px;border-radius:9px;font-weight:800}
+.brand strong,.brand small{display:block}
+.brand strong{font-size:13px;letter-spacing:.5px}
+.brand small{color:#8fa1ba;font-size:11px;margin-top:5px}
+.nav-label,.eyebrow{font-size:10px;letter-spacing:1.5px;font-weight:700;color:#7193c2}
+.nav-label{margin:25px 10px 10px}
+nav{display:grid;gap:4px}
+.nav-item{display:flex;align-items:center;gap:11px;text-align:left;border:0;border-radius:7px;padding:11px;background:transparent;color:#a9bad1;cursor:pointer}
+.nav-item:hover,.nav-item.active{background:#1b2b45;color:#fff}
+.nav-item.active{box-shadow:inset 3px 0 #5597ff}
+.side-note{margin:28px 5px;padding:12px;border:1px solid #26354d;border-radius:8px;color:#41d6a3;font-size:11px}
+.side-note small{display:block;color:#8fa1ba;line-height:1.6;margin-top:8px}
+.status-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#41d6a3;margin-right:6px}
+.main{min-width:0}
+.topbar{height:67px;display:flex;align-items:center;justify-content:space-between;padding:0 30px;border-bottom:1px solid #26354d;background:#0d1627;font-size:12px}
+.muted{color:#8fa1ba}
+.demo-label{font-size:10px;color:#8fa1ba;letter-spacing:1px}
+.content{max-width:1450px;margin:auto;padding:29px 30px}
+.page-heading{display:flex;justify-content:space-between;margin-bottom:22px}
+h1{font-size:27px;margin:8px 0}
+h2{font-size:15px;margin:0}
+.page-heading p{font-size:13px}
+.notice{background:#192a41;border:1px solid #304967;color:#b8cce5;padding:13px 15px;border-radius:8px;font-size:12px;line-height:1.6}
+.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin:20px 0}
+.metric,.panel{background:#111b2e;border:1px solid #26354d;border-radius:10px}
+.metric{padding:17px}
+.metric span,.metric small{display:block;color:#8fa1ba;font-size:12px}
+.metric strong{display:block;font-size:29px;margin:12px 0}
+.metric small{font-size:11px}
+.panel{padding:18px;margin-top:16px}
+.panel-heading{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-bottom:15px}
+input{background:#0b1424;border:1px solid #30405a;border-radius:7px;padding:10px 12px;color:#e6edf7;max-width:100%}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;white-space:nowrap}
+th,td{text-align:left;padding:13px 10px;border-bottom:1px solid #223047;font-size:12px}
+th{font-size:10px;letter-spacing:.8px;color:#8fa1ba;text-transform:uppercase}
+tbody tr:last-child td{border-bottom:0}
+.pill{display:inline-block;padding:5px 8px;border-radius:20px;font-size:10px;background:#24344a}
+.pill.high{background:#48252e;color:#ff9ba3}
+.pill.medium{background:#45361f;color:#f4cb78}
+.pill.low{background:#193d38;color:#75e5bd}
+.placeholder{line-height:1.7;color:#b8cce5}
+footer{text-align:center;padding:20px;color:#6f829b;font-size:10px}
+@media(max-width:950px){.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.shell{grid-template-columns:205px minmax(0,1fr)}.content{padding:22px 18px}}
+@media(max-width:650px){.shell{grid-template-columns:1fr}.sidebar{padding:12px}.brand{padding-bottom:12px}.nav-label,.side-note{display:none}nav{display:flex;flex-wrap:wrap;margin-top:12px}.nav-item{padding:9px;font-size:12px}.topbar{padding:0 14px}.content{padding:18px 12px}.metrics{gap:8px}.metric{padding:12px}.metric strong{font-size:23px}.panel-heading{align-items:flex-start;flex-direction:column}}
+vite.config.ts SHA256=6B43376270165293073C01F3A290405D117DF479A627D103ECA5B18AFAD14FFC
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    host: "127.0.0.1",
+    strictPort: true,
+  },
+});
+package.json SHA256=059A6E005F889183E5C0089D19C3EABA36148449CC16B793D482FC5F696CB864
+{
+  "name": "cirt-dfir-platform-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "typescript": "~5.8.3",
+    "vite": "^7.0.0"
+  }
+}

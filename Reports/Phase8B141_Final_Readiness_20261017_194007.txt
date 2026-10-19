@@ -1,0 +1,33 @@
+﻿CIRT-DFIR - PHASE 8B141
+Final regression and authentication-boundary verification
+Timestamp: 20261017_194007
+
+=== ENTRA CONFIGURATION PRESENCE ===
+CIRT_DFIR_ENTRA_TENANT_ID : Configured=False; Scopes=
+CIRT_DFIR_ENTRA_EXPECTED_ISSUER : Configured=False; Scopes=
+CIRT_DFIR_ENTRA_AUDIENCE : Configured=False; Scopes=
+
+=== FULL PYTEST SUITE ===
+........................................................................ [ 25%]
+........................................................................ [ 51%]
+........................................................................ [ 77%]
+................................................................         [100%]
+============================== warnings summary ===============================
+.venv\Lib\site-packages\fastapi\testclient.py:1
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+280 passed, 1 warning in 3.85s
+
+Pytest exit code: 0
+
+=== PRODUCTION BOUNDARY ===
+auth_dependencies.py unchanged: True
+main.py unchanged: True
+Production authentication boundary unchanged: True
+
+=== FINAL STATUS ===
+RESULT: TESTS PASS; PRODUCTION WIRING BLOCKED pending approved Entra configuration.
+
+No source files or environment variables were changed by this audit.

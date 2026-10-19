@@ -1,0 +1,107 @@
+﻿2026-10-16 12:27:53 Phase 8B.93 Entra readiness audit started.
+2026-10-16 12:27:53 Project: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional
+2026-10-16 12:27:53 Mode: local/offline audit; no production source edits.
+2026-10-16 12:27:54 PASS - Pre-audit backups - 22 existing files backed up to C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\Phase8B93_20261016_122753
+2026-10-16 12:27:54 PASS - File exists: platform\backend\app\auth_dependencies.py - C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\auth_dependencies.py
+2026-10-16 12:27:54 PASS - File exists: platform\backend\app\entra_token_verifier.py - C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_token_verifier.py
+2026-10-16 12:27:54 PASS - File exists: platform\backend\app\entra_jwks.py - C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_jwks.py
+2026-10-16 12:27:54 PASS - File exists: platform\backend\app\entra_jwks_cache.py - C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_jwks_cache.py
+2026-10-16 12:27:54 PASS - File exists: platform\backend\app\entra_principal.py - C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_principal.py
+2026-10-16 12:27:54 PASS - File exists: platform\backend\app\security.py - C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\security.py
+2026-10-16 12:27:54 PASS - File exists: platform\frontend\src\auth\entraConfig.ts - C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\auth\entraConfig.ts
+2026-10-16 12:27:54 PASS - File exists: platform\frontend\src\auth\authenticatedFetch.ts - C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\auth\authenticatedFetch.ts
+2026-10-16 12:27:54 PASS - File exists: platform\frontend\.env.example - C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\.env.example
+2026-10-16 12:27:54 PASS - Backend authentication remains fail-closed - Unauthenticated requests should continue to be rejected.
+2026-10-16 12:27:54 PASS - Token verifier static indicators - Review algorithm, issuer, audience, and tenant validation in verifier source.
+2026-10-16 12:27:54 PASS - JWKS resolver source indicators - Static indicators only; does not prove that the JWKS source is trusted.
+2026-10-16 12:27:54 PASS - JWKS cache source indicators - Static indicators only; review cache refresh and failure behavior.
+2026-10-16 12:27:54 PASS - Approved role mapping indicators - Roles should come from verified claims and an explicitly approved mapping.
+2026-10-16 12:27:54 FAIL - Verifier and mapper wired into API gate - Expected to remain FAIL until reviewed, trusted integration is deliberately implemented.
+2026-10-16 12:27:54 PASS - Frontend Entra config module present - Presence does not mean the tenant/client settings are approved.
+2026-10-16 12:27:54 PASS - Configuration placeholders identified - Placeholder markers found: True. Do not replace them with guessed values.
+2026-10-16 12:27:54 PASS - Frontend local .env file status - Exists: False. Contents intentionally not read or displayed.
+2026-10-16 12:27:54 PASS - MSAL dependencies declared - Dependency declaration check only.
+2026-10-16 12:27:54 Running: Focused API auth gate tests
+2026-10-16 12:27:56 Focused API auth gate tests output:
+2026-10-16 12:27:56 ....                                                                     [100%]
+2026-10-16 12:27:56 ============================== warnings summary ===============================
+2026-10-16 12:27:56 .venv\Lib\site-packages\fastapi\testclient.py:1
+2026-10-16 12:27:56   C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+2026-10-16 12:27:56     from starlette.testclient import TestClient as TestClient  # noqa
+2026-10-16 12:27:56 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+2026-10-16 12:27:56 4 passed, 1 warning in 0.04s
+2026-10-16 12:27:56 PASS - Focused API auth gate tests - Exit code: 0
+2026-10-16 12:27:56 Running: Full backend test suite
+2026-10-16 12:28:01 Full backend test suite output:
+2026-10-16 12:28:01 ........................................................................ [ 30%]
+2026-10-16 12:28:01 ........................................................................ [ 60%]
+2026-10-16 12:28:01 ........................................................................ [ 90%]
+2026-10-16 12:28:01 ......................                                                   [100%]
+2026-10-16 12:28:01 ============================== warnings summary ===============================
+2026-10-16 12:28:01 .venv\Lib\site-packages\fastapi\testclient.py:1
+2026-10-16 12:28:01   C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+2026-10-16 12:28:01     from starlette.testclient import TestClient as TestClient  # noqa
+2026-10-16 12:28:01 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+2026-10-16 12:28:01 238 passed, 1 warning in 3.12s
+2026-10-16 12:28:01 PASS - Full backend test suite - Exit code: 0
+2026-10-16 12:28:01 Running frontend production build.
+2026-10-16 12:28:05 BUILD: > cirt-dfir-platform-frontend@0.1.0 build
+2026-10-16 12:28:05 BUILD: > tsc -b && vite build
+2026-10-16 12:28:05 BUILD: [36mvite v7.3.7 [32mbuilding client environment for production...[36m[39m
+2026-10-16 12:28:05 BUILD: transforming...
+2026-10-16 12:28:05 BUILD: [32mâœ“[39m 200 modules transformed.
+2026-10-16 12:28:05 BUILD: rendering chunks...
+2026-10-16 12:28:05 BUILD: computing gzip size...
+2026-10-16 12:28:05 BUILD: [2mdist/[22m[32mindex.html                 [39m[1m[2m  0.45 kB[22m[1m[22m[2m â”‚ gzip:   0.30 kB[22m
+2026-10-16 12:28:05 BUILD: [2mdist/[22m[35massets/index-BPJY-tX1.css  [39m[1m[2m  4.87 kB[22m[1m[22m[2m â”‚ gzip:   1.64 kB[22m
+2026-10-16 12:28:05 BUILD: [2mdist/[22m[36massets/index-CIqGSHiu.js   [39m[1m[2m496.33 kB[22m[1m[22m[2m â”‚ gzip: 140.28 kB[22m
+2026-10-16 12:28:05 BUILD: [32mâœ“ built in 1.73s[39m
+2026-10-16 12:28:05 PASS - Frontend production build - Exit code: 0
+
+=== SUMMARY ===
+Timestamp: 20261016_122753
+Backup directory: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\Phase8B93_20261016_122753
+Report path: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase8B93_Entra_Readiness_20261016_122753.txt
+Source changes made by this audit: NONE
+Live Entra requests made: NONE
+Servers started: NONE
+Original evidence modified: NO
+
+=== CHECK RESULTS ===
+PASS | Pre-audit backups | 22 existing files backed up to C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\Phase8B93_20261016_122753
+PASS | File exists: platform\backend\app\auth_dependencies.py | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\auth_dependencies.py
+PASS | File exists: platform\backend\app\entra_token_verifier.py | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_token_verifier.py
+PASS | File exists: platform\backend\app\entra_jwks.py | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_jwks.py
+PASS | File exists: platform\backend\app\entra_jwks_cache.py | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_jwks_cache.py
+PASS | File exists: platform\backend\app\entra_principal.py | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_principal.py
+PASS | File exists: platform\backend\app\security.py | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\security.py
+PASS | File exists: platform\frontend\src\auth\entraConfig.ts | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\auth\entraConfig.ts
+PASS | File exists: platform\frontend\src\auth\authenticatedFetch.ts | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\auth\authenticatedFetch.ts
+PASS | File exists: platform\frontend\.env.example | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\.env.example
+PASS | Backend authentication remains fail-closed | Unauthenticated requests should continue to be rejected.
+PASS | Token verifier static indicators | Review algorithm, issuer, audience, and tenant validation in verifier source.
+PASS | JWKS resolver source indicators | Static indicators only; does not prove that the JWKS source is trusted.
+PASS | JWKS cache source indicators | Static indicators only; review cache refresh and failure behavior.
+PASS | Approved role mapping indicators | Roles should come from verified claims and an explicitly approved mapping.
+FAIL | Verifier and mapper wired into API gate | Expected to remain FAIL until reviewed, trusted integration is deliberately implemented.
+PASS | Frontend Entra config module present | Presence does not mean the tenant/client settings are approved.
+PASS | Configuration placeholders identified | Placeholder markers found: True. Do not replace them with guessed values.
+PASS | Frontend local .env file status | Exists: False. Contents intentionally not read or displayed.
+PASS | MSAL dependencies declared | Dependency declaration check only.
+PASS | Focused API auth gate tests | Exit code: 0
+PASS | Full backend test suite | Exit code: 0
+PASS | Frontend production build | Exit code: 0
+
+Passed checks: 22
+Failed/unfinished checks: 1
+
+=== REQUIRED BEFORE LIVE ENTRA INTEGRATION ===
+1. Obtain the approved tenant ID, issuer, API audience, SPA client ID, redirect URI, and API scope.
+2. Confirm the exact Entra application roles and their mapping to internal roles.
+3. Approve trusted discovery/JWKS retrieval, allowed hosts, key rotation, cache refresh, and outage behavior.
+4. Review token validation and connect it to the API dependency only after configuration is approved.
+5. Replace hardcoded audit actor attribution with the verified principal subject.
+6. Review HTTPS, reverse proxy, CORS, browser token handling, and deployment settings.
+
+Important: synthetic offline tests do not establish live Microsoft Entra authentication.
+The API authentication dependency must remain fail-closed until approved integration is complete.

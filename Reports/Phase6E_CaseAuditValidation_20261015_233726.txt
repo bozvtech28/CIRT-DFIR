@@ -1,0 +1,14 @@
+﻿CIRT DFIR Professional - Phase 6E
+Timestamp: 2026-10-15 23:37:27
+Validation exit code: 1
+Runner: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase6E_Validation_20261015_233726.py
+Standard output: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase6E_stdout_20261015_233726.txt
+Standard error: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase6E_stderr_20261015_233726.txt
+Database: Temporary synthetic SQLite database
+Persistent application database accessed: No
+Backend/frontend server started: No
+Production collector executed: No
+Real evidence accessed: No
+Original collector source modified: No
+
+Overall result: FAIL - One or more Phase 6E checks failed; review the logs

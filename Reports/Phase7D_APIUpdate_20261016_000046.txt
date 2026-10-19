@@ -1,0 +1,21 @@
+﻿CIRT DFIR Professional - Phase 7D
+Timestamp: 2026-10-16 00:00:53
+API patch exit code: 2
+Synthetic API test exit code: 1
+Synthetic API tests run: 7
+Synthetic API test failures: 1
+Synthetic API test errors: 0
+Synthetic API tests passed: False
+Frontend build exit code: 0
+Frontend build passed: True
+Repository/store/schema remained unchanged: True
+Backup directory: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\Phase7D_20261016_000046
+Test output: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase7D_TestOutput_20261016_000046.txt
+Test errors: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase7D_TestErrors_20261016_000046.txt
+Frontend output: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase7D_FrontendBuild_20261016_000046.txt
+API server started: No
+Production collector executed: No
+Real evidence accessed: No
+Persistent application database modified by tests: No
+
+STOP - One or more Phase 7D checks failed; inspect the report and error logs.

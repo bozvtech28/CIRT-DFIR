@@ -1,0 +1,260 @@
+﻿CIRT DFIR PROFESSIONAL
+PHASE 8B.72 - READ-ONLY ENTRA INTEGRATION AUDIT
+Timestamp: 2026-10-16T08:49:20.9214806+08:00
+Project: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional
+Purpose: Inspect authentication integration boundaries.
+Source files will not be modified.
+No packages will be installed.
+No network requests or authentication attempts will be made.
+
+=== 1. FILE INVENTORY ===
+PRESENT | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\package.json
+PRESENT | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\package-lock.json
+PRESENT | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\App.tsx
+PRESENT | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\main.tsx
+PRESENT | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\vite.config.ts
+PRESENT | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\main.py
+PRESENT | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\security.py
+PRESENT | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\auth_dependencies.py
+PRESENT | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\oidc_claims.py
+PRESENT | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_metadata_client.py
+PRESENT | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_http_transport.py
+PRESENT | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_jwks_cache.py
+PRESENT | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\requirements.txt
+PRESENT | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_api_auth_gate.py
+PRESENT | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\docs\Phase8B64_Entra_Configuration_Gate.md
+PRESENT | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\docs\Phase8B66_Entra_Frontend_Integration_Design.md
+
+=== 2. FRONTEND DEPENDENCY DECLARATIONS ===
+  "name": "cirt-dfir-platform-frontend",
+  "version": "0.1.0",
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview"
+  "dependencies": {
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  "devDependencies": {
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "typescript": "~5.8.3",
+    "vite": "^7.0.0"
+MSAL browser declared: False
+MSAL React declared: False
+
+=== 3. BACKEND AUTHENTICATION BOUNDARY ===
+
+--- FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\main.py ---
+L1: from fastapi import FastAPI, HTTPException, Depends
+L6: from app.auth_dependencies import require_permission
+L64: @app.patch("/api/v1/cases/{case_id}", response_model=DemoCase, dependencies=[Depends(require_permission("cases:update"))])
+L71: raise HTTPException(
+L95: raise HTTPException(status_code=409, detail=message) from exc
+L96: raise HTTPException(status_code=422, detail=message) from exc
+L99: raise HTTPException(status_code=404, detail="Case not found.")
+L103: @app.get("/api/v1/demo/cases", response_model=list[DemoCase], dependencies=[Depends(require_permission("cases:read"))])
+
+--- FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\security.py ---
+L3: This module authorizes an already authenticated principal.
+L4: It does not authenticate users or validate OIDC tokens.
+L23: "cases:read": frozenset({
+L28: "cases:update": frozenset({
+L56: def validate_principal(principal: Principal | None) -> Principal:
+L70: def authorize(principal: Principal | None, permission: str) -> bool:
+L71: """Authorize a trusted principal for a named permission.
+L74: mechanism, such as validated OIDC claims. Never build it from request
+L77: trusted = validate_principal(principal)
+
+--- FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\auth_dependencies.py ---
+L7: from fastapi import Depends, HTTPException
+L13: authorize,
+L16: def get_current_principal() -> Principal:
+L18: raise HTTPException(
+L19: status_code=401,
+L21: headers={"WWW-Authenticate": "Bearer"},
+L24: def require_permission(permission: str):
+L25: """Require a validated principal and enforce the RBAC permission."""
+L26: def dependency(principal: Principal = Depends(get_current_principal)) -> Principal:
+L28: authorize(principal, permission)
+L30: raise HTTPException(
+L31: status_code=401,
+L33: headers={"WWW-Authenticate": "Bearer"},
+L36: raise HTTPException(
+L37: status_code=403,
+
+--- FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\oidc_claims.py ---
+L4: validate_verified_claims() does NOT verify JWT signatures.
+L6: already checked the signature, permitted algorithm, issuer metadata/JWKS,
+L21: def validate_verified_claims(
+L24: expected_issuer: str,
+L25: expected_audience: str,
+L28: """Validate required OIDC claims after cryptographic token verification."""
+L32: if not expected_issuer or not expected_audience:
+L33: raise ValueError("Expected issuer and audience must be configured.")
+L35: issuer = claims.get("iss")
+L36: if not isinstance(issuer, str) or issuer != expected_issuer:
+L37: raise InvalidOIDCClaims("Token issuer is invalid.")
+L39: audience = claims.get("aud")
+L40: if isinstance(audience, str):
+L41: audiences = [audience]
+L42: elif isinstance(audience, list) and all(
+L43: isinstance(item, str) and item for item in audience
+L45: audiences = audience
+L47: raise InvalidOIDCClaims("Token audience is missing or malformed.")
+L49: if expected_audience not in audiences:
+L50: raise InvalidOIDCClaims("Token audience is invalid.")
+
+--- FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_metadata_client.py ---
+L1: """Provider-neutral Entra metadata/JWKS client primitives.
+L4: A caller must inject a trusted transport and must validate the
+L5: approved tenant, issuer, discovery endpoint, and JWKS URI.
+L19: """Raised when discovery metadata or JWKS data is not trusted."""
+L24: issuer: str
+L25: jwks_uri: str
+L46: def validate_discovery_document(
+L49: expected_issuer: str,
+L50: allowed_jwks_hosts: set[str],
+L52: """Validate discovery metadata against caller-approved trust settings.
+L61: if not isinstance(expected_issuer, str) or not expected_issuer.strip():
+L62: raise MetadataTrustError("Expected issuer is not configured")
+L64: issuer = document.get("issuer")
+L65: jwks_uri = document.get("jwks_uri")
+L67: if not isinstance(issuer, str) or issuer != expected_issuer:
+L68: raise MetadataTrustError("Discovery issuer does not match configuration")
+L70: _require_https_url(issuer, "issuer")
+L71: _require_https_url(jwks_uri, "jwks_uri")
+L73: parsed_jwks = urlparse(jwks_uri)
+L76: for host in allowed_jwks_hosts
+L80: if (parsed_jwks.hostname or "").lower().rstrip(".") not in allowed_hosts:
+L81: raise MetadataTrustError("JWKS hostname is not in the approved allowlist")
+L83: if parsed_jwks.query:
+L84: raise MetadataTrustError("JWKS URI query parameters are not allowed")
+L85: if parsed_jwks.fragment:
+L86: raise MetadataTrustError("JWKS URI fragments are not allowed")
+L88: return TrustedMetadata(issuer=issuer, jwks_uri=jwks_uri)
+L91: def fetch_trusted_document(
+L100: The injected transport must enforce the timeout and validate every
+L127: def validate_jwks_document(document: Any) -> dict[str, Any]:
+L128: """Perform structural checks before the existing offline JWKS resolver."""
+L131: raise MetadataTrustError("JWKS document must be a JSON object")
+L135: raise MetadataTrustError("JWKS must contain a non-empty keys array")
+L141: raise MetadataTrustError("Each JWKS key must be a JSON object")
+L145: raise MetadataTrustError("Each JWKS key must have a non-empty kid")
+L148: raise MetadataTrustError("JWKS contains duplicate key IDs")
+L154: raise MetadataTrustError("JWKS key must be designated for signatures")
+L160: raise MetadataTrustError("JWKS must not contain private key parameters")
+
+--- FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_http_transport.py ---
+L77: follow_redirects=False,
+L78: verify=True,
+L79: trust_env=False,
+
+--- FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_jwks_cache.py ---
+L1: """Bounded in-memory JWKS cache with explicit refresh.
+L20: validate_jwks_document,
+L24: class JWKSCacheError(RuntimeError):
+L25: """Raised when trusted JWKS data cannot be loaded or validated."""
+L28: class JWKSCache:
+L29: """Thread-safe in-memory JWKS cache with bounded TTL."""
+L56: def _load_and_validate(self) -> dict[str, Any]:
+L59: validated = validate_jwks_document(document)
+L61: return deepcopy(validated)
+L63: raise JWKSCacheError("Loaded JWKS failed validation") from exc
+L65: raise JWKSCacheError("JWKS loader failed") from exc
+L80: document = self._load_and_validate()
+L88: document = self._load_and_validate()
+L93: def invalidate(self) -> None:
+
+=== 4. FRONTEND API AND SIGN-IN REFERENCES ===
+
+--- FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\App.tsx ---
+L23: { case_id: "DEMO-2026-002", title: "Suspicious Login Review", severity: "Medium", status: "Triage" },
+L50: const response = await fetch(`${API_BASE}/api/v1/demo/cases`, {
+
+--- FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\main.tsx ---
+No configured audit patterns matched.
+
+--- FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\vite-env.d.ts ---
+No configured audit patterns matched.
+
+--- FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\vite.config.ts ---
+L9: proxy: {
+
+=== 5. BACKEND DEPENDENCIES AND AUTH TESTS ===
+--- requirements.txt ---
+fastapi>=0.115,<1.0
+uvicorn[standard]>=0.34,<1.0
+pydantic>=2.10,<3.0
+pytest>=8.3,<9.0
+httpx>=0.28,<1.0
+PyJWT==2.15.1
+# Phase 8B.48 - versions verified in the project virtual environment
+cryptography==50.0.2
+--- test_api_auth_gate.py relevant lines ---
+L4: from app.auth_dependencies import get_current_principal
+L6: from app.security import Principal, ROLE_ADMINISTRATOR, ROLE_VIEWER
+L10: def test_demo_cases_reject_unauthenticated_request():
+L11: app.dependency_overrides.clear()
+L13: response = client.get("/api/v1/demo/cases")
+L14: assert response.status_code == 401
+L17: app.dependency_overrides.clear()
+L19: def test_case_update_rejects_unauthenticated_request():
+L20: app.dependency_overrides.clear()
+L23: "/api/v1/cases/DEMO-2026-001",
+L26: assert response.status_code == 401
+L28: app.dependency_overrides.clear()
+L31: app.dependency_overrides[get_current_principal] = lambda: Principal(
+L37: "/api/v1/cases/DEMO-2026-001",
+L40: assert response.status_code == 403
+L42: app.dependency_overrides.clear()
+L45: # Dependency override represents an already validated synthetic principal.
+L47: from app.auth_dependencies import require_permission
+L52: test_app.dependency_overrides[get_current_principal] = lambda: Principal(
+L57: @test_app.get("/test-protected-update-permission")
+L58: def protected_permission_check(principal=Depends(require_permission("cases:update"))):
+L61: response = LocalClient(test_app).get("/test-protected-update-permission")
+
+=== 6. SOURCE FILE HASHES ===
+059A6E005F889183E5C0089D19C3EABA36148449CC16B793D482FC5F696CB864 | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\package.json
+BF1103B8D96A0244D00DD9B3741362C3409FAF7C890354F0ACBE75584B02DD03 | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\package-lock.json
+DBEAED9BED6258804A1A37F13185426929E977D45C1F4005AE1E511A2E2538DC | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\App.tsx
+42E90C8A9973F6138D7B1E339E4247D08E1735AD83B7EF84AD390B3548EB251A | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\main.tsx
+44CE89930B6E9D5B32679A5401000C6353DDE6CF453AE5F3D1ADB73EB81862A0 | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\vite.config.ts
+55D66D658ED9182535E1FFD6F98507958CB52AFAD3A4DEFFECECEC960A5F17B6 | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\main.py
+0022274BA349E8B72A26590814909D3A327403BAD44C63A200E8B1807584AB28 | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\security.py
+79502FBC9DD630408C2694DD6B4C1CD4E3B9D84B944CEB326F051980A0DAEF11 | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\auth_dependencies.py
+CC2EB813B999C669F8A0E26C74BB92AA18968F107E4416736F3738FF1EB3CFCE | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\oidc_claims.py
+FB08AC8C3F164EC335B99273872DB7E92CF67B6F3FC20CDFF9223C1E736A8472 | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_metadata_client.py
+4D86E55ED32D451095EE9979E3EC11D78639A31469E8D02BA9A811DED475D466 | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_http_transport.py
+97907A3B3A7EB074155C18D8700668ABF330AAFE4FF57F6FCAA776C96B87C4DD | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_jwks_cache.py
+5621D0F8CC935A8D5EFDC3DB7E496B5255EC6D876653D2DA5EA182D582F6177D | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\requirements.txt
+ABC212FCB6F25E9968C41375B78510FFF4E55205BC0E8F9D2F4986A07A9B66AF | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_api_auth_gate.py
+5BE2DEA921643EB3575395555F64DFF1E483DAA2F15BC72C25E2FAF834F29614 | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\docs\Phase8B64_Entra_Configuration_Gate.md
+918E212E48C8609C1F32F9A61FC8C9A3EBEDD32309980CF005C9710B838B270D | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\docs\Phase8B66_Entra_Frontend_Integration_Design.md
+
+=== 7. READ-ONLY INTEGRITY CHECK ===
+Unchanged=True | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\auth_dependencies.py
+Unchanged=True | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\package.json
+Unchanged=True | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_api_auth_gate.py
+Unchanged=True | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_metadata_client.py
+Unchanged=True | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\docs\Phase8B64_Entra_Configuration_Gate.md
+Unchanged=True | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\requirements.txt
+Unchanged=True | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\vite.config.ts
+Unchanged=True | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\oidc_claims.py
+Unchanged=True | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_http_transport.py
+Unchanged=True | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\main.tsx
+Unchanged=True | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_jwks_cache.py
+Unchanged=True | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\package-lock.json
+Unchanged=True | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\docs\Phase8B66_Entra_Frontend_Integration_Design.md
+Unchanged=True | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\security.py
+Unchanged=True | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\main.py
+Unchanged=True | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\App.tsx
+Audited source integrity passed: True
+
+=== AUDIT LIMITATIONS ===
+This audit uses static text matching; it does not prove that token validation is production-ready.
+No live identity-provider calls were made.
+No sign-in flow was enabled.
+No package manifests or lockfiles were intentionally changed.
+Production authentication must remain fail-closed until the approved Entra integration is implemented and tested.

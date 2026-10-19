@@ -1,0 +1,869 @@
+﻿PHASE 8B.131 - AUTHENTICATION CONTRACT REVIEW
+Timestamp: 20261017_190819
+Project: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional
+Read-only source inspection; no configuration or source edits.
+
+
+==================================================
+FILE: app\auth_dependencies.py
+==================================================
+"""Fail-closed authentication gate pending approved OIDC integration.
+
+This module intentionally authenticates nobody. Replace the placeholder
+identity provider integration only after the organization chooses a provider.
+Never trust roles supplied by a browser or request body.
+"""
+from fastapi import Depends, HTTPException
+
+from app.security import (
+    AuthenticationRequired,
+    AuthorizationDenied,
+    Principal,
+    authorize,
+)
+
+def get_current_principal() -> Principal:
+    """Reject all requests until real token/session validation is implemented."""
+    raise HTTPException(
+        status_code=401,
+        detail="Authentication is not configured. Access is denied by default.",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+def require_permission(permission: str):
+    """Require a validated principal and enforce the RBAC permission."""
+    def dependency(principal: Principal = Depends(get_current_principal)) -> Principal:
+        try:
+            authorize(principal, permission)
+        except AuthenticationRequired as exc:
+            raise HTTPException(
+                status_code=401,
+                detail="Authentication required.",
+                headers={"WWW-Authenticate": "Bearer"},
+            ) from exc
+        except AuthorizationDenied as exc:
+            raise HTTPException(
+                status_code=403,
+                detail="Insufficient permission.",
+            ) from exc
+        return principal
+    return dependency
+
+==================================================
+FILE: app\entra_bearer_adapter.py
+==================================================
+"""Offline-tested bearer-token adapter for the CIRT DFIR Entra integration.
+
+This module does not fetch metadata or JWKS and is not wired into FastAPI.
+The caller must supply a trusted key resolver and approved server-side config.
+"""
+from collections.abc import Mapping
+from typing import Any
+
+from jwt import InvalidTokenError
+
+from app.entra_principal import (
+    PrincipalMappingError,
+    principal_from_verified_claims,
+)
+from app.entra_token_verifier import verify_entra_access_token
+from app.security import Principal
+
+
+class BearerAuthenticationError(Exception):
+    """Raised when a bearer token cannot produce a trusted principal."""
+
+
+def principal_from_authorization_header(
+    authorization: str | None,
+    *,
+    trusted_key_resolver,
+    expected_issuer: str,
+    expected_audience: str,
+    expected_tenant_id: str,
+    approved_role_map: Mapping[str, str],
+) -> Principal:
+    """Validate a Bearer header, verify its JWT, and map verified roles.
+
+    This function deliberately performs no network requests. Do not pass
+    untrusted JWKS data or configuration supplied by a browser/request body.
+    """
+    if not isinstance(authorization, str):
+        raise BearerAuthenticationError("A Bearer authorization header is required.")
+
+    scheme, separator, raw_token = authorization.partition(" ")
+    token = raw_token.strip()
+
+    if (
+        not separator
+        or scheme.lower() != "bearer"
+        or not token
+        or any(character.isspace() for character in token)
+    ):
+        raise BearerAuthenticationError("The authorization header is malformed.")
+
+    try:
+        claims = verify_entra_access_token(
+            token,
+            trusted_key_resolver=trusted_key_resolver,
+            expected_issuer=expected_issuer,
+            expected_audience=expected_audience,
+            expected_tenant_id=expected_tenant_id,
+        )
+        return principal_from_verified_claims(
+            claims,
+            approved_role_map=approved_role_map,
+        )
+    except (InvalidTokenError, PrincipalMappingError, ValueError) as exc:
+        raise BearerAuthenticationError(
+            "Bearer token validation or role mapping failed."
+        ) from exc
+
+==================================================
+FILE: app\entra_token_verifier.py
+==================================================
+"""Isolated Microsoft Entra access-token verification foundation.
+
+SECURITY BOUNDARY:
+- This module is NOT wired into application routes.
+- The caller must provide a key resolver backed by trusted Microsoft
+  OpenID Connect metadata/JWKS, with HTTPS and safe key-rotation handling.
+- Never use a token-provided URL or arbitrary token-provided key as trusted.
+- Never use this verifier until tenant, issuer, and audience are approved.
+"""
+from collections.abc import Callable
+from typing import Any
+
+import jwt
+from jwt import InvalidTokenError
+
+TrustedKeyResolver = Callable[[str], Any]
+
+
+def verify_entra_access_token(
+    token: str,
+    *,
+    trusted_key_resolver: TrustedKeyResolver,
+    expected_issuer: str,
+    expected_audience: str,
+    expected_tenant_id: str,
+) -> dict[str, Any]:
+    """Verify an RS256 token against a trusted key resolver and fixed config.
+
+    The resolver must obtain keys only from an administrator-approved,
+    trusted JWKS source. This function deliberately performs no network access.
+    """
+    if not isinstance(token, str) or not token.strip():
+        raise InvalidTokenError("A non-empty bearer token is required.")
+
+    for name, value in (
+        ("expected_issuer", expected_issuer),
+        ("expected_audience", expected_audience),
+        ("expected_tenant_id", expected_tenant_id),
+    ):
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(f"{name} must be configured before verification.")
+
+    if not callable(trusted_key_resolver):
+        raise ValueError("A trusted signing-key resolver is required.")
+
+    # The key resolver must select a key from a trusted JWKS source.
+    # The token's algorithm is not allowed to select the accepted algorithm.
+    signing_key = trusted_key_resolver(token)
+    if signing_key is None:
+        raise InvalidTokenError("No trusted signing key was found.")
+
+    claims = jwt.decode(
+        token,
+        key=signing_key,
+        algorithms=["RS256"],
+        issuer=expected_issuer,
+        audience=expected_audience,
+        options={
+            "require": ["exp", "iat", "nbf", "iss", "aud", "sub", "tid"],
+            "verify_signature": True,
+            "verify_exp": True,
+            "verify_iat": True,
+            "verify_nbf": True,
+            "verify_iss": True,
+            "verify_aud": True,
+        },
+        leeway=0,
+    )
+
+    if not isinstance(claims.get("sub"), str) or not claims["sub"].strip():
+        raise InvalidTokenError("The subject claim is missing or invalid.")
+
+    if claims.get("tid") != expected_tenant_id:
+        raise InvalidTokenError("The token tenant does not match the configured tenant.")
+
+    return claims
+
+==================================================
+FILE: app\entra_principal.py
+==================================================
+"""Map verified Entra application-role claims to internal CIRT DFIR roles.
+
+SECURITY BOUNDARY:
+Only pass the claims returned by verify_entra_access_token after successful
+cryptographic and issuer/audience/tenant validation. This module does not
+validate token signatures or establish claim provenance.
+
+approved_role_map must come from trusted server-side configuration. Never
+accept it, the claims, or role assignments from browser-controlled input.
+"""
+from collections.abc import Mapping
+from typing import Any
+
+from app.security import KNOWN_ROLES, Principal
+
+
+class PrincipalMappingError(ValueError):
+    """Raised when verified claims cannot safely become an application principal."""
+
+
+def principal_from_verified_claims(
+    claims: Mapping[str, Any],
+    *,
+    approved_role_map: Mapping[str, str],
+) -> Principal:
+    """Create an internal Principal from verified claims and an explicit role map."""
+    if not isinstance(claims, Mapping):
+        raise PrincipalMappingError("Verified claims must be a mapping.")
+
+    subject = claims.get("sub")
+    if not isinstance(subject, str) or not subject.strip():
+        raise PrincipalMappingError("A non-empty subject claim is required.")
+
+    if not isinstance(approved_role_map, Mapping) or not approved_role_map:
+        raise PrincipalMappingError("An explicit server-side role map is required.")
+
+    for app_role, internal_role in approved_role_map.items():
+        if not isinstance(app_role, str) or not app_role.strip():
+            raise PrincipalMappingError("Role-map keys must be non-empty strings.")
+        if not isinstance(internal_role, str) or internal_role not in KNOWN_ROLES:
+            raise PrincipalMappingError("Role map contains an unrecognized internal role.")
+
+    raw_roles = claims.get("roles")
+    if not isinstance(raw_roles, list) or not raw_roles:
+        raise PrincipalMappingError("A non-empty roles array is required.")
+
+    if any(not isinstance(role, str) or not role.strip() for role in raw_roles):
+        raise PrincipalMappingError("Every application role must be a non-empty string.")
+
+    if len(set(raw_roles)) != len(raw_roles):
+        raise PrincipalMappingError("Duplicate application roles are not accepted.")
+
+    unknown_roles = [role for role in raw_roles if role not in approved_role_map]
+    if unknown_roles:
+        raise PrincipalMappingError("Claims contain an unapproved application role.")
+
+    internal_roles = frozenset(approved_role_map[role] for role in raw_roles)
+    if not internal_roles:
+        raise PrincipalMappingError("No approved internal roles were resolved.")
+
+    return Principal(subject=subject.strip(), roles=internal_roles)
+
+==================================================
+FILE: app\security.py
+==================================================
+"""RBAC policy foundation for CIRT DFIR Professional.
+
+This module authorizes an already authenticated principal.
+It does not authenticate users or validate OIDC tokens.
+Do not treat a caller-created Principal as proof of identity.
+"""
+
+from dataclasses import dataclass
+from typing import FrozenSet
+
+
+ROLE_ADMINISTRATOR = "Administrator"
+ROLE_ANALYST = "DFIR Analyst"
+ROLE_VIEWER = "Viewer"
+
+KNOWN_ROLES: FrozenSet[str] = frozenset({
+    ROLE_ADMINISTRATOR,
+    ROLE_ANALYST,
+    ROLE_VIEWER,
+})
+
+PERMISSIONS = {
+    "cases:read": frozenset({
+        ROLE_ADMINISTRATOR,
+        ROLE_ANALYST,
+        ROLE_VIEWER,
+    }),
+    "cases:update": frozenset({
+        ROLE_ADMINISTRATOR,
+        ROLE_ANALYST,
+    }),
+    "users:manage": frozenset({
+        ROLE_ADMINISTRATOR,
+    }),
+    "audit:read": frozenset({
+        ROLE_ADMINISTRATOR,
+    }),
+}
+
+
+@dataclass(frozen=True)
+class Principal:
+    """Identity and roles supplied by a trusted authentication layer."""
+    subject: str
+    roles: FrozenSet[str]
+
+
+class AuthenticationRequired(PermissionError):
+    """Raised when no authenticated principal is available."""
+
+
+class AuthorizationDenied(PermissionError):
+    """Raised when the principal lacks the required permission."""
+
+
+def validate_principal(principal: Principal | None) -> Principal:
+    if principal is None:
+        raise AuthenticationRequired("Authentication is required.")
+    if not isinstance(principal, Principal):
+        raise AuthenticationRequired("A trusted principal is required.")
+    if not isinstance(principal.subject, str) or not principal.subject.strip():
+        raise AuthenticationRequired("Principal subject is missing.")
+    if not principal.roles:
+        raise AuthorizationDenied("Principal has no assigned roles.")
+    if not principal.roles.issubset(KNOWN_ROLES):
+        raise AuthorizationDenied("Principal contains an unknown role.")
+    return principal
+
+
+def authorize(principal: Principal | None, permission: str) -> bool:
+    """Authorize a trusted principal for a named permission.
+
+    The caller must obtain the principal from a verified authentication
+    mechanism, such as validated OIDC claims. Never build it from request
+    fields supplied by the client.
+    """
+    trusted = validate_principal(principal)
+    allowed_roles = PERMISSIONS.get(permission)
+    if allowed_roles is None:
+        raise AuthorizationDenied("Unknown permission.")
+    if trusted.roles.isdisjoint(allowed_roles):
+        raise AuthorizationDenied("Permission denied.")
+    return True
+
+==================================================
+FILE: tests\test_api_auth_gate.py
+==================================================
+"""API access-control tests using synthetic identities only."""
+from fastapi.testclient import TestClient
+
+from app.auth_dependencies import get_current_principal
+from app.main import app
+from app.security import Principal, ROLE_ADMINISTRATOR, ROLE_VIEWER
+
+client = TestClient(app)
+
+def test_demo_cases_reject_unauthenticated_request():
+    app.dependency_overrides.clear()
+    try:
+        response = client.get("/api/v1/demo/cases")
+        assert response.status_code == 401
+        assert "Authentication" in response.json()["detail"]
+    finally:
+        app.dependency_overrides.clear()
+
+def test_case_update_rejects_unauthenticated_request():
+    app.dependency_overrides.clear()
+    try:
+        response = client.patch(
+            "/api/v1/cases/DEMO-2026-001",
+            json={"status": "Contained"},
+        )
+        assert response.status_code == 401
+    finally:
+        app.dependency_overrides.clear()
+
+def test_viewer_cannot_update_case():
+    app.dependency_overrides[get_current_principal] = lambda: Principal(
+        subject="synthetic-test-viewer",
+        roles=frozenset({ROLE_VIEWER}),
+    )
+    try:
+        response = client.patch(
+            "/api/v1/cases/DEMO-2026-001",
+            json={"status": "Contained"},
+        )
+        assert response.status_code == 403
+    finally:
+        app.dependency_overrides.clear()
+
+def test_case_update_audit_actor_comes_from_principal(tmp_path, monkeypatch):
+    import app.case_store as case_store
+    from app.case_repository import connect, initialize, create_case, list_audit_events
+    from app.security import ROLE_ANALYST
+
+    database_path = tmp_path / "audit-attribution.sqlite"
+    schema_path = __import__("pathlib").Path(__file__).resolve().parents[1] / "schema.sql"
+    if not schema_path.is_file():
+        # Find the project's schema file without touching the configured application database.
+        candidates = list(__import__("pathlib").Path(__file__).resolve().parents[1].rglob("*.sql"))
+        assert candidates, "No SQL schema file found for isolated test database."
+        schema_path = candidates[0]
+
+    initialize(database_path, schema_path)
+    db = connect(database_path)
+    try:
+        create_case(
+            db,
+            case_id="TEST-AUDIT-001",
+            title="Synthetic audit attribution test",
+            severity="Medium",
+            status="Triage",
+            actor_id="synthetic-test-creator",
+            timestamp="2026-01-01T00:00:00+00:00",
+        )
+    finally:
+        db.close()
+
+    monkeypatch.setattr(case_store, "DB_PATH", database_path)
+    app.dependency_overrides[get_current_principal] = lambda: Principal(
+        subject="synthetic-audit-analyst-117",
+        roles=frozenset({ROLE_ANALYST}),
+    )
+    try:
+        response = client.patch(
+            "/api/v1/cases/TEST-AUDIT-001",
+            json={"status": "Contained"},
+        )
+        assert response.status_code == 200, response.text
+
+        db = connect(database_path)
+        try:
+            events = list_audit_events(db, "TEST-AUDIT-001")
+        finally:
+            db.close()
+
+        update_events = [event for event in events if event["event_type"] == "CASE_UPDATED"]
+        assert len(update_events) == 1
+        assert update_events[0]["actor_id"] == "synthetic-audit-analyst-117"
+    finally:
+        app.dependency_overrides.clear()
+
+def test_admin_can_pass_case_update_authorization_gate():
+    # Dependency override represents an already validated synthetic principal.
+    # This test checks authorization only; it does not perform a database update.
+    from app.auth_dependencies import require_permission
+    from fastapi import Depends, FastAPI
+    from fastapi.testclient import TestClient as LocalClient
+
+    test_app = FastAPI()
+    test_app.dependency_overrides[get_current_principal] = lambda: Principal(
+        subject="synthetic-test-admin",
+        roles=frozenset({ROLE_ADMINISTRATOR}),
+    )
+
+    @test_app.get("/test-protected-update-permission")
+    def protected_permission_check(principal=Depends(require_permission("cases:update"))):
+        return {"authorized": True}
+
+    response = LocalClient(test_app).get("/test-protected-update-permission")
+    assert response.status_code == 200
+    assert response.json()["authorized"] is True
+
+
+==================================================
+FILE: tests\test_api_oidc_fail_closed.py
+==================================================
+from fastapi.testclient import TestClient
+
+from app.auth_dependencies import get_current_principal
+from app.main import app
+
+
+client = TestClient(app)
+
+
+def test_missing_bearer_token_is_rejected():
+    app.dependency_overrides.clear()
+    try:
+        response = client.get("/api/v1/demo/cases")
+        assert response.status_code == 401
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_malformed_bearer_token_is_rejected():
+    app.dependency_overrides.clear()
+    try:
+        response = client.get(
+            "/api/v1/demo/cases",
+            headers={"Authorization": "Bearer not.a.valid.token"},
+        )
+        assert response.status_code == 401
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_case_update_without_authentication_is_rejected():
+    app.dependency_overrides.clear()
+    try:
+        response = client.patch(
+            "/api/v1/cases/DEMO-2026-001",
+            json={"status": "Contained"},
+        )
+        assert response.status_code == 401
+    finally:
+        app.dependency_overrides.clear()
+
+==================================================
+FILE: tests\test_entra_bearer_adapter.py
+==================================================
+import json
+import time
+
+import jwt
+import pytest
+from cryptography.hazmat.primitives.asymmetric import rsa
+
+from app.entra_bearer_adapter import (
+    BearerAuthenticationError,
+    principal_from_authorization_header,
+)
+from app.entra_jwks import build_jwks_resolver
+from app.security import (
+    ROLE_ADMINISTRATOR,
+    ROLE_ANALYST,
+    ROLE_VIEWER,
+    AuthorizationDenied,
+    authorize,
+)
+
+TENANT = "11111111-2222-4333-8444-555555555555"
+ISSUER = f"https://login.microsoftonline.com/{TENANT}/v2.0"
+AUDIENCE = "api://synthetic-cirt-dfir-api"
+ROLE_MAP = {
+    "CIRT.DFIR.Viewer": ROLE_VIEWER,
+    "CIRT.DFIR.Analyst": ROLE_ANALYST,
+    "CIRT.DFIR.Administrator": ROLE_ADMINISTRATOR,
+}
+
+
+@pytest.fixture
+def identity():
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048,
+    )
+    public_jwk = json.loads(
+        jwt.algorithms.RSAAlgorithm.to_jwk(private_key.public_key())
+    )
+    public_jwk.update({
+        "kid": "offline-adapter-test-key",
+        "use": "sig",
+        "alg": "RS256",
+    })
+    resolver = build_jwks_resolver({"keys": [public_jwk]})
+
+    def issue_token(roles=None, **overrides):
+        now = int(time.time())
+        claims = {
+            "iss": ISSUER,
+            "aud": AUDIENCE,
+            "sub": "synthetic-adapter-user",
+            "tid": TENANT,
+            "iat": now,
+            "nbf": now,
+            "exp": now + 300,
+            "roles": roles if roles is not None else ["CIRT.DFIR.Analyst"],
+        }
+        claims.update(overrides)
+        return jwt.encode(
+            claims,
+            private_key,
+            algorithm="RS256",
+            headers={"kid": "offline-adapter-test-key"},
+        )
+
+    return resolver, issue_token
+
+
+def authenticate(header, resolver):
+    return principal_from_authorization_header(
+        header,
+        trusted_key_resolver=resolver,
+        expected_issuer=ISSUER,
+        expected_audience=AUDIENCE,
+        expected_tenant_id=TENANT,
+        approved_role_map=ROLE_MAP,
+    )
+
+
+def test_valid_analyst_bearer_produces_principal(identity):
+    resolver, issue = identity
+    principal = authenticate("Bearer " + issue(), resolver)
+    assert principal.subject == "synthetic-adapter-user"
+    assert principal.roles == frozenset({ROLE_ANALYST})
+    assert authorize(principal, "cases:read")
+    assert authorize(principal, "cases:update")
+
+
+def test_viewer_cannot_update(identity):
+    resolver, issue = identity
+    principal = authenticate(
+        "Bearer " + issue(roles=["CIRT.DFIR.Viewer"]),
+        resolver,
+    )
+    with pytest.raises(AuthorizationDenied):
+        authorize(principal, "cases:update")
+
+
+def test_administrator_can_pass_admin_permission(identity):
+    resolver, issue = identity
+    principal = authenticate(
+        "Bearer " + issue(roles=["CIRT.DFIR.Administrator"]),
+        resolver,
+    )
+    assert authorize(principal, "users:manage")
+    assert authorize(principal, "audit:read")
+
+
+@pytest.mark.parametrize(
+    "header",
+    [
+        None,
+        "",
+        "Basic abc",
+        "Bearer",
+        "Bearer ",
+        "Bearer first second",
+    ],
+)
+def test_missing_or_malformed_header_is_rejected(identity, header):
+    resolver, _ = identity
+    with pytest.raises(BearerAuthenticationError):
+        authenticate(header, resolver)
+
+
+def test_tampered_token_is_rejected(identity):
+    resolver, issue = identity
+    token = issue()
+    header, payload, signature = token.split(".")
+    altered = ("A" if signature[0] != "A" else "B") + signature[1:]
+    with pytest.raises(BearerAuthenticationError):
+        authenticate(f"Bearer {header}.{payload}.{altered}", resolver)
+
+
+def test_wrong_tenant_is_rejected(identity):
+    resolver, issue = identity
+    with pytest.raises(BearerAuthenticationError):
+        authenticate(
+            "Bearer " + issue(tid="aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"),
+            resolver,
+        )
+
+
+def test_unapproved_role_is_rejected(identity):
+    resolver, issue = identity
+    with pytest.raises(BearerAuthenticationError):
+        authenticate(
+            "Bearer " + issue(roles=["CIRT.DFIR.Unapproved"]),
+            resolver,
+        )
+
+
+def test_empty_roles_are_rejected(identity):
+    resolver, issue = identity
+    with pytest.raises(BearerAuthenticationError):
+        authenticate("Bearer " + issue(roles=[]), resolver)
+
+def test_wrong_audience_is_rejected(identity):
+    resolver, issue = identity
+    with pytest.raises(BearerAuthenticationError):
+        authenticate("Bearer " + issue(aud="api://wrong-synthetic-audience"), resolver)
+
+
+def test_wrong_issuer_is_rejected(identity):
+    resolver, issue = identity
+    with pytest.raises(BearerAuthenticationError):
+        authenticate("Bearer " + issue(iss="https://invalid.example/tenant/v2.0"), resolver)
+
+
+def test_expired_token_is_rejected(identity):
+    resolver, issue = identity
+    with pytest.raises(BearerAuthenticationError):
+        authenticate("Bearer " + issue(exp=int(time.time()) - 60), resolver)
+
+
+def test_future_issued_token_is_rejected(identity):
+    resolver, issue = identity
+    with pytest.raises(BearerAuthenticationError):
+        authenticate("Bearer " + issue(iat=int(time.time()) + 120), resolver)
+
+==================================================
+FILE: tests\test_entra_end_to_end_offline.py
+==================================================
+import json
+import time
+
+import jwt
+import pytest
+from cryptography.hazmat.primitives.asymmetric import rsa
+from jwt import InvalidTokenError
+
+from app.entra_jwks import build_jwks_resolver
+from app.entra_principal import (
+    PrincipalMappingError,
+    principal_from_verified_claims,
+)
+from app.entra_token_verifier import verify_entra_access_token
+from app.security import (
+    AuthorizationDenied,
+    ROLE_ADMINISTRATOR,
+    ROLE_ANALYST,
+    ROLE_VIEWER,
+    authorize,
+)
+
+TENANT_ID = "11111111-2222-4333-8444-555555555555"
+ISSUER = f"https://login.microsoftonline.com/{TENANT_ID}/v2.0"
+AUDIENCE = "api://synthetic-cirt-dfir-api"
+ROLE_MAP = {
+    "CIRT.DFIR.Viewer": ROLE_VIEWER,
+    "CIRT.DFIR.Analyst": ROLE_ANALYST,
+    "CIRT.DFIR.Administrator": ROLE_ADMINISTRATOR,
+}
+
+
+@pytest.fixture
+def identity_material():
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048,
+    )
+    public_jwk = json.loads(
+        jwt.algorithms.RSAAlgorithm.to_jwk(private_key.public_key())
+    )
+    public_jwk.update({
+        "kid": "synthetic-test-key",
+        "use": "sig",
+        "alg": "RS256",
+    })
+    jwks = {"keys": [public_jwk]}
+    resolver = build_jwks_resolver(jwks)
+    now = int(time.time())
+
+    def issue_token(roles=None, **overrides):
+        claims = {
+            "iss": ISSUER,
+            "aud": AUDIENCE,
+            "sub": "synthetic-user-001",
+            "tid": TENANT_ID,
+            "iat": now,
+            "nbf": now,
+            "exp": now + 300,
+            "roles": roles if roles is not None else ["CIRT.DFIR.Analyst"],
+        }
+        claims.update(overrides)
+        return jwt.encode(
+            claims,
+            private_key,
+            algorithm="RS256",
+            headers={"kid": "synthetic-test-key"},
+        )
+
+    return resolver, issue_token
+
+
+def verify(token, resolver):
+    return verify_entra_access_token(
+        token,
+        trusted_key_resolver=resolver,
+        expected_issuer=ISSUER,
+        expected_audience=AUDIENCE,
+        expected_tenant_id=TENANT_ID,
+    )
+
+
+def test_synthetic_token_verifies_maps_and_authorizes(identity_material):
+    resolver, issue_token = identity_material
+    claims = verify(issue_token(), resolver)
+    principal = principal_from_verified_claims(
+        claims,
+        approved_role_map=ROLE_MAP,
+    )
+
+    assert principal.subject == "synthetic-user-001"
+    assert principal.roles == frozenset({ROLE_ANALYST})
+    assert authorize(principal, "cases:read")
+    assert authorize(principal, "cases:update")
+
+    with pytest.raises(AuthorizationDenied):
+        authorize(principal, "users:manage")
+
+
+def test_viewer_can_read_but_cannot_update(identity_material):
+    resolver, issue_token = identity_material
+    claims = verify(
+        issue_token(roles=["CIRT.DFIR.Viewer"]),
+        resolver,
+    )
+    principal = principal_from_verified_claims(
+        claims,
+        approved_role_map=ROLE_MAP,
+    )
+
+    assert authorize(principal, "cases:read")
+    with pytest.raises(AuthorizationDenied):
+        authorize(principal, "cases:update")
+
+
+def test_invalid_signature_is_rejected_before_role_mapping(identity_material):
+    resolver, issue_token = identity_material
+    token = issue_token()
+    header, payload, signature = token.split(".")
+    altered_signature = ("A" if signature[0] != "A" else "B") + signature[1:]
+    tampered_token = f"{header}.{payload}.{altered_signature}"
+
+    with pytest.raises(InvalidTokenError):
+        verify(tampered_token, resolver)
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"iss": "https://attacker.invalid/"},
+        {"aud": "api://wrong-audience"},
+        {"tid": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"},
+        {"exp": int(time.time()) - 60},
+        {"nbf": int(time.time()) + 600},
+    ],
+)
+def test_invalid_claims_are_rejected(identity_material, overrides):
+    resolver, issue_token = identity_material
+    with pytest.raises(InvalidTokenError):
+        verify(issue_token(**overrides), resolver)
+
+
+def test_unapproved_role_is_rejected(identity_material):
+    resolver, issue_token = identity_material
+    claims = verify(
+        issue_token(roles=["CIRT.DFIR.Unapproved"]),
+        resolver,
+    )
+
+    with pytest.raises(PrincipalMappingError):
+        principal_from_verified_claims(
+            claims,
+            approved_role_map=ROLE_MAP,
+        )
+
+
+def test_missing_roles_are_rejected(identity_material):
+    resolver, issue_token = identity_material
+    claims = verify(issue_token(roles=[]), resolver)
+
+    with pytest.raises(PrincipalMappingError):
+        principal_from_verified_claims(
+            claims,
+            approved_role_map=ROLE_MAP,
+        )

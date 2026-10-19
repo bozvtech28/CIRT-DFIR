@@ -1,0 +1,136 @@
+﻿CIRT-DFIR - PHASE 8B182
+Read-only deployment configuration readiness audit
+Backend: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend
+
+=== CONFIGURATION FILE INVENTORY ===
+MISSING C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\.env
+MISSING C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\.env.example
+MISSING C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\.env.template
+MISSING C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\.env.sample
+FOUND   C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\requirements.txt
+MISSING C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\pyproject.toml
+MISSING C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\Dockerfile
+MISSING C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\docker-compose.yml
+MISSING C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\compose.yml
+MISSING C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\README.md
+MISSING C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\.env
+MISSING C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\.env.example
+FOUND   C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\.gitignore
+FOUND   C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\README.md
+MISSING C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\docker-compose.yml
+MISSING C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\compose.yml
+
+=== ENVIRONMENT VARIABLE STATUS ===
+CIRT_DFIR_ENTRA_TENANT_ID: MISSING OR EMPTY
+CIRT_DFIR_ENTRA_EXPECTED_ISSUER: MISSING OR EMPTY
+CIRT_DFIR_ENTRA_AUDIENCE: MISSING OR EMPTY
+
+=== SAFE CONFIGURATION MARKERS ===
+.venv_phase8b161\Lib\site-packages\dotenv\cli.py:15: "It seems python-dotenv is not installed with cli option. \n"
+.venv_phase8b161\Lib\site-packages\dotenv\cli.py:16: 'Run pip install "python-dotenv[cli]" to fix this.'
+.venv_phase8b161\Lib\site-packages\dotenv\ipython.py:8: from .main import find_dotenv, load_dotenv
+.venv_phase8b161\Lib\site-packages\dotenv\ipython.py:45: load_dotenv(dotenv_path, verbose=args.verbose, override=args.override)
+.venv_phase8b161\Lib\site-packages\dotenv\main.py:22: def _load_dotenv_disabled() -> bool:
+.venv_phase8b161\Lib\site-packages\dotenv\main.py:36: "python-dotenv could not parse statement starting at line %s",
+.venv_phase8b161\Lib\site-packages\dotenv\main.py:70: "python-dotenv could not find configuration file %s.",
+.venv_phase8b161\Lib\site-packages\dotenv\main.py:388: def load_dotenv(
+.venv_phase8b161\Lib\site-packages\dotenv\main.py:418: if _load_dotenv_disabled():
+.venv_phase8b161\Lib\site-packages\dotenv\main.py:420: "python-dotenv: .env loading disabled by PYTHON_DOTENV_DISABLED environment variable"
+.venv_phase8b161\Lib\site-packages\dotenv\__init__.py:3: from .main import dotenv_values, find_dotenv, get_key, load_dotenv, set_key, unset_key
+.venv_phase8b161\Lib\site-packages\dotenv\__init__.py:44: "load_dotenv",
+.venv_phase8b161\Lib\site-packages\pydantic\mypy.py:92: BASESETTINGS_FULLNAME = 'pydantic_settings.main.BaseSettings'
+.venv_phase8b161\Lib\site-packages\pydantic\mypy.py:553: is_settings = info.has_base(BASESETTINGS_FULLNAME)
+.venv_phase8b161\Lib\site-packages\pydantic\mypy.py:963: base_settings_node = self._api.lookup_fully_qualified(BASESETTINGS_FULLNAME).node
+.venv_phase8b161\Lib\site-packages\pydantic\_migration.py:304: if import_path == 'pydantic:BaseSettings':
+.venv_phase8b161\Lib\site-packages\pydantic\_migration.py:306: '`BaseSettings` has been moved to the `pydantic-settings` package. '
+.venv_phase8b161\Lib\site-packages\pydantic\_migration.py:307: f'See https://pydantic.dev/docs/validation/{version_short()}/migration/#basesettings-has-moved-to-pydantic-settings '
+.venv_phase8b161\Lib\site-packages\starlette\config.py:52: env_file: str | Path | None = None,
+.venv_phase8b161\Lib\site-packages\starlette\config.py:60: if env_file is not None:
+.venv_phase8b161\Lib\site-packages\starlette\config.py:61: if not os.path.isfile(env_file):
+.venv_phase8b161\Lib\site-packages\starlette\config.py:62: warnings.warn(f"Config file '{env_file}' not found.")
+.venv_phase8b161\Lib\site-packages\starlette\config.py:64: self.file_values = self._read_file(env_file, encoding)
+.venv_phase8b161\Lib\site-packages\uvicorn\config.py:213: env_file: str | os.PathLike[str] | None = None,
+.venv_phase8b161\Lib\site-packages\uvicorn\config.py:352: if env_file is not None:
+.venv_phase8b161\Lib\site-packages\uvicorn\config.py:353: from dotenv import load_dotenv
+.venv_phase8b161\Lib\site-packages\uvicorn\config.py:355: logger.info("Loading environment from '%s'", env_file)
+.venv_phase8b161\Lib\site-packages\uvicorn\config.py:356: load_dotenv(dotenv_path=env_file)
+.venv_phase8b161\Lib\site-packages\uvicorn\main.py:418: env_file: str,
+.venv_phase8b161\Lib\site-packages\uvicorn\main.py:464: env_file=env_file,
+.venv_phase8b161\Lib\site-packages\uvicorn\main.py:527: env_file: str | os.PathLike[str] | None = None,
+.venv_phase8b161\Lib\site-packages\uvicorn\main.py:584: env_file=env_file,
+.venv_phase8b161\Lib\site-packages\pydantic\v1\env_settings.py:13: env_file_sentinel = str(object())
+.venv_phase8b161\Lib\site-packages\pydantic\v1\env_settings.py:15: SettingsSourceCallable = Callable[['BaseSettings'], Dict[str, Any]]
+.venv_phase8b161\Lib\site-packages\pydantic\v1\env_settings.py:23: class BaseSettings(BaseModel):
+.venv_phase8b161\Lib\site-packages\pydantic\v1\env_settings.py:33: _env_file: Optional[DotenvType] = env_file_sentinel,
+.venv_phase8b161\Lib\site-packages\pydantic\v1\env_settings.py:34: _env_file_encoding: Optional[str] = None,
+.venv_phase8b161\Lib\site-packages\pydantic\v1\env_settings.py:43: _env_file=_env_file,
+.venv_phase8b161\Lib\site-packages\pydantic\v1\env_settings.py:44: _env_file_encoding=_env_file_encoding,
+.venv_phase8b161\Lib\site-packages\pydantic\v1\env_settings.py:53: _env_file: Optional[DotenvType] = None,
+.venv_phase8b161\Lib\site-packages\pydantic\v1\env_settings.py:54: _env_file_encoding: Optional[str] = None,
+.venv_phase8b161\Lib\site-packages\pydantic\v1\env_settings.py:61: env_file=(_env_file if _env_file != env_file_sentinel else self.__config__.env_file),
+.venv_phase8b161\Lib\site-packages\pydantic\v1\env_settings.py:62: env_file_encoding=(
+.venv_phase8b161\Lib\site-packages\pydantic\v1\env_settings.py:63: _env_file_encoding if _env_file_encoding is not None else self.__config__.env_file_encoding
+.venv_phase8b161\Lib\site-packages\pydantic\v1\env_settings.py:84: env_file: Optional[DotenvType] = None
+.venv_phase8b161\Lib\site-packages\pydantic\v1\env_settings.py:85: env_file_encoding: Optional[str] = None
+.venv_phase8b161\Lib\site-packages\pydantic\v1\env_settings.py:102: 'aliases are no longer used by BaseSettings to define which environment variables to read. '
+.venv_phase8b161\Lib\site-packages\pydantic\v1\env_settings.py:144: def __call__(self, settings: BaseSettings) -> Dict[str, Any]:
+.venv_phase8b161\Lib\site-packages\pydantic\v1\env_settings.py:152: __slots__ = ('env_file', 'env_file_encoding', 'env_nested_delimiter', 'env_prefix_len')
+.venv_phase8b161\Lib\site-packages\pydantic\v1\env_settings.py:156: env_file: Optional[DotenvType],
+.venv_phase8b161\Lib\site-packages\pydantic\v1\env_settings.py:157: env_file_encoding: Optional[str],
+.venv_phase8b161\Lib\site-packages\pydantic\v1\env_settings.py:161: self.env_file: Optional[DotenvType] = env_file
+.venv_phase8b161\Lib\site-packages\pydantic\v1\env_settings.py:162: self.env_file_encoding: Optional[str] = env_file_encoding
+.venv_phase8b161\Lib\site-packages\pydantic\v1\env_settings.py:166: def __call__(self, settings: BaseSettings) -> Dict[str, Any]:  # noqa C901
+.venv_phase8b161\Lib\site-packages\pydantic\v1\env_settings.py:177: dotenv_vars = self._read_env_files(settings.__config__.case_sensitive)
+.venv_phase8b161\Lib\site-packages\pydantic\v1\env_settings.py:213: def _read_env_files(self, case_sensitive: bool) -> Dict[str, Optional[str]]:
+.venv_phase8b161\Lib\site-packages\pydantic\v1\env_settings.py:214: env_files = self.env_file
+.venv_phase8b161\Lib\site-packages\pydantic\v1\env_settings.py:215: if env_files is None:
+.venv_phase8b161\Lib\site-packages\pydantic\v1\env_settings.py:218: if isinstance(env_files, (str, os.PathLike)):
+.venv_phase8b161\Lib\site-packages\pydantic\v1\env_settings.py:219: env_files = [env_files]
+.venv_phase8b161\Lib\site-packages\pydantic\v1\env_settings.py:222: for env_file in env_files:
+.venv_phase8b161\Lib\site-packages\pydantic\v1\env_settings.py:223: env_path = Path(env_file).expanduser()
+.venv_phase8b161\Lib\site-packages\pydantic\v1\env_settings.py:226: read_env_file(env_path, encoding=self.env_file_encoding, case_sensitive=case_sensitive)
+.venv_phase8b161\Lib\site-packages\pydantic\v1\env_settings.py:270: f'EnvSettingsSource(env_file={self.env_file!r}, env_file_encoding={self.env_file_encoding!r}, '
+.venv_phase8b161\Lib\site-packages\pydantic\v1\env_settings.py:281: def __call__(self, settings: BaseSettings) -> Dict[str, Any]:
+.venv_phase8b161\Lib\site-packages\pydantic\v1\env_settings.py:326: def read_env_file(
+.venv_phase8b161\Lib\site-packages\pydantic\v1\env_settings.py:332: raise ImportError('python-dotenv is not installed, run `pip install pydantic[dotenv]`') from e
+.venv_phase8b161\Lib\site-packages\pydantic\v1\mypy.py:81: BASESETTINGS_FULLNAME = f'{_NAMESPACE}.env_settings.BaseSettings'
+.venv_phase8b161\Lib\site-packages\pydantic\v1\mypy.py:317: is_settings = any(get_fullname(base) == BASESETTINGS_FULLNAME for base in info.mro[:-1])
+.venv_phase8b161\Lib\site-packages\pydantic\v1\__init__.py:7: from pydantic.v1.env_settings import BaseSettings
+.venv_phase8b161\Lib\site-packages\pydantic\v1\__init__.py:38: 'BaseSettings',
+Reports\Phase8A_SecurityAssessment_20261016_001041.py:109: ("Secret/configuration indicators", r"\b(os\.environ|getenv\(|BaseSettings|SecretStr|SECRET_KEY|API_KEY)\b"),
+Reports\Phase8B133_Auth_Integration_Preflight_20261017_191222.txt:2463: CIRT_DFIR_ENTRA_TENANT_ID: ProcessSet=False; UserSet=False; MachineSet=False
+Reports\Phase8B133_Auth_Integration_Preflight_20261017_191222.txt:2464: CIRT_DFIR_ENTRA_EXPECTED_ISSUER: ProcessSet=False; UserSet=False; MachineSet=False
+Reports\Phase8B133_Auth_Integration_Preflight_20261017_191222.txt:2465: CIRT_DFIR_ENTRA_AUDIENCE: ProcessSet=False; UserSet=False; MachineSet=False
+Reports\Phase8B133_Auth_Integration_Preflight_20261017_191305.txt:2463: CIRT_DFIR_ENTRA_TENANT_ID: ProcessSet=False; UserSet=False; MachineSet=False
+Reports\Phase8B133_Auth_Integration_Preflight_20261017_191305.txt:2464: CIRT_DFIR_ENTRA_EXPECTED_ISSUER: ProcessSet=False; UserSet=False; MachineSet=False
+Reports\Phase8B133_Auth_Integration_Preflight_20261017_191305.txt:2465: CIRT_DFIR_ENTRA_AUDIENCE: ProcessSet=False; UserSet=False; MachineSet=False
+Reports\Phase8B135_Entra_Composition_Audit_FIXED_20261017_191657.txt:834: CIRT_DFIR_ENTRA_TENANT_ID: Process=UNSET; User=UNSET; Machine=UNSET
+Reports\Phase8B135_Entra_Composition_Audit_FIXED_20261017_191657.txt:835: CIRT_DFIR_ENTRA_EXPECTED_ISSUER: Process=UNSET; User=UNSET; Machine=UNSET
+Reports\Phase8B135_Entra_Composition_Audit_FIXED_20261017_191657.txt:836: CIRT_DFIR_ENTRA_AUDIENCE: Process=UNSET; User=UNSET; Machine=UNSET
+Reports\Phase8B139_Production_Readiness_20261017_193720.txt:5: CIRT_DFIR_ENTRA_TENANT_ID : Configured=False; Scopes=
+Reports\Phase8B139_Production_Readiness_20261017_193720.txt:6: CIRT_DFIR_ENTRA_EXPECTED_ISSUER : Configured=False; Scopes=
+Reports\Phase8B139_Production_Readiness_20261017_193720.txt:7: CIRT_DFIR_ENTRA_AUDIENCE : Configured=False; Scopes=
+Reports\Phase8B139_Production_Readiness_20261017_193720.txt:24: Missing: CIRT_DFIR_ENTRA_TENANT_ID
+Reports\Phase8B139_Production_Readiness_20261017_193720.txt:25: Missing: CIRT_DFIR_ENTRA_EXPECTED_ISSUER
+Reports\Phase8B139_Production_Readiness_20261017_193720.txt:26: Missing: CIRT_DFIR_ENTRA_AUDIENCE
+Reports\Phase8B140_Entra_Setup_Worksheet_20261017_193846.txt:7: CIRT_DFIR_ENTRA_TENANT_ID : Configured=False; Scopes=
+Reports\Phase8B140_Entra_Setup_Worksheet_20261017_193846.txt:8: CIRT_DFIR_ENTRA_EXPECTED_ISSUER : Configured=False; Scopes=
+Reports\Phase8B140_Entra_Setup_Worksheet_20261017_193846.txt:9: CIRT_DFIR_ENTRA_AUDIENCE : Configured=False; Scopes=
+Reports\Phase8B141_Final_Readiness_20261017_194007.txt:6: CIRT_DFIR_ENTRA_TENANT_ID : Configured=False; Scopes=
+Reports\Phase8B141_Final_Readiness_20261017_194007.txt:7: CIRT_DFIR_ENTRA_EXPECTED_ISSUER : Configured=False; Scopes=
+Reports\Phase8B141_Final_Readiness_20261017_194007.txt:8: CIRT_DFIR_ENTRA_AUDIENCE : Configured=False; Scopes=
+Reports\Phase8B142_Entra_Approval_Worksheet_20261017_194145.txt:95: CIRT_DFIR_ENTRA_TENANT_ID
+Reports\Phase8B142_Entra_Approval_Worksheet_20261017_194145.txt:96: CIRT_DFIR_ENTRA_EXPECTED_ISSUER
+Reports\Phase8B142_Entra_Approval_Worksheet_20261017_194145.txt:97: CIRT_DFIR_ENTRA_AUDIENCE
+Reports\Phase8B143_Integration_Audit_20261017_194310.txt:62: CIRT_DFIR_ENTRA_TENANT_ID : Configured=False
+Reports\Phase8B143_Integration_Audit_20261017_194310.txt:63: CIRT_DFIR_ENTRA_EXPECTED_ISSUER : Configured=False
+Reports\Phase8B143_Integration_Audit_20261017_194310.txt:64: CIRT_DFIR_ENTRA_AUDIENCE : Configured=False
+Reports\Phase8B152_Config_Readiness_20261017_195345.txt:5: CIRT_DFIR_ENTRA_TENANT_ID : NOT SET in Process, User, or Machine scopes
+Output capped at 100 matches.
+
+=== SAFETY ===
+File contents and environment values were not printed.
+No configuration was created or modified.
+No network requests were made.
+Authentication wiring was not changed.
+STATUS: READ-ONLY INVENTORY; MANUAL REVIEW REQUIRED

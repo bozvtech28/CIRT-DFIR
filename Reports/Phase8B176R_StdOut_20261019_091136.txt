@@ -1,0 +1,36 @@
+CIRT-DFIR - PHASE 8B176-R
+Authentication wiring boundary review
+READ-ONLY: source files will not be modified
+Working directory: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend
+
+=== app/main.py ===
+6: from app.auth_dependencies import require_permission
+68:     principal = Depends(require_permission("cases:update")),
+104: @app.get("/api/v1/demo/cases", response_model=list[DemoCase], dependencies=[Depends(require_permission("cases:read"))])
+
+=== app/auth_dependencies.py ===
+16: def get_current_principal() -> Principal:
+24: def require_permission(permission: str):
+26:     def dependency(principal: Principal = Depends(get_current_principal)) -> Principal:
+28:             authorize(principal, permission)
+
+=== app/security.py ===
+70: def authorize(principal: Principal | None, permission: str) -> bool:
+
+=== app/entra_bearer_adapter.py ===
+15: from app.entra_token_verifier import verify_entra_access_token
+
+=== app/entra_authenticator.py ===
+16: from app.entra_bearer_adapter import (
+199: def create_entra_authenticator(
+
+=== app/entra_token_verifier.py ===
+No matching wiring markers found.
+
+=== app/entra_principal.py ===
+No matching wiring markers found.
+
+Missing target files: None
+Review limitation: text matches do not prove runtime behavior.
+Authentication must remain fail-closed pending review and approval.
+INSPECTION STATUS: COMPLETED - source markers collected

@@ -1,0 +1,29 @@
+﻿CIRT DFIR Prototype - Actual Structure Validation
+Timestamp: 2026-10-15 22:43:03 +08:00
+HTML: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Collector_Tools\Upgrade-Workspace\CIRT_DFIR_Upgrade_20261015_223611\apps\web-prototype\index.html
+SHA256: E0E280A35FF7A3F9DF04C00C76811500DA4AF48349CB6FC9F272F1FFC900337D
+
+Navigation targets and section matches:
+Target=admin ; SectionExists=True
+Target=cases ; SectionExists=True
+Target=dashboard ; SectionExists=True
+Target=evidence ; SectionExists=True
+Target=findings ; SectionExists=True
+Target=reports ; SectionExists=True
+Target=response ; SectionExists=True
+Target=scans ; SectionExists=True
+
+JavaScript function checks:
+Function=showView ; Present=True
+Function=filterCases ; Present=True
+
+HTML structure checks:
+Check=HTML doctype ; Present=True
+Check=Viewport metadata ; Present=True
+Check=Dashboard section ; Present=True
+Check=Cases table ; Present=True
+Check=Case search ; Present=True
+Check=CSV export control ; Present=True
+Check=Informational scan control ; Present=True
+Check=Closing script tag ; Present=True
+Check=Closing HTML tag ; Present=True

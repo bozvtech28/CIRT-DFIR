@@ -1,0 +1,40 @@
+﻿MICROSOFT ENTRA CONFIGURATION WORKSHEET
+Phase 8B.34 - Fill in only through the approved administrative process.
+
+Tenant ID:
+[WAITING FOR AUTHORIZED ADMIN]
+
+API audience:
+[WAITING FOR AUTHORIZED ADMIN]
+
+Expected issuer:
+[WAITING FOR AUTHORIZED ADMIN]
+
+Frontend client ID:
+[WAITING FOR AUTHORIZED ADMIN]
+
+Approved API scope:
+[WAITING FOR AUTHORIZED ADMIN]
+
+Exact app-role values:
+[WAITING FOR AUTHORIZED ADMIN]
+
+Frontend redirect URI:
+[WAITING FOR AUTHORIZED ADMIN]
+
+Logout redirect URI:
+[WAITING FOR AUTHORIZED ADMIN]
+
+Token version / claim contract:
+[WAITING FOR AUTHORIZED ADMIN]
+
+Approved deployment origin:
+[WAITING FOR AUTHORIZED ADMIN]
+
+HTTPS / reverse-proxy / CORS requirements:
+[WAITING FOR AUTHORIZED ADMIN]
+
+Administrator approval reference:
+[WAITING FOR AUTHORIZED ADMIN]
+
+SECURITY: Do not record secrets, private keys, access tokens, or refresh tokens here.

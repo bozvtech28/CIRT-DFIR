@@ -1,0 +1,19 @@
+﻿CIRT DFIR Professional - Phase 7D.2
+Timestamp: 2026-10-16 00:03:07
+Patch exit code: 2
+Test exit code: 0
+Tests run: 7
+Test failures: 0
+Test errors: 0
+Tests passed: True
+Frontend build exit code: 0
+Frontend build passed: True
+Backup directory: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\Phase7D2_20261016_000301
+Test output: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase7D2_TestOutput_20261016_000301.txt
+Test errors: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase7D2_TestErrors_20261016_000301.txt
+Build output: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase7D2_FrontendBuild_20261016_000301.txt
+API server started: No
+Production collector executed: No
+Real evidence accessed: No
+
+STOP - One or more checks failed; do not start the API server.

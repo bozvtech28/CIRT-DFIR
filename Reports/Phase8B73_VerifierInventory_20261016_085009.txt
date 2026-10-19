@@ -1,0 +1,1021 @@
+﻿CIRT DFIR PROFESSIONAL - PHASE 8B.73
+Offline verifier and JWKS resolver inventory
+Timestamp: 2026-10-16T08:50:09.6318352+08:00
+Read-only source inspection.
+No network requests, package changes, or server startup.
+Production authentication must remain fail-closed.
+
+
+--- platform\backend\app\entra_jwks.py ---
+L1: """Offline JWKS key selector for the Entra verifier prototype.
+L3: No HTTP calls are made by this module. The JWKS document must come from a
+L14: def build_jwks_resolver(jwks: Mapping[str, Any]):
+L15: """Build a resolver from a supplied JWKS document.
+L18: does not establish that the supplied JWKS document is authentic.
+L20: if not isinstance(jwks, Mapping):
+L21: raise ValueError("JWKS must be a mapping.")
+L23: keys = jwks.get("keys")
+L25: raise ValueError("JWKS must contain a non-empty keys array.")
+L31: raise ValueError("Every JWKS key must be an object.")
+L33: kid = item.get("kid")
+L34: if not isinstance(kid, str) or not kid.strip():
+L35: raise ValueError("Every JWKS key must have a non-empty kid.")
+L37: if kid in indexed:
+L38: raise ValueError("Duplicate kid values are not allowed.")
+L44: raise ValueError("JWKS key use must be sig.")
+L46: if item.get("alg", "RS256") != "RS256":
+L47: raise ValueError("Only RS256 JWKS keys are supported.")
+L49: # A public JWKS must not include RSA private-key parameters.
+L54: parsed = jwt.PyJWK.from_dict(dict(item), algorithm="RS256")
+L55: indexed[kid] = parsed.key
+L57: raise ValueError(f"Invalid RSA JWK for kid {kid!r}.") from exc
+L59: def resolve(token: str):
+L61: header = jwt.get_unverified_header(token)
+L65: if header.get("alg") != "RS256":
+L66: raise InvalidTokenError("Only RS256 tokens are accepted.")
+L68: kid = header.get("kid")
+L69: if not isinstance(kid, str) or not kid.strip():
+L70: raise InvalidTokenError("JWT header must contain a non-empty kid.")
+L72: key = indexed.get(kid)
+L74: raise InvalidTokenError("JWT kid was not found in the trusted JWKS set.")
+
+--- platform\backend\app\entra_jwks_cache.py ---
+L1: """Bounded in-memory JWKS cache with explicit refresh.
+L20: validate_jwks_document,
+L24: class JWKSCacheError(RuntimeError):
+L25: """Raised when trusted JWKS data cannot be loaded or validated."""
+L28: class JWKSCache:
+L29: """Thread-safe in-memory JWKS cache with bounded TTL."""
+L59: validated = validate_jwks_document(document)
+L63: raise JWKSCacheError("Loaded JWKS failed validation") from exc
+L65: raise JWKSCacheError("JWKS loader failed") from exc
+
+--- platform\backend\app\entra_metadata_client.py ---
+L1: """Provider-neutral Entra metadata/JWKS client primitives.
+L5: approved tenant, issuer, discovery endpoint, and JWKS URI.
+L19: """Raised when discovery metadata or JWKS data is not trusted."""
+L25: jwks_uri: str
+L46: def validate_discovery_document(
+L50: allowed_jwks_hosts: set[str],
+L65: jwks_uri = document.get("jwks_uri")
+L71: _require_https_url(jwks_uri, "jwks_uri")
+L73: parsed_jwks = urlparse(jwks_uri)
+L76: for host in allowed_jwks_hosts
+L80: if (parsed_jwks.hostname or "").lower().rstrip(".") not in allowed_hosts:
+L81: raise MetadataTrustError("JWKS hostname is not in the approved allowlist")
+L83: if parsed_jwks.query:
+L84: raise MetadataTrustError("JWKS URI query parameters are not allowed")
+L85: if parsed_jwks.fragment:
+L86: raise MetadataTrustError("JWKS URI fragments are not allowed")
+L88: return TrustedMetadata(issuer=issuer, jwks_uri=jwks_uri)
+L127: def validate_jwks_document(document: Any) -> dict[str, Any]:
+L128: """Perform structural checks before the existing offline JWKS resolver."""
+L131: raise MetadataTrustError("JWKS document must be a JSON object")
+L135: raise MetadataTrustError("JWKS must contain a non-empty keys array")
+L137: seen_kids: set[str] = set()
+L141: raise MetadataTrustError("Each JWKS key must be a JSON object")
+L143: kid = key.get("kid")
+L144: if not isinstance(kid, str) or not kid.strip():
+L145: raise MetadataTrustError("Each JWKS key must have a non-empty kid")
+L147: if kid in seen_kids:
+L148: raise MetadataTrustError("JWKS contains duplicate key IDs")
+L149: seen_kids.add(kid)
+L154: raise MetadataTrustError("JWKS key must be designated for signatures")
+L155: if key.get("alg", "RS256") != "RS256":
+L156: raise MetadataTrustError("Only RS256 signing keys are accepted")
+L160: raise MetadataTrustError("JWKS must not contain private key parameters")
+
+--- platform\backend\app\entra_token_verifier.py ---
+L6: OpenID Connect metadata/JWKS, with HTTPS and safe key-rotation handling.
+L19: def verify_entra_access_token(
+L22: trusted_key_resolver: TrustedKeyResolver,
+L27: """Verify an RS256 token against a trusted key resolver and fixed config.
+L29: The resolver must obtain keys only from an administrator-approved,
+L30: trusted JWKS source. This function deliberately performs no network access.
+L46: # The key resolver must select a key from a trusted JWKS source.
+L52: claims = jwt.decode(
+L55: algorithms=["RS256"],
+
+--- platform\backend\app\oidc_claims.py ---
+L4: validate_verified_claims() does NOT verify JWT signatures.
+L6: already checked the signature, permitted algorithm, issuer metadata/JWKS,
+L21: def validate_verified_claims(
+
+--- platform\backend\tests\test_api_oidc_fail_closed.py ---
+L10: def test_missing_bearer_token_is_rejected():
+L19: def test_malformed_bearer_token_is_rejected():
+
+--- platform\backend\tests\test_entra_jwks.py ---
+L8: from app.entra_jwks import build_jwks_resolver
+L11: def make_pair(kid):
+L13: public_jwk = json.loads(jwt.algorithms.RSAAlgorithm.to_jwk(private_key.public_key()))
+L14: public_jwk.update({"kid": kid, "use": "sig", "alg": "RS256"})
+L15: return private_key, public_jwk
+L18: def make_token(private_key, kid="key-a", algorithm="RS256"):
+L23: headers={"kid": kid},
+L27: def test_selects_matching_key_from_jwks():
+L28: private_key, public_jwk = make_pair("key-a")
+L29: resolver = build_jwks_resolver({"keys": [public_jwk]})
+L32: decoded = jwt.decode(
+L35: algorithms=["RS256"],
+L41: def test_selects_correct_key_when_multiple_keys_exist():
+L42: private_a, jwk_a = make_pair("key-a")
+L43: _, jwk_b = make_pair("key-b")
+L44: resolver = build_jwks_resolver({"keys": [jwk_a, jwk_b]})
+L45: assert resolver(make_token(private_a, "key-a")) is not None
+L48: def test_rejects_unknown_kid():
+L49: _, jwk = make_pair("known-key")
+L50: resolver = build_jwks_resolver({"keys": [jwk]})
+L52: with pytest.raises(InvalidTokenError, match="kid"):
+L53: resolver(make_token(unrelated_private, "unknown-key"))
+L56: def test_supports_rotation_overlap_with_old_and_new_keys():
+L57: old_private, old_jwk = make_pair("old-key")
+L58: new_private, new_jwk = make_pair("new-key")
+L59: resolver = build_jwks_resolver({"keys": [old_jwk, new_jwk]})
+L60: assert resolver(make_token(old_private, "old-key")) is not None
+L61: assert resolver(make_token(new_private, "new-key")) is not None
+L64: def test_removed_key_is_rejected_after_rotation():
+L65: old_private, old_jwk = make_pair("old-key")
+L66: _, new_jwk = make_pair("new-key")
+L67: resolver_after_rotation = build_jwks_resolver({"keys": [new_jwk]})
+L68: with pytest.raises(InvalidTokenError, match="kid"):
+L69: resolver_after_rotation(make_token(old_private, "old-key"))
+L78: def test_rejects_malformed_jwks_documents(document):
+L80: build_jwks_resolver(document)
+L83: def test_rejects_duplicate_kids():
+L84: _, jwk_a = make_pair("duplicate")
+L85: _, jwk_b = make_pair("duplicate")
+L87: build_jwks_resolver({"keys": [jwk_a, jwk_b]})
+L90: def test_rejects_non_rsa_key():
+L92: build_jwks_resolver({"keys": [{"kid": "ec-key", "kty": "EC"}]})
+L95: def test_rejects_encryption_only_key():
+L96: _, jwk = make_pair("enc-key")
+L97: jwk["use"] = "enc"
+L99: build_jwks_resolver({"keys": [jwk]})
+L102: def test_rejects_non_rs256_jwk():
+L103: _, jwk = make_pair("other-alg")
+L104: jwk["alg"] = "RS384"
+L105: with pytest.raises(ValueError, match="RS256"):
+L106: build_jwks_resolver({"keys": [jwk]})
+L109: def test_rejects_private_key_material_in_jwks():
+L110: _, jwk = make_pair("private-key")
+L111: jwk["d"] = "not-accepted"
+L113: build_jwks_resolver({"keys": [jwk]})
+L116: def test_rejects_token_without_kid():
+L117: private_key, jwk = make_pair("key-a")
+L118: resolver = build_jwks_resolver({"keys": [jwk]})
+L122: algorithm="RS256",
+L124: with pytest.raises(InvalidTokenError, match="kid"):
+L128: def test_rejects_non_rs256_token_header():
+L130: jwk_private, jwk = make_pair("key-a")
+L131: resolver = build_jwks_resolver({"keys": [jwk]})
+L135: algorithm="HS256",
+L136: headers={"kid": "key-a"},
+L138: with pytest.raises(InvalidTokenError, match="RS256"):
+L142: def test_rejects_malformed_token():
+L143: _, jwk = make_pair("key-a")
+L144: resolver = build_jwks_resolver({"keys": [jwk]})
+
+--- platform\backend\tests\test_entra_jwks_cache.py ---
+L3: from app.entra_jwks_cache import JWKSCache, JWKSCacheError
+L6: def make_jwks(kid="synthetic-key-1"):
+L10: "kid": kid,
+L13: "alg": "RS256",
+L14: "n": "synthetic-modulus-" + kid,
+L34: source = make_jwks()
+L40: cache = JWKSCache(loader, ttl_seconds=30)
+L53: return make_jwks()
+L55: cache = JWKSCache(loader, ttl_seconds=10, clock=clock)
+L72: return make_jwks(f"synthetic-key-{len(calls)}")
+L74: cache = JWKSCache(loader, ttl_seconds=5, clock=clock)
+L75: assert cache.get()["keys"][0]["kid"] == "synthetic-key-1"
+L78: assert cache.get()["keys"][0]["kid"] == "synthetic-key-2"
+L81: def test_refresh_replaces_keys_after_rotation():
+L82: current = {"value": make_jwks("synthetic-old-key")}
+L84: cache = JWKSCache(lambda: current["value"])
+L85: assert cache.get()["keys"][0]["kid"] == "synthetic-old-key"
+L87: current["value"] = make_jwks("synthetic-new-key")
+L90: assert refreshed["keys"][0]["kid"] == "synthetic-new-key"
+L91: assert cache.get()["keys"][0]["kid"] == "synthetic-new-key"
+L99: return make_jwks()
+L101: cache = JWKSCache(loader)
+L111: cache = JWKSCache(lambda: make_jwks())
+L113: first["keys"][0]["kid"] = "tampered"
+L116: assert second["keys"][0]["kid"] == "synthetic-key-1"
+L120: source = make_jwks()
+L121: cache = JWKSCache(lambda: source)
+L124: source["keys"][0]["kid"] = "tampered"
+L125: assert cache.get()["keys"][0]["kid"] == "synthetic-key-1"
+L128: def test_expired_keys_not_returned_if_loader_fails():
+L135: return make_jwks()
+L137: cache = JWKSCache(loader, ttl_seconds=2, clock=clock)
+L143: with pytest.raises(JWKSCacheError):
+L150: state = {"document": make_jwks("synthetic-original")}
+L155: cache = JWKSCache(loader, ttl_seconds=30)
+L159: with pytest.raises(JWKSCacheError):
+L164: assert cache.get()["keys"][0]["kid"] == "synthetic-original"
+L170: JWKSCache(lambda: make_jwks(), ttl_seconds=ttl)
+L175: JWKSCache(None)
+L180: JWKSCache(lambda: make_jwks(), clock=None)
+L183: def test_invalid_loaded_jwks_is_rejected():
+L184: cache = JWKSCache(lambda: {"keys": []})
+L185: with pytest.raises(JWKSCacheError):
+L193: cache = JWKSCache(loader)
+L194: with pytest.raises(JWKSCacheError):
+L203: return make_jwks(f"synthetic-key-{len(calls)}")
+L205: cache = JWKSCache(loader)
+L206: assert cache.get()["keys"][0]["kid"] == "synthetic-key-1"
+L207: assert cache.refresh()["keys"][0]["kid"] == "synthetic-key-2"
+L213: JWKSCache(lambda: make_jwks(), ttl_seconds=3600.01)
+L217: cache = JWKSCache(lambda: make_jwks())
+L222: cache = JWKSCache(lambda: make_jwks())
+
+--- platform\backend\tests\test_entra_jwks_cache_hardening.py ---
+L7: from app.entra_jwks_cache import JWKSCache, JWKSCacheError
+L10: def make_jwks(kid="synthetic-key-1"):
+L14: "kid": kid,
+L17: "alg": "RS256",
+L18: "n": "synthetic-modulus-" + kid,
+L44: return make_jwks()
+L46: cache = JWKSCache(loader, ttl_seconds=30)
+L52: assert all(item == make_jwks() for item in results)
+L64: return make_jwks(f"synthetic-key-{number}")
+L66: cache = JWKSCache(loader, ttl_seconds=30)
+L76: assert cache.get()["keys"][0]["kid"].startswith("synthetic-key-")
+L88: return make_jwks()
+L90: cache = JWKSCache(loader, ttl_seconds=5, clock=clock)
+L95: with pytest.raises(JWKSCacheError):
+L104: with pytest.raises(JWKSCacheError):
+L109: state = {"document": make_jwks("synthetic-original")}
+L110: cache = JWKSCache(lambda: state["document"], ttl_seconds=30)
+L115: with pytest.raises(JWKSCacheError):
+L119: assert cache.get()["keys"][0]["kid"] == "synthetic-original"
+L129: return make_jwks()
+L131: cache = JWKSCache(loader, ttl_seconds=2, clock=clock)
+L136: with pytest.raises(JWKSCacheError):
+L150: return make_jwks()
+L152: cache = JWKSCache(loader)
+L160: assert all(item == make_jwks() for item in results)
+L164: cache = JWKSCache(lambda: make_jwks())
+L169: document["keys"][0]["kid"] = "tampered"
+L175: assert cache.get()["keys"][0]["kid"] == "synthetic-key-1"
+L180: cache = JWKSCache(lambda: make_jwks(), ttl_seconds=10, clock=clock)
+L192: cache = JWKSCache(loader)
+L194: with pytest.raises(JWKSCacheError):
+L206: return make_jwks()
+L208: cache = JWKSCache(loader, ttl_seconds=10, clock=clock)
+
+--- platform\backend\tests\test_entra_metadata_client.py ---
+L6: validate_discovery_document,
+L7: validate_jwks_document,
+L12: JWKS_URI = "https://login.microsoftonline.com/tenant-test/discovery/v2.0/keys"
+L17: return {"issuer": ISSUER, "jwks_uri": JWKS_URI}
+L20: def valid_jwks():
+L24: "kid": "synthetic-key-1",
+L27: "alg": "RS256",
+L36: metadata = validate_discovery_document(
+L39: allowed_jwks_hosts=HOSTS,
+L42: assert metadata.jwks_uri == JWKS_URI
+L49: validate_discovery_document(
+L52: allowed_jwks_hosts=HOSTS,
+L56: def test_rejects_http_jwks_url():
+L58: document["jwks_uri"] = "http://login.microsoftonline.com/keys"
+L60: validate_discovery_document(
+L63: allowed_jwks_hosts=HOSTS,
+L67: def test_rejects_unapproved_jwks_host():
+L69: document["jwks_uri"] = "https://attacker.example/keys"
+L71: validate_discovery_document(
+L74: allowed_jwks_hosts=HOSTS,
+L80: validate_discovery_document(
+L83: allowed_jwks_hosts=HOSTS,
+L152: def test_accepts_structurally_valid_jwks():
+L153: result = validate_jwks_document(valid_jwks())
+L154: assert result["keys"][0]["kid"] == "synthetic-key-1"
+L158: def test_rejects_invalid_jwks_container(document):
+L160: validate_jwks_document(document)
+L163: def test_rejects_duplicate_key_ids():
+L164: document = valid_jwks()
+L167: validate_jwks_document(document)
+L170: def test_rejects_non_rsa_key():
+L171: document = valid_jwks()
+L174: validate_jwks_document(document)
+L177: def test_rejects_private_key_material():
+L178: document = valid_jwks()
+L181: validate_jwks_document(document)
+L185: document = valid_jwks()
+L186: document["keys"][0]["alg"] = "HS256"
+L188: validate_jwks_document(document)
+L191: def test_rejects_encryption_key():
+L192: document = valid_jwks()
+L195: validate_jwks_document(document)
+L198: def test_rejects_missing_key_id():
+L199: document = valid_jwks()
+L200: document["keys"][0].pop("kid")
+L202: validate_jwks_document(document)
+
+--- platform\backend\tests\test_entra_token_verifier.py ---
+L8: from app.entra_token_verifier import verify_entra_access_token
+L23: def make_token(private_key, **overrides):
+L36: return jwt.encode(claims, private_key, algorithm="RS256", headers={"kid": "synthetic-key-1"})
+L39: def verify(token, public_key):
+L40: return verify_entra_access_token(
+L42: trusted_key_resolver=lambda _token: public_key,
+L49: def test_accepts_valid_synthetic_rs256_token(signing_material):
+L51: claims = verify(make_token(private_key), public_key)
+L64: def test_rejects_expired_token(signing_material):
+L69: verify(token, public_key)
+L75: verify(make_token(private_key, iss="https://untrusted.invalid/"), public_key)
+L81: verify(make_token(private_key, aud="api://wrong-audience"), public_key)
+L87: verify(make_token(private_key, tid=OTHER_TENANT), public_key)
+L90: def test_rejects_token_signed_by_another_key(signing_material):
+L94: verify(make_token(private_key), other_private.public_key())
+L97: def test_rejects_hs256_token(signing_material):
+L103: algorithm="HS256",
+L106: verify(token, public_key)
+L120: token = jwt.encode(claims, private_key, algorithm="RS256")
+L122: verify(token, public_key)
+L124: def test_rejects_missing_required_exp_claim(signing_material):
+L131: token = jwt.encode(claims, private_key, algorithm="RS256")
+L133: verify(token, public_key)
+L140: verify_entra_access_token(
+L142: trusted_key_resolver=lambda _token: public_key,
+L149: def test_rejects_empty_token(signing_material):
+
+--- platform\backend\tests\test_entra_verifier_jwks_integration.py ---
+L9: from app.entra_jwks import build_jwks_resolver
+L10: from app.entra_token_verifier import verify_entra_access_token
+L21: public_jwk = json.loads(
+L22: jwt.algorithms.RSAAlgorithm.to_jwk(private_key.public_key())
+L24: public_jwk.update({
+L25: "kid": "integration-key-1",
+L27: "alg": "RS256",
+L29: return private_key, public_jwk
+L32: def make_token(private_key, kid="integration-key-1", **overrides):
+L48: algorithm="RS256",
+L49: headers={"kid": kid},
+L53: def verify_with_jwks(token, jwks):
+L54: resolver = build_jwks_resolver(jwks)
+L55: return verify_entra_access_token(
+L64: def test_valid_token_verifies_through_jwks_and_verifier(test_material):
+L65: private_key, jwk = test_material
+L68: claims = verify_with_jwks(token, {"keys": [jwk]})
+L76: _, trusted_jwk = test_material
+L81: verify_with_jwks(token, {"keys": [trusted_jwk]})
+L84: def test_unknown_kid_is_rejected(test_material):
+L85: private_key, jwk = test_material
+L86: token = make_token(private_key, kid="unknown-key-id")
+L88: with pytest.raises(InvalidTokenError, match="kid"):
+L89: verify_with_jwks(token, {"keys": [jwk]})
+L92: def test_expired_token_is_rejected(test_material):
+L93: private_key, jwk = test_material
+L103: verify_with_jwks(token, {"keys": [jwk]})
+L107: private_key, jwk = test_material
+L111: verify_with_jwks(token, {"keys": [jwk]})
+L115: private_key, jwk = test_material
+L119: verify_with_jwks(token, {"keys": [jwk]})
+L123: private_key, jwk = test_material
+L127: verify_with_jwks(token, {"keys": [jwk]})
+L131: private_key, jwk = test_material
+L140: verify_with_jwks(token, {"keys": [jwk]})
+L143: def test_rotation_overlap_accepts_old_and_new_keys():
+L147: old_jwk = json.loads(
+L148: jwt.algorithms.RSAAlgorithm.to_jwk(old_private.public_key())
+L150: old_jwk.update({"kid": "old-key", "use": "sig", "alg": "RS256"})
+L152: new_jwk = json.loads(
+L153: jwt.algorithms.RSAAlgorithm.to_jwk(new_private.public_key())
+L155: new_jwk.update({"kid": "new-key", "use": "sig", "alg": "RS256"})
+L157: jwks = {"keys": [old_jwk, new_jwk]}
+L159: old_claims = verify_with_jwks(
+L160: make_token(old_private, kid="old-key"), jwks
+L162: new_claims = verify_with_jwks(
+L163: make_token(new_private, kid="new-key"), jwks
+L170: def test_removed_key_is_rejected_after_rotation():
+L174: new_jwk = json.loads(
+L175: jwt.algorithms.RSAAlgorithm.to_jwk(new_private.public_key())
+L177: new_jwk.update({"kid": "new-key", "use": "sig", "alg": "RS256"})
+L179: token = make_token(old_private, kid="old-key")
+L181: with pytest.raises(InvalidTokenError, match="kid"):
+L182: verify_with_jwks(token, {"keys": [new_jwk]})
+L185: def test_private_key_material_in_jwks_is_rejected(test_material):
+L186: _, jwk = test_material
+L187: malicious_document = dict(jwk)
+L191: build_jwks_resolver({"keys": [malicious_document]})
+L195: private_key, jwk = test_material
+L197: resolver = build_jwks_resolver({"keys": [jwk]})
+L200: verify_entra_access_token(
+
+--- platform\backend\tests\test_oidc_claims.py ---
+L3: from app.oidc_claims import InvalidOIDCClaims, validate_verified_claims
+L11: def valid_claims():
+L20: def test_accepts_valid_verified_claims():
+L21: result = validate_verified_claims(
+L30: def test_rejects_expired_token_claims():
+L34: validate_verified_claims(
+L46: validate_verified_claims(
+L58: validate_verified_claims(
+L69: validate_verified_claims(
+L81: validate_verified_claims(
+L89: def test_rejects_future_not_before_claim():
+L93: validate_verified_claims(
+L105: validate_verified_claims(
+
+--- platform\backend\tests\test_synthetic_jwt_harness.py ---
+L9: verify_synthetic_token,
+L19: def claims(**overrides):
+L31: def issue(value=None, *, kid="test-key-a", key=KEY_A):
+L34: kid=kid,
+L39: def verify(token, keys=None):
+L40: return verify_synthetic_token(
+L42: keys_by_kid={"test-key-a": KEY_A} if keys is None else keys,
+L49: def test_valid_synthetic_token_is_accepted():
+L53: def test_expired_token_is_rejected():
+L76: def test_unknown_key_id_is_rejected():
+L77: token = issue(kid="unknown-key")
+L79: verify(token)
+L82: def test_key_rotation_accepts_old_and_new_keys_during_overlap():
+L83: old_token = issue(kid="test-key-a", key=KEY_A)
+L84: new_token = issue(kid="test-key-b", key=KEY_B)
+L86: assert verify(old_token, overlap_keys)["sub"] == "synthetic-user-001"
+L87: assert verify(new_token, overlap_keys)["sub"] == "synthetic-user-001"
+L90: def test_removed_old_key_is_rejected_after_rotation():
+L91: old_token = issue(kid="test-key-a", key=KEY_A)
+L93: verify(old_token, {"test-key-b": KEY_B})
+L115: def test_malformed_token_is_rejected():
+
+--- platform\backend\tests\test_synthetic_role_mapping.py ---
+L72: def test_no_browser_or_identity_claims_are_accepted_as_permissions():
+
+--- platform\backend\tests\test_synthetic_rs256_harness.py ---
+L7: from synthetic_test_support.rs256_harness import (
+L8: SyntheticRS256Error,
+L9: issue_rs256_token,
+L10: verify_rs256_token,
+L24: def claims(**updates):
+L28: "sub": "synthetic-rs256-user",
+L36: def issue(value=None, kid="key-a", private_key=PRIVATE_A):
+L37: return issue_rs256_token(
+L39: kid=kid,
+L44: def verify(token, keys=None):
+L45: return verify_rs256_token(
+L47: public_keys_by_kid={"key-a": PUBLIC_A} if keys is None else keys,
+L54: def test_valid_rs256_token_is_accepted():
+L55: assert verify(issue())["sub"] == "synthetic-rs256-user"
+L58: def test_expired_token_is_rejected():
+L59: with pytest.raises(SyntheticRS256Error, match="Expired"):
+L64: with pytest.raises(SyntheticRS256Error, match="issuer"):
+L69: with pytest.raises(SyntheticRS256Error, match="audience"):
+L77: with pytest.raises(SyntheticRS256Error, match="signature"):
+L91: with pytest.raises(SyntheticRS256Error, match="signature"):
+L95: def test_unknown_key_id_is_rejected():
+L96: with pytest.raises(SyntheticRS256Error, match="Unknown signing key"):
+L97: verify(issue(kid="untrusted-key"))
+L100: def test_key_rotation_overlap_accepts_both_trusted_keys():
+L101: old = issue(kid="key-a", private_key=PRIVATE_A)
+L102: new = issue(kid="key-b", private_key=PRIVATE_B)
+L104: assert verify(old, overlap)["sub"] == "synthetic-rs256-user"
+L105: assert verify(new, overlap)["sub"] == "synthetic-rs256-user"
+L108: def test_removed_key_is_rejected():
+L109: old = issue(kid="key-a", private_key=PRIVATE_A)
+L110: with pytest.raises(SyntheticRS256Error, match="Unknown signing key"):
+L120: header["alg"] = "HS256"
+L124: with pytest.raises(SyntheticRS256Error, match="Disallowed algorithm"):
+L129: with pytest.raises(SyntheticRS256Error, match="not yet valid"):
+L136: with pytest.raises(SyntheticRS256Error, match="Missing subject"):
+L140: def test_malformed_token_is_rejected():
+L141: with pytest.raises(SyntheticRS256Error, match="Malformed token"):
+L142: verify("not-a-token")
+
+=== 2. PYTHON MODULE IMPORTS AND PUBLIC SIGNATURES ===
+
+--- platform\backend\app\auth_dependencies.py ---
+L7: from fastapi import Depends, HTTPException
+L9: from app.security import (
+L16: def get_current_principal() -> Principal:
+L24: def require_permission(permission: str):
+L26: def dependency(principal: Principal = Depends(get_current_principal)) -> Principal:
+
+--- platform\backend\app\case_repository.py ---
+L1: import json
+L2: import sqlite3
+L3: from pathlib import Path
+L4: from typing import Any
+L7: def connect(database_path: str | Path) -> sqlite3.Connection:
+L14: def initialize(database_path: str | Path, schema_path: str | Path) -> None:
+L24: def create_case(
+L62: def update_case(
+L72: import json
+L153: def get_case(db: sqlite3.Connection, case_id: str) -> dict[str, Any] | None:
+L163: def list_cases(db: sqlite3.Connection) -> list[dict[str, Any]]:
+L172: def list_audit_events(
+
+--- platform\backend\app\case_store.py ---
+L1: import os
+L2: from pathlib import Path
+L3: from typing import Any
+L5: from app.case_repository import connect, create_case, initialize, list_cases
+L13: def ensure_database() -> None:
+L54: def list_demo_cases() -> list[dict[str, Any]]:
+
+--- platform\backend\app\entra_http_transport.py ---
+L7: from __future__ import annotations
+L9: import json
+L10: from typing import Any, Callable
+L11: from urllib.parse import urlparse
+L13: import httpx
+L15: from app.entra_metadata_client import MetadataTrustError
+L21: def fetch_json_document(
+
+--- platform\backend\app\entra_jwks.py ---
+L7: from collections.abc import Mapping
+L8: from typing import Any
+L10: import jwt
+L11: from jwt import InvalidTokenError
+L14: def build_jwks_resolver(jwks: Mapping[str, Any]):
+L59: def resolve(token: str):
+
+--- platform\backend\app\entra_jwks_cache.py ---
+L11: from __future__ import annotations
+L13: from copy import deepcopy
+L14: from threading import RLock
+L15: from time import monotonic
+L16: from typing import Any, Callable
+L18: from app.entra_metadata_client import (
+L24: class JWKSCacheError(RuntimeError):
+L28: class JWKSCache:
+L31: def __init__(
+L56: def _load_and_validate(self) -> dict[str, Any]:
+L67: def get(self) -> dict[str, Any]:
+L85: def refresh(self) -> dict[str, Any]:
+L93: def invalidate(self) -> None:
+L99: @property
+L100: def is_valid(self) -> bool:
+
+--- platform\backend\app\entra_metadata_client.py ---
+L11: from __future__ import annotations
+L13: from dataclasses import dataclass
+L14: from typing import Any, Callable
+L15: from urllib.parse import urlparse
+L18: class MetadataTrustError(ValueError):
+L22: @dataclass(frozen=True)
+L23: class TrustedMetadata:
+L28: def _require_https_url(value: str, field_name: str) -> str:
+L46: def validate_discovery_document(
+L91: def fetch_trusted_document(
+L127: def validate_jwks_document(document: Any) -> dict[str, Any]:
+
+--- platform\backend\app\entra_token_verifier.py ---
+L10: from collections.abc import Callable
+L11: from typing import Any
+L13: import jwt
+L14: from jwt import InvalidTokenError
+L19: def verify_entra_access_token(
+
+--- platform\backend\app\main.py ---
+L1: from fastapi import FastAPI, HTTPException, Depends
+L2: from pydantic import BaseModel, ConfigDict
+L3: from app import case_store
+L4: from app.case_repository import connect, update_case
+L5: from app.case_store import list_demo_cases
+L6: from app.auth_dependencies import require_permission
+L15: class HealthResponse(BaseModel):
+L22: class CaseUpdateRequest(BaseModel):
+L28: class DemoCase(BaseModel):
+L57: @app.get("/api/v1/health", response_model=HealthResponse)
+L58: def health() -> HealthResponse:
+L64: @app.patch("/api/v1/cases/{case_id}", response_model=DemoCase, dependencies=[Depends(require_permission("cases:update"))])
+L65: def update_case_endpoint(
+L103: @app.get("/api/v1/demo/cases", response_model=list[DemoCase], dependencies=[Depends(require_permission("cases:read"))])
+L104: def get_demo_cases() -> list[DemoCase]:
+
+--- platform\backend\app\oidc_claims.py ---
+L12: from collections.abc import Mapping
+L13: from typing import Any
+L14: import time
+L17: class InvalidOIDCClaims(ValueError):
+L21: def validate_verified_claims(
+
+--- platform\backend\app\security.py ---
+L8: from dataclasses import dataclass
+L9: from typing import FrozenSet
+L41: @dataclass(frozen=True)
+L42: class Principal:
+L48: class AuthenticationRequired(PermissionError):
+L52: class AuthorizationDenied(PermissionError):
+L56: def validate_principal(principal: Principal | None) -> Principal:
+L70: def authorize(principal: Principal | None, permission: str) -> bool:
+
+=== 3. AUTHENTICATION GATE IMPORT BOUNDARY ===
+1: """Fail-closed authentication gate pending approved OIDC integration.
+2: 
+3: This module intentionally authenticates nobody. Replace the placeholder
+4: identity provider integration only after the organization chooses a provider.
+5: Never trust roles supplied by a browser or request body.
+6: """
+7: from fastapi import Depends, HTTPException
+8: 
+9: from app.security import (
+10:     AuthenticationRequired,
+11:     AuthorizationDenied,
+12:     Principal,
+13:     authorize,
+14: )
+15: 
+16: def get_current_principal() -> Principal:
+17:     """Reject all requests until real token/session validation is implemented."""
+18:     raise HTTPException(
+19:         status_code=401,
+20:         detail="Authentication is not configured. Access is denied by default.",
+21:         headers={"WWW-Authenticate": "Bearer"},
+22:     )
+23: 
+24: def require_permission(permission: str):
+25:     """Require a validated principal and enforce the RBAC permission."""
+26:     def dependency(principal: Principal = Depends(get_current_principal)) -> Principal:
+27:         try:
+28:             authorize(principal, permission)
+29:         except AuthenticationRequired as exc:
+30:             raise HTTPException(
+31:                 status_code=401,
+32:                 detail="Authentication required.",
+33:                 headers={"WWW-Authenticate": "Bearer"},
+34:             ) from exc
+35:         except AuthorizationDenied as exc:
+36:             raise HTTPException(
+37:                 status_code=403,
+38:                 detail="Insufficient permission.",
+39:             ) from exc
+40:         return principal
+41:     return dependency
+42: 
+
+Fail-closed 401 pattern present: True
+Metadata client imported into gate: False
+HTTP transport imported into gate: False
+JWKS cache imported into gate: False
+Token verifier pattern detected in gate: False
+
+=== 4. RELEVANT TEST INVENTORY ===
+
+--- platform\backend\tests\test_api_auth_gate.py ---
+L15: assert "Authentication" in response.json()["detail"]
+L47: from app.auth_dependencies import require_permission
+L57: @test_app.get("/test-protected-update-permission")
+L58: def protected_permission_check(principal=Depends(require_permission("cases:update"))):
+L61: response = LocalClient(test_app).get("/test-protected-update-permission")
+
+--- platform\backend\tests\test_api_oidc_fail_closed.py ---
+L31: def test_case_update_without_authentication_is_rejected():
+
+--- platform\backend\tests\test_entra_http_transport.py ---
+L207: content=b'{"issuer":"synthetic"}',
+L214: ) == {"issuer": "synthetic"}
+L244: return json_response({"issuer": "synthetic"})
+L252: assert result == {"issuer": "synthetic"}
+
+--- platform\backend\tests\test_entra_jwks.py ---
+L3: import jwt
+L6: from jwt import InvalidTokenError
+L8: from app.entra_jwks import build_jwks_resolver
+L13: public_jwk = json.loads(jwt.algorithms.RSAAlgorithm.to_jwk(private_key.public_key()))
+L18: def make_token(private_key, kid="key-a", algorithm="RS256"):
+L19: return jwt.encode(
+L22: algorithm=algorithm,
+L27: def test_selects_matching_key_from_jwks():
+L29: resolver = build_jwks_resolver({"keys": [public_jwk]})
+L32: decoded = jwt.decode(
+L35: algorithms=["RS256"],
+L44: resolver = build_jwks_resolver({"keys": [jwk_a, jwk_b]})
+L50: resolver = build_jwks_resolver({"keys": [jwk]})
+L59: resolver = build_jwks_resolver({"keys": [old_jwk, new_jwk]})
+L67: resolver_after_rotation = build_jwks_resolver({"keys": [new_jwk]})
+L78: def test_rejects_malformed_jwks_documents(document):
+L80: build_jwks_resolver(document)
+L87: build_jwks_resolver({"keys": [jwk_a, jwk_b]})
+L92: build_jwks_resolver({"keys": [{"kid": "ec-key", "kty": "EC"}]})
+L99: build_jwks_resolver({"keys": [jwk]})
+L106: build_jwks_resolver({"keys": [jwk]})
+L109: def test_rejects_private_key_material_in_jwks():
+L113: build_jwks_resolver({"keys": [jwk]})
+L118: resolver = build_jwks_resolver({"keys": [jwk]})
+L119: token = jwt.encode(
+L122: algorithm="RS256",
+L131: resolver = build_jwks_resolver({"keys": [jwk]})
+L132: token = jwt.encode(
+L135: algorithm="HS256",
+L144: resolver = build_jwks_resolver({"keys": [jwk]})
+L146: resolver("not.a.valid.jwt")
+
+--- platform\backend\tests\test_entra_jwks_cache.py ---
+L3: from app.entra_jwks_cache import JWKSCache, JWKSCacheError
+L6: def make_jwks(kid="synthetic-key-1"):
+L34: source = make_jwks()
+L40: cache = JWKSCache(loader, ttl_seconds=30)
+L53: return make_jwks()
+L55: cache = JWKSCache(loader, ttl_seconds=10, clock=clock)
+L72: return make_jwks(f"synthetic-key-{len(calls)}")
+L74: cache = JWKSCache(loader, ttl_seconds=5, clock=clock)
+L82: current = {"value": make_jwks("synthetic-old-key")}
+L84: cache = JWKSCache(lambda: current["value"])
+L87: current["value"] = make_jwks("synthetic-new-key")
+L99: return make_jwks()
+L101: cache = JWKSCache(loader)
+L111: cache = JWKSCache(lambda: make_jwks())
+L120: source = make_jwks()
+L121: cache = JWKSCache(lambda: source)
+L135: return make_jwks()
+L137: cache = JWKSCache(loader, ttl_seconds=2, clock=clock)
+L143: with pytest.raises(JWKSCacheError):
+L150: state = {"document": make_jwks("synthetic-original")}
+L155: cache = JWKSCache(loader, ttl_seconds=30)
+L159: with pytest.raises(JWKSCacheError):
+L170: JWKSCache(lambda: make_jwks(), ttl_seconds=ttl)
+L175: JWKSCache(None)
+L180: JWKSCache(lambda: make_jwks(), clock=None)
+L183: def test_invalid_loaded_jwks_is_rejected():
+L184: cache = JWKSCache(lambda: {"keys": []})
+L185: with pytest.raises(JWKSCacheError):
+L193: cache = JWKSCache(loader)
+L194: with pytest.raises(JWKSCacheError):
+L203: return make_jwks(f"synthetic-key-{len(calls)}")
+L205: cache = JWKSCache(loader)
+L213: JWKSCache(lambda: make_jwks(), ttl_seconds=3600.01)
+L217: cache = JWKSCache(lambda: make_jwks())
+L222: cache = JWKSCache(lambda: make_jwks())
+
+--- platform\backend\tests\test_entra_jwks_cache_hardening.py ---
+L7: from app.entra_jwks_cache import JWKSCache, JWKSCacheError
+L10: def make_jwks(kid="synthetic-key-1"):
+L44: return make_jwks()
+L46: cache = JWKSCache(loader, ttl_seconds=30)
+L52: assert all(item == make_jwks() for item in results)
+L64: return make_jwks(f"synthetic-key-{number}")
+L66: cache = JWKSCache(loader, ttl_seconds=30)
+L88: return make_jwks()
+L90: cache = JWKSCache(loader, ttl_seconds=5, clock=clock)
+L95: with pytest.raises(JWKSCacheError):
+L104: with pytest.raises(JWKSCacheError):
+L109: state = {"document": make_jwks("synthetic-original")}
+L110: cache = JWKSCache(lambda: state["document"], ttl_seconds=30)
+L115: with pytest.raises(JWKSCacheError):
+L129: return make_jwks()
+L131: cache = JWKSCache(loader, ttl_seconds=2, clock=clock)
+L136: with pytest.raises(JWKSCacheError):
+L150: return make_jwks()
+L152: cache = JWKSCache(loader)
+L160: assert all(item == make_jwks() for item in results)
+L164: cache = JWKSCache(lambda: make_jwks())
+L180: cache = JWKSCache(lambda: make_jwks(), ttl_seconds=10, clock=clock)
+L192: cache = JWKSCache(loader)
+L194: with pytest.raises(JWKSCacheError):
+L206: return make_jwks()
+L208: cache = JWKSCache(loader, ttl_seconds=10, clock=clock)
+
+--- platform\backend\tests\test_entra_metadata_client.py ---
+L7: validate_jwks_document,
+L11: ISSUER = "https://login.microsoftonline.com/tenant-test/v2.0"
+L12: JWKS_URI = "https://login.microsoftonline.com/tenant-test/discovery/v2.0/keys"
+L17: return {"issuer": ISSUER, "jwks_uri": JWKS_URI}
+L20: def valid_jwks():
+L38: expected_issuer=ISSUER,
+L39: allowed_jwks_hosts=HOSTS,
+L41: assert metadata.issuer == ISSUER
+L42: assert metadata.jwks_uri == JWKS_URI
+L45: def test_rejects_wrong_issuer():
+L47: document["issuer"] = "https://attacker.example/issuer"
+L51: expected_issuer=ISSUER,
+L52: allowed_jwks_hosts=HOSTS,
+L56: def test_rejects_http_jwks_url():
+L58: document["jwks_uri"] = "http://login.microsoftonline.com/keys"
+L62: expected_issuer=ISSUER,
+L63: allowed_jwks_hosts=HOSTS,
+L67: def test_rejects_unapproved_jwks_host():
+L69: document["jwks_uri"] = "https://attacker.example/keys"
+L73: expected_issuer=ISSUER,
+L74: allowed_jwks_hosts=HOSTS,
+L78: def test_rejects_missing_expected_issuer():
+L82: expected_issuer="",
+L83: allowed_jwks_hosts=HOSTS,
+L101: assert result["issuer"] == ISSUER
+L152: def test_accepts_structurally_valid_jwks():
+L153: result = validate_jwks_document(valid_jwks())
+L158: def test_rejects_invalid_jwks_container(document):
+L160: validate_jwks_document(document)
+L164: document = valid_jwks()
+L167: validate_jwks_document(document)
+L171: document = valid_jwks()
+L174: validate_jwks_document(document)
+L178: document = valid_jwks()
+L181: validate_jwks_document(document)
+L184: def test_rejects_wrong_algorithm():
+L185: document = valid_jwks()
+L188: validate_jwks_document(document)
+L192: document = valid_jwks()
+L195: validate_jwks_document(document)
+
+--- platform\backend\tests\test_entra_token_verifier.py ---
+L3: import jwt
+L6: from jwt import InvalidTokenError
+L11: ISSUER = "https://login.microsoftonline.com/synthetic-tenant/v2.0"
+L12: AUDIENCE = "api://synthetic-cirt-dfir"
+L26: "iss": ISSUER,
+L27: "aud": AUDIENCE,
+L36: return jwt.encode(claims, private_key, algorithm="RS256", headers={"kid": "synthetic-key-1"})
+L43: expected_issuer=ISSUER,
+L44: expected_audience=AUDIENCE,
+L55: def test_rejects_tampered_signature(signing_material):
+L72: def test_rejects_wrong_issuer(signing_material):
+L78: def test_rejects_wrong_audience(signing_material):
+L81: verify(make_token(private_key, aud="api://wrong-audience"), public_key)
+L99: token = jwt.encode(
+L100: {"iss": ISSUER, "aud": AUDIENCE, "sub": "synthetic-user",
+L103: algorithm="HS256",
+L113: "iss": ISSUER,
+L114: "aud": AUDIENCE,
+L120: token = jwt.encode(claims, private_key, algorithm="RS256")
+L128: "iss": ISSUER, "aud": AUDIENCE, "sub": "synthetic-user-001",
+L131: token = jwt.encode(claims, private_key, algorithm="RS256")
+L143: expected_issuer=ISSUER,
+L144: expected_audience=AUDIENCE,
+
+--- platform\backend\tests\test_entra_verifier_jwks_integration.py ---
+L4: import jwt
+L7: from jwt import InvalidTokenError
+L9: from app.entra_jwks import build_jwks_resolver
+L13: ISSUER = "https://login.microsoftonline.com/synthetic-tenant/v2.0"
+L14: AUDIENCE = "api://synthetic-cirt-dfir"
+L22: jwt.algorithms.RSAAlgorithm.to_jwk(private_key.public_key())
+L35: "iss": ISSUER,
+L36: "aud": AUDIENCE,
+L45: return jwt.encode(
+L48: algorithm="RS256",
+L53: def verify_with_jwks(token, jwks):
+L54: resolver = build_jwks_resolver(jwks)
+L58: expected_issuer=ISSUER,
+L59: expected_audience=AUDIENCE,
+L64: def test_valid_token_verifies_through_jwks_and_verifier(test_material):
+L68: claims = verify_with_jwks(token, {"keys": [jwk]})
+L75: def test_invalid_signature_is_rejected(test_material):
+L81: verify_with_jwks(token, {"keys": [trusted_jwk]})
+L89: verify_with_jwks(token, {"keys": [jwk]})
+L103: verify_with_jwks(token, {"keys": [jwk]})
+L106: def test_wrong_issuer_is_rejected(test_material):
+L111: verify_with_jwks(token, {"keys": [jwk]})
+L114: def test_wrong_audience_is_rejected(test_material):
+L116: token = make_token(private_key, aud="api://wrong-audience")
+L119: verify_with_jwks(token, {"keys": [jwk]})
+L127: verify_with_jwks(token, {"keys": [jwk]})
+L140: verify_with_jwks(token, {"keys": [jwk]})
+L148: jwt.algorithms.RSAAlgorithm.to_jwk(old_private.public_key())
+L153: jwt.algorithms.RSAAlgorithm.to_jwk(new_private.public_key())
+L157: jwks = {"keys": [old_jwk, new_jwk]}
+L159: old_claims = verify_with_jwks(
+L160: make_token(old_private, kid="old-key"), jwks
+L162: new_claims = verify_with_jwks(
+L163: make_token(new_private, kid="new-key"), jwks
+L175: jwt.algorithms.RSAAlgorithm.to_jwk(new_private.public_key())
+L182: verify_with_jwks(token, {"keys": [new_jwk]})
+L185: def test_private_key_material_in_jwks_is_rejected(test_material):
+L191: build_jwks_resolver({"keys": [malicious_document]})
+L197: resolver = build_jwks_resolver({"keys": [jwk]})
+L203: expected_issuer=ISSUER,
+
+--- platform\backend\tests\test_oidc_claims.py ---
+L3: from app.oidc_claims import InvalidOIDCClaims, validate_verified_claims
+L6: ISSUER = "https://identity.example.invalid/"
+L7: AUDIENCE = "cirt-dfir-api"
+L13: "iss": ISSUER,
+L14: "aud": AUDIENCE,
+L23: expected_issuer=ISSUER,
+L24: expected_audience=AUDIENCE,
+L33: with pytest.raises(InvalidOIDCClaims, match="expired"):
+L36: expected_issuer=ISSUER,
+L37: expected_audience=AUDIENCE,
+L42: def test_rejects_wrong_issuer():
+L45: with pytest.raises(InvalidOIDCClaims, match="issuer"):
+L48: expected_issuer=ISSUER,
+L49: expected_audience=AUDIENCE,
+L54: def test_rejects_wrong_audience():
+L57: with pytest.raises(InvalidOIDCClaims, match="audience"):
+L60: expected_issuer=ISSUER,
+L61: expected_audience=AUDIENCE,
+L66: def test_accepts_expected_audience_in_audience_list():
+L68: claims["aud"] = ["another-api", AUDIENCE]
+L71: expected_issuer=ISSUER,
+L72: expected_audience=AUDIENCE,
+L80: with pytest.raises(InvalidOIDCClaims, match="subject"):
+L83: expected_issuer=ISSUER,
+L84: expected_audience=AUDIENCE,
+L92: with pytest.raises(InvalidOIDCClaims, match="not yet valid"):
+L95: expected_issuer=ISSUER,
+L96: expected_audience=AUDIENCE,
+L104: with pytest.raises(InvalidOIDCClaims, match="expiry"):
+L107: expected_issuer=ISSUER,
+L108: expected_audience=AUDIENCE,
+
+--- platform\backend\tests\test_security.py ---
+L4: AuthenticationRequired,
+L21: for permission in ("cases:read", "cases:update", "users:manage", "audit:read"):
+L22: with self.subTest(permission=permission):
+L23: self.assertTrue(authorize(self.admin, permission))
+L30: for permission in ("users:manage", "audit:read"):
+L31: with self.subTest(permission=permission):
+L33: authorize(self.analyst, permission)
+L43: with self.assertRaises(AuthenticationRequired):
+L51: def test_unknown_permission_is_rejected(self):
+L57: with self.assertRaises(AuthenticationRequired):
+
+--- platform\backend\tests\test_synthetic_jwt_harness.py ---
+L6: from synthetic_test_support.jwt_harness import (
+L12: ISSUER = "https://issuer.synthetic.invalid/"
+L13: AUDIENCE = "cirt-dfir-synthetic-test"
+L21: "iss": ISSUER,
+L22: "aud": AUDIENCE,
+L43: expected_issuer=ISSUER,
+L44: expected_audience=AUDIENCE,
+L58: def test_wrong_issuer_is_rejected():
+L59: with pytest.raises(SyntheticTokenError, match="issuer"):
+L63: def test_wrong_audience_is_rejected():
+L64: with pytest.raises(SyntheticTokenError, match="audience"):
+L68: def test_invalid_signature_is_rejected():
+L70: header, payload, signature = token.split(".")
+L71: changed = ("A" if signature[0] != "A" else "B") + signature[1:]
+L72: with pytest.raises(SyntheticTokenError, match="signature"):
+L96: def test_disallowed_algorithm_is_rejected():
+L98: header, payload, signature = token.split(".")
+L106: with pytest.raises(SyntheticTokenError, match="Disallowed algorithm"):
+L107: verify(f"{new_header}.{payload}.{signature}")
+L117: verify("not-a-jwt")
+
+--- platform\backend\tests\test_synthetic_role_mapping.py ---
+L4: map_synthetic_roles_to_permissions,
+L8: def test_viewer_gets_read_only_permission():
+L9: assert map_synthetic_roles_to_permissions(["Viewer"]) == frozenset({
+L14: def test_analyst_gets_read_and_update_permissions():
+L15: assert map_synthetic_roles_to_permissions(["Analyst"]) == frozenset({
+L21: def test_admin_gets_proposed_admin_permissions():
+L22: assert map_synthetic_roles_to_permissions(["Admin"]) == frozenset({
+L30: def test_multiple_known_roles_union_permissions():
+L31: assert map_synthetic_roles_to_permissions(["Viewer", "Analyst"]) == frozenset({
+L39: map_synthetic_roles_to_permissions(["Viewer", "SuperUser"])
+L44: map_synthetic_roles_to_permissions([])
+L58: map_synthetic_roles_to_permissions(roles)
+L63: map_synthetic_roles_to_permissions(["admin"])
+L66: def test_duplicate_roles_do_not_escalate_permissions():
+L67: assert map_synthetic_roles_to_permissions(["Viewer", "Viewer"]) == frozenset({
+L72: def test_no_browser_or_identity_claims_are_accepted_as_permissions():
+L74: map_synthetic_roles_to_permissions(["cases:update"])
+L77: def test_returned_permissions_cannot_be_mutated():
+L78: result = map_synthetic_roles_to_permissions(["Viewer"])
+
+--- platform\backend\tests\test_synthetic_rs256_harness.py ---
+L13: ISSUER = "https://issuer.synthetic.invalid/"
+L14: AUDIENCE = "cirt-dfir-synthetic-api"
+L26: "iss": ISSUER,
+L27: "aud": AUDIENCE,
+L48: expected_issuer=ISSUER,
+L49: expected_audience=AUDIENCE,
+L63: def test_wrong_issuer_is_rejected():
+L64: with pytest.raises(SyntheticRS256Error, match="issuer"):
+L68: def test_wrong_audience_is_rejected():
+L69: with pytest.raises(SyntheticRS256Error, match="audience"):
+L73: def test_signature_tampering_is_rejected():
+L77: with pytest.raises(SyntheticRS256Error, match="signature"):
+L91: with pytest.raises(SyntheticRS256Error, match="signature"):
+L114: def test_disallowed_algorithm_is_rejected():
+L124: with pytest.raises(SyntheticRS256Error, match="Disallowed algorithm"):
+
+=== 5. FINAL INTEGRITY CHECK ===
+Unchanged during final check=True | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\auth_dependencies.py
+Unchanged during final check=True | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_repository.py
+Unchanged during final check=True | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_store.py
+Unchanged during final check=True | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_http_transport.py
+Unchanged during final check=True | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_jwks.py
+Unchanged during final check=True | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_jwks_cache.py
+Unchanged during final check=True | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_metadata_client.py
+Unchanged during final check=True | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_token_verifier.py
+Unchanged during final check=True | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\main.py
+Unchanged during final check=True | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\oidc_claims.py
+Unchanged during final check=True | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\security.py
+Unchanged during final check=True | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\__init__.py
+Unchanged during final check=True | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\conftest.py
+Unchanged during final check=True | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_api.py
+Unchanged during final check=True | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_api_auth_gate.py
+Unchanged during final check=True | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_api_oidc_fail_closed.py
+Unchanged during final check=True | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_entra_http_transport.py
+Unchanged during final check=True | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_entra_jwks.py
+Unchanged during final check=True | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_entra_jwks_cache.py
+Unchanged during final check=True | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_entra_jwks_cache_hardening.py
+Unchanged during final check=True | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_entra_metadata_client.py
+Unchanged during final check=True | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_entra_token_verifier.py
+Unchanged during final check=True | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_entra_verifier_jwks_integration.py
+Unchanged during final check=True | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_oidc_claims.py
+Unchanged during final check=True | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_security.py
+Unchanged during final check=True | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_synthetic_jwt_harness.py
+Unchanged during final check=True | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_synthetic_role_mapping.py
+Unchanged during final check=True | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_synthetic_rs256_harness.py
+
+Final integrity check passed: True
+No source edits performed by this command.
+No dependencies installed.
+No network requests made.
+Production authentication remains fail-closed.

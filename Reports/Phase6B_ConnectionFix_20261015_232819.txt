@@ -1,0 +1,13 @@
+﻿Phase 6B - SQLite Connection Lifecycle Fix
+Timestamp: 2026-10-15 23:28:21
+Repository: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py
+Backup: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py.20261015_232819.bak
+Test file: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\test_case_repository.py
+Change: initialize() now explicitly closes its SQLite connection in finally.
+Production backend changed: No.
+Production collector executed: No.
+Evidence accessed: No.
+Test exit code: 0
+Test stdout: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase6B_Retest_stdout_20261015_232819.txt
+Test stderr: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase6B_Retest_stderr_20261015_232819.txt
+Result: PASS

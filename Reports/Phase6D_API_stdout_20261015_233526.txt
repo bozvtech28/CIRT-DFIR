@@ -1,0 +1,5 @@
+PASS: test_health_endpoint
+PASS: test_demo_cases_are_synthetic
+PASS: database-backed API returns three synthetic cases
+
+API checks failed: 0

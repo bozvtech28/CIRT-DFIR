@@ -1,0 +1,11 @@
+PASS | Repository function parity | design_functions=['connect', 'create_case', 'get_case', 'initialize', 'list_audit_events', 'list_cases', 'update_case']; backend_functions=['connect', 'create_case', 'get_case', 'initialize', 'list_audit_events', 'list_cases', 'update_case']
+PASS | Repository module-level parity | Non-function top-level AST nodes compared
+PASS | SQL schema byte parity | design_sha256=69347622f6553ed288ed9db39215c7b5bfed5c4323c90bc93e2e333e55f9e915; backend_sha256=69347622f6553ed288ed9db39215c7b5bfed5c4323c90bc93e2e333e55f9e915
+PASS | Schema idempotency declarations | Checks CREATE TABLE/INDEX/TRIGGER IF NOT EXISTS
+FAIL | PATCH case-update endpoint | PATCH /api/v1/cases/{case_id}
+PASS | HTTP error mapping | No-change=409; other ValueError=422
+FAIL | Health endpoint | GET /api/v1/health
+FAIL | Synthetic demo-case endpoint | GET /api/v1/demo/cases
+PASS | BozV signature | Developer and powered-by labels checked
+PASS | Relative API request | Frontend references demo-case API
+PHASE7E_SOURCE_SUMMARY passed=7; failed=3; total=10

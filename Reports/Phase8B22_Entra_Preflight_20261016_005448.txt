@@ -1,0 +1,41 @@
+﻿CIRT DFIR PROFESSIONAL - PHASE 8B.22
+Timestamp: 2026-10-16T00:54:49.9938906+08:00
+Purpose: Safe Entra implementation preflight
+Mode: Static review and file backup
+Backup: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\Phase8B22_20261016_005448
+Source files changed: NO
+Packages installed or updated: NO
+Server started: NO
+Microsoft endpoint contacted: NO
+Secrets or configuration values printed: NO
+
+=== CHECK RESULTS ===
+[PASS] Authentication gate rejects requests by default - Static marker only; inspect runtime behavior separately.
+[PASS] Cases read route references RBAC permission - Checks for cases:read dependency on the route.
+[PASS] Case update route references RBAC permission - Checks for cases:update dependency on the route.
+[PASS] RBAC policy module exists and declares permissions - Static policy marker only.
+[PASS] OIDC claims validation module exists - Claims validation alone does not verify JWT signatures.
+[PASS] Frontend API endpoint remains present - Checks the existing API endpoint reference.
+[REVIEW] MSAL package declared in package.json - A missing package is expected until implementation is approved.
+[REVIEW] MSAL package appears in package lock - No package was installed by this preflight.
+[REVIEW] Frontend Microsoft sign-in implementation detected - Phase 8B.20 found no established sign-in flow.
+[REVIEW] Tenant configuration exists in current process environment - Presence only; values intentionally not displayed.
+[REVIEW] Client configuration exists in current process environment - Presence only; values intentionally not displayed.
+[REVIEW] Issuer or audience configuration exists in current process environment - Presence only; values intentionally not displayed.
+
+Checks passing: 6
+Items needing review: 6
+
+=== SECURITY STATUS ===
+Production Entra authentication: NOT IMPLEMENTED
+Trusted production token signature verification: NOT CONFIRMED
+Trusted Entra app-role mapping: NOT IMPLEMENTED
+Deployment approval: NOT GRANTED
+
+=== NEXT REQUIREMENTS ===
+1. Obtain the approved tenant ID, frontend client ID, backend API audience, redirect URI, and role assignments from the Entra administrator.
+2. Implement MSAL frontend sign-in only after the application registration is approved.
+3. Implement backend verification using trusted Microsoft discovery/JWKS and strict issuer, audience, signature, time, and tenant checks.
+4. Map only verified app-role claims to server-side RBAC.
+5. Test unauthorized, invalid-token, role-denial, audit attribution, and frontend sign-in behavior.
+6. Keep the API fail-closed and off the organizational network until security tests and deployment review pass.

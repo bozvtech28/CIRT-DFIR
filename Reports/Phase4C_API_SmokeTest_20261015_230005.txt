@@ -1,0 +1,12 @@
+﻿Phase 4C localhost API smoke test
+Timestamp: 2026-10-15 23:00:06
+Endpoint base: http://127.0.0.1:8765
+Health endpoint: PASS
+Synthetic cases endpoint: NOT TESTED
+Temporary server started by this script: True
+Temporary server stopped by this script: False
+Production collector modified: No
+Evidence accessed: No
+Failure: Expected 3 synthetic cases; received 1.
+Server stdout: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase4C_Server_20261015_230005.log
+Server stderr: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase4C_Server_20261015_230005.err

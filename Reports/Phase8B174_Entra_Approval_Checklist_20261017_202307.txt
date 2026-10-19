@@ -1,0 +1,50 @@
+﻿CIRT-DFIR - PHASE 8B174
+Entra Configuration and Approval Checklist
+Generated: 2026-10-17 20:23:08
+Mode: READ-ONLY REVIEW; REPORT OUTPUT ONLY
+
+SECURITY RULE: Keep authentication fail-closed until formal approval.
+Do not put secrets, tokens, client secrets, or private keys in this report.
+
+1. REQUIRED CONFIGURATION — obtain approved values from the Entra administrator
+[ ] CIRT_DFIR_ENTRA_TENANT_ID — approved tenant ID
+[ ] CIRT_DFIR_ENTRA_EXPECTED_ISSUER — exact issuer for the approved tenant
+[ ] CIRT_DFIR_ENTRA_AUDIENCE — audience expected by this API
+
+2. REQUIRED SECURITY APPROVALS
+[ ] Entra app registration and API resource verified
+[ ] Token issuer, audience, signature and lifetime validation reviewed
+[ ] Required app roles and role-to-permission mapping approved
+[ ] Required permissions and consent reviewed
+[ ] Unauthorized and insufficient-permission behavior tested
+[ ] Security owner/admin sign-off recorded
+
+3. RELEVANT IMPLEMENTATION FILES
+[FOUND] app\auth_dependencies.py
+[FOUND] app\security.py
+[FOUND] app\entra_config_preflight.py
+[FOUND] app\entra_bearer_adapter.py
+[FOUND] app\entra_token_verifier.py
+[FOUND] app\entra_principal.py
+[FOUND] app\entra_jwks.py
+[FOUND] app\entra_jwks_cache.py
+[FOUND] app\entra_metadata_client.py
+[FOUND] app\entra_http_transport.py
+[FOUND] app\entra_authenticator.py
+[FOUND] tests\test_entra_config_preflight.py
+[FOUND] tests\test_api_auth_gate.py
+[FOUND] tests\test_api_oidc_fail_closed.py
+
+4. CURRENT PROCESS ENVIRONMENT — presence only; values are not read into the report
+CIRT_DFIR_ENTRA_TENANT_ID : MISSING OR EMPTY
+CIRT_DFIR_ENTRA_EXPECTED_ISSUER : MISSING OR EMPTY
+CIRT_DFIR_ENTRA_AUDIENCE : MISSING OR EMPTY
+
+5. TEST STATUS
+Phase 8B173 focused authentication tests: 8 passed.
+This checklist does not independently rerun those tests.
+
+6. DECISION
+Do not enable or wire production authentication based on this checklist alone.
+Complete configuration verification, role mapping, security testing and formal approval first.
+No application files or environment variables were modified by this script.

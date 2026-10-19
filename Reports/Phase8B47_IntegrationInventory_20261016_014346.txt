@@ -1,0 +1,44 @@
+﻿CIRT DFIR PROFESSIONAL - PHASE 8B.47
+Timestamp: 2026-10-16T01:43:47.3122741+08:00
+Mode: READ-ONLY INTEGRATION READINESS INVENTORY
+
+=== READINESS CHECKS ===
+PASS - Authentication gate has fail-closed 401 behavior
+PASS - Cases read route has permission dependency
+PASS - Case update route has permission dependency
+PASS - Offline verifier uses RS256
+PASS - JWKS resolver restricts RS256
+PASS - OIDC claims module exists
+REVIEW - PyJWT is declared in backend requirements
+REVIEW - Cryptography is declared in backend requirements
+PASS - Frontend package manifest parses
+REVIEW - MSAL browser package declared
+REVIEW - MSAL React package declared
+REVIEW - Frontend has authentication/token marker
+PASS - Scope intake section exists
+PASS - Application role intake section exists
+
+Checks passed: 9/14
+Checks requiring review: 5
+Administrator configuration placeholders remain: True
+
+=== INTEGRATION BOUNDARIES ===
+Verifier and JWKS resolver wired into production routes: NOT established by this inventory
+Live Microsoft discovery/JWKS trust: NOT tested
+Trusted production app-role mapping: NOT established
+Authenticated audit subject attribution: NOT established
+Frontend sign-in and bearer-token flow: NOT established
+
+=== SAFETY ===
+Application source modified: NO
+Worksheet modified: NO
+Packages installed: NO
+Server started: NO
+Microsoft endpoints contacted: NO
+Secrets or tokens displayed: NO
+Authentication gate changed: NO
+Production authentication enabled: NO
+
+Overall result: INVENTORY COMPLETE; REVIEW ITEMS MUST BE RESOLVED BEFORE INTEGRATION
+Do not replace the fail-closed authentication gate until trusted Entra configuration and
+verified token processing, role mapping, frontend flow, and security review are complete.

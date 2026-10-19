@@ -1,0 +1,22 @@
+﻿CIRT DFIR PROFESSIONAL - PHASE 8B.5
+Fail-closed authentication gate and API authorization tests
+Timestamp: 2026-10-16T00:19:10.9712216+08:00
+Identity provider: NOT DECIDED
+Deployment target: INTERNAL ORGANIZATION NETWORK
+Backup folder: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\Phase8B5_20261016_001906
+
+Test exit code: 0
+Frontend build exit code: 0
+
+Modified/created files:
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\main.py
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\auth_dependencies.py
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\conftest.py
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_api_auth_gate.py
+
+Security limitation:
+No real authentication is implemented. The protected case-list and case-update routes reject requests by default.
+The test identity overrides are synthetic and exist only inside the pytest suite.
+Do not expose this service to the network or treat it as production-ready until OIDC authentication, token validation, role mapping, and deployment security are implemented.
+
+No server was started. No identity provider was contacted. No packages were installed.

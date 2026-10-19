@@ -1,0 +1,4 @@
+cirt-dfir-platform-frontend@0.1.0 C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend
++-- @azure/msal-browser@5.25.1
+`-- @azure/msal-react@5.7.2
+

@@ -1,0 +1,9 @@
+﻿============================================================
+CIRT-DFIR Phase 8B.135 - Entra Authentication Composition Audit
+Timestamp: 2026-10-17 19:16:26 +08:00
+Project: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional
+Backend: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend
+============================================================
+
+[1] Python and dependency versions
+python: Python 3.12.10

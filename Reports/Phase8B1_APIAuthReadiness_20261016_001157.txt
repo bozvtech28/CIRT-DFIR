@@ -1,0 +1,64 @@
+CIRT DFIR PROFESSIONAL — PHASE 8B.1
+API Authentication Readiness and Dependency Verification
+Generated UTC: 2026-10-15T16:11:57.709392+00:00
+Static inspection only; no server or network requests.
+
+1. SOURCE FILE HASHES
+platform\backend\app\main.py | SHA256=86959092ee271ff72414cf3bf9d5ce75905551454c8ca17ad66e23870245854f
+platform\backend\requirements.txt | SHA256=79c0260b05030c247e0d1b2d625828fe846de9c21059b2a21ab2866813d54ab6
+platform\frontend\vite.config.ts | SHA256=44ce89930b6e9d5b32679a5401000c6353dde6cf453ae5f3d1adb73eb81862a0
+
+2. API ROUTE AND HANDLER INSPECTION
+ROUTE: GET /api/v1/health
+  Handler: health (line 57)
+  Parameters: (none)
+  Depends/Security in parameter defaults: False
+ROUTE: PATCH /api/v1/cases/{case_id}
+  Handler: update_case_endpoint (line 64)
+  Parameters: case_id, payload
+  Depends/Security in parameter defaults: False
+ROUTE: GET /api/v1/demo/cases
+  Handler: get_demo_cases (line 103)
+  Parameters: (none)
+  Depends/Security in parameter defaults: False
+
+3. GLOBAL AUTHENTICATION / AUTHORIZATION INDICATORS
+No common global authentication/dependency indicators detected by this static scan.
+
+4. INSTALLED BACKEND DISTRIBUTIONS
+fastapi: 0.143.2
+starlette: 1.8.0
+pydantic: 2.14.1
+uvicorn: 0.54.0
+pytest: 8.4.2
+python-jose: NOT INSTALLED in this Python environment
+PyJWT: NOT INSTALLED in this Python environment
+passlib: NOT INSTALLED in this Python environment
+bcrypt: NOT INSTALLED in this Python environment
+argon2-cffi: NOT INSTALLED in this Python environment
+cryptography: NOT INSTALLED in this Python environment
+
+5. REQUIREMENTS DECLARATION
+DECLARED: ﻿fastapi>=0.115,<1.0
+DECLARED: uvicorn[standard]>=0.34,<1.0
+DECLARED: pydantic>=2.10,<3.0
+DECLARED: pytest>=8.3,<9.0
+DECLARED: httpx>=0.28,<1.0
+DECLARED CHECK fastapi: False
+DECLARED CHECK pydantic: True
+DECLARED CHECK uvicorn: True
+
+6. FRONTEND DEVELOPMENT PROXY
+vite.config.ts:7: host: "127.0.0.1",
+vite.config.ts:8: strictPort: true,
+vite.config.ts:9: proxy: {
+vite.config.ts:11: target: "http://127.0.0.1:8000",
+
+7. REVIEW NOTES
+- A route without an obvious Depends/Security parameter is not proof by itself that the route is unprotected; inspect dependencies and middleware manually.
+- Package installation is not the same as a dependency being declared in requirements.txt.
+- Do not add authentication libraries until the current deployment model and identity source are chosen.
+- For the next implementation phase, define roles and route permissions before coding.
+- Use temporary databases and synthetic cases for security tests.
+- No application source, database, collector, or evidence files were modified by this Python assessment.
+- This script does not start the API, install packages, or send network requests.

@@ -1,0 +1,73 @@
+CIRT DFIR PROFESSIONAL — PHASE 8A
+Security Design and Read-Only Assessment
+Generated UTC: 2026-10-15T16:10:41.700822+00:00
+Project root: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional
+Scope: static source/configuration inspection only
+
+FILE FOUND | platform/backend/app/main.py | SHA256=86959092ee271ff72414cf3bf9d5ce75905551454c8ca17ad66e23870245854f
+FILE FOUND | platform/backend/app/case_store.py | SHA256=775ff3334ccd2d401b2392d0e96bcb87e7a2bbd90b76379f104e2e01651eebe8
+FILE FOUND | platform/backend/app/case_repository.py | SHA256=8b9754093836118da4c5a76edc243e305cef66a104e948f02c09fdcbe903f3d2
+FILE FOUND | platform/backend/app/case_schema.sql | SHA256=69347622f6553ed288ed9db39215c7b5bfed5c4323c90bc93e2e333e55f9e915
+FILE FOUND | platform/backend/requirements.txt | SHA256=79c0260b05030c247e0d1b2d625828fe846de9c21059b2a21ab2866813d54ab6
+FILE FOUND | platform/frontend/src/App.tsx | SHA256=dbeaed9bed6258804a1a37f13185426929e977d45c1f4005ae1e511a2e2538dc
+FILE FOUND | platform/frontend/vite.config.ts | SHA256=44ce89930b6e9d5b32679a5401000c6353dde6cf453ae5f3d1adb73eb81862a0
+FILE FOUND | platform/frontend/package.json | SHA256=059a6e005f889183e5c0089d19c3eaba36148449cc16b793d482fc5f696cb864
+FILE FOUND | README.md | SHA256=7bc3f882f6325ee86536541c5f700edb7553f78dffdd7a2c8666d5dab727ba31
+FILE FOUND | docs/Architecture.md | SHA256=0a6ba94fd7bdaf323eb72bdbb4218814b22af33cafebf77d6d681e613249ed5a
+FILE FOUND | docs/Requirements.md | SHA256=465a2d43462e16b864b0a67fb41c9f15c6d073880b74c604840eea251f8e80f7
+
+1. BACKEND ROUTE INVENTORY
+ROUTE | line 57 | app.get('/api/v1/health', response_model=HealthResponse) | function=health
+ROUTE | line 64 | app.patch('/api/v1/cases/{case_id}', response_model=DemoCase) | function=update_case_endpoint
+ROUTE | line 103 | app.get('/api/v1/demo/cases', response_model=list[DemoCase]) | function=get_demo_cases
+
+2. SECURITY CONTROL INDICATORS
+[PASS] Authentication indicators: authentication, Authentication
+[PASS] Authorization / role indicators: authorization
+[REVIEW] Session / cookie security indicators: No matching indicators found; manual review required
+[REVIEW] CSRF protection indicators: No matching indicators found; manual review required
+[REVIEW] Rate limiting indicators: No matching indicators found; manual review required
+[REVIEW] CORS configuration indicators: No matching indicators found; manual review required
+[PASS] Secret/configuration indicators: os.environ
+[PASS] Audit/hash-chain indicators: event_hash, previous_hash, signature
+[REVIEW] TLS / secure transport indicators: No matching indicators found; manual review required
+
+3. API AND DATABASE OBSERVATIONS
+[PASS] HTTP error handling: Indicator found
+[PASS] Pydantic unknown-field rejection: Indicator found
+[PASS] PATCH route: Indicator found
+[REVIEW] FastAPI dependency injection: Indicator not found in main.py
+[PASS] Audit table declaration: audit_events table declaration found
+[PASS] Audit update/delete triggers: At least one idempotent trigger and UPDATE/DELETE trigger pattern detected
+[PASS] Repository update auditing: CASE_UPDATED and audit-related code indicators found
+[PASS] Database path override: Environment-variable database override detected
+[PASS] Default database location: SQLite filename indicator found
+
+4. DEPENDENCY AND FRONTEND CONFIGURATION
+[REVIEW] Backend dependency: fastapi: Not detected in requirements.txt
+[PASS] Backend dependency: pydantic: Listed in requirements.txt
+[PASS] Frontend API proxy target: Local development proxy target detected
+[PASS] Frontend package manifest: package.json was read
+
+5. REVIEW FINDINGS
+These are static indicators, not proof that a control is secure or operational.
+A keyword match may be a comment or unused code; absence of a match is not definitive proof of absence.
+
+Priority review items:
+P1 — Confirm whether every sensitive API endpoint requires authenticated identity.
+P1 — Define authorization rules for case creation, case updates, viewing, and audit access.
+P1 — Decide how credentials, secrets, and session/token lifetimes will be managed.
+P1 — Define the threat model for the SQLite database and audit records, including local administrator access.
+P2 — Specify secure deployment settings, including HTTPS, CORS policy, and rate limiting where applicable.
+P2 — Add negative tests for unauthenticated requests and insufficient privileges before enabling access controls.
+P2 — Keep all security tests on temporary databases and synthetic case records.
+
+6. SCOPE AND SAFETY
+No application source, database, collector, or evidence files were intentionally modified by this assessment.
+No server was started, no packages were installed, and no network requests were made.
+Only this assessment script and its report are written under Reports.
+
+7. SUMMARY
+Indicators/checks marked PASS: 15
+Items requiring manual review: 7
+This report is a design baseline, not a penetration test, compliance certification, or production-readiness approval.

@@ -1,0 +1,11 @@
+﻿BozV signature correction
+Timestamp: 2026-10-15 23:09:04
+Frontend build exit code: -1
+Backend test exit code: -1
+Failure: Footer replacement did not change App.tsx.
+Rollback verified: True
+Backup: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\BozV_Signature_Fix_20261015_230903
+Vite proxy preserved: Yes, if preflight and post-write checks passed
+Production collector modified: No
+Evidence accessed: No
+Server started: No

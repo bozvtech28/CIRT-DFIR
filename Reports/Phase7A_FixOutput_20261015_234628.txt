@@ -1,0 +1,1 @@
+Moved the five lifecycle test methods into RepositoryTests.

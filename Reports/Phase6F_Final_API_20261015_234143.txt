@@ -1,0 +1,8 @@
+PASS: API health endpoint - HTTP 200; development scaffold
+PASS: Synthetic demo-case endpoint - HTTP 200; three synthetic cases
+PASS: Database/audit consistency - Three demo cases and three creation audit events
+PASS: Audit protection triggers - Update/delete protection triggers exist
+PASS: Repository unit tests - 9 repository tests passed
+PASS: API-to-store wiring - API source references the database-backed case store
+
+Phase 6F checks: 6 passed, 0 failed

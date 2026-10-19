@@ -1,0 +1,17 @@
+﻿CIRT-DFIR - PHASE 8B185
+Focused Entra configuration regression tests
+No application or environment changes are intended.
+
+Matching test files:
+ - tests\test_entra_authenticator.py
+ - tests\test_entra_config_preflight.py
+
+Executing focused tests with the project virtual environment:
+Command: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\.venv\Scripts\python.exe -m pytest -q C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_entra_authenticator.py C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_entra_config_preflight.py
+==============================================================================
+..................................                                       [100%]
+34 passed in 0.54s
+==============================================================================
+PYTEST_EXIT_CODE: 0
+RESULT: PASS - all discovered focused test files passed.
+STATUS: TESTS ONLY; no application files or environment variables changed.

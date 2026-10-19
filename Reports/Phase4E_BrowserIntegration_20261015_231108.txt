@@ -1,0 +1,12 @@
+﻿Phase 4E browser integration test
+Timestamp: 2026-10-15 23:11:35
+Result: FAIL
+Backend URL: http://127.0.0.1:8000
+Frontend URL: http://127.0.0.1:5173
+Failure: Unable to connect to the remote server
+Backend window PID: 15744
+Frontend window PID: 8004
+BozV signature: Previously verified
+Evidence accessed: No
+Production collector modified: No
+Stop both development servers with Ctrl+C in their respective windows when finished.

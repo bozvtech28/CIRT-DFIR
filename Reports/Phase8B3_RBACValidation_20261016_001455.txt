@@ -1,0 +1,38 @@
+﻿CIRT DFIR PROFESSIONAL — PHASE 8B.3
+RBAC Policy Foundation Validation
+Timestamp: 20261016_001455
+Scope: synthetic principals and authorization policy only
+
+Backup directory: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\Phase8B3_RBAC_20261016_001455
+Backup manifest: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\Phase8B3_RBAC_20261016_001455\SHA256_Manifest.txt
+
+Test command: python -m pytest tests\test_security.py -v
+Exit code: 0
+
+TEST OUTPUT:
+============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-8.4.2, pluggy-1.7.0 -- C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend
+plugins: anyio-4.15.1
+collecting ... collected 10 items
+
+tests/test_security.py::TestRBACPolicy::test_admin_can_read_update_manage_users_and_read_audit PASSED [ 10%]
+tests/test_security.py::TestRBACPolicy::test_analyst_can_read_and_update_cases PASSED [ 20%]
+tests/test_security.py::TestRBACPolicy::test_analyst_cannot_manage_users_or_read_audit PASSED [ 30%]
+tests/test_security.py::TestRBACPolicy::test_empty_subject_is_rejected PASSED [ 40%]
+tests/test_security.py::TestRBACPolicy::test_missing_principal_is_rejected PASSED [ 50%]
+tests/test_security.py::TestRBACPolicy::test_no_roles_is_rejected PASSED [ 60%]
+tests/test_security.py::TestRBACPolicy::test_unknown_permission_is_rejected PASSED [ 70%]
+tests/test_security.py::TestRBACPolicy::test_unknown_role_is_rejected PASSED [ 80%]
+tests/test_security.py::TestRBACPolicy::test_viewer_can_read_cases PASSED [ 90%]
+tests/test_security.py::TestRBACPolicy::test_viewer_cannot_update_cases PASSED [100%]
+
+============================= 10 passed in 0.02s ==============================
+
+LIMITATIONS:
+- This module does not authenticate users.
+- OIDC provider, issuer, audience, signing keys, and callback configuration are not set.
+- Do not wire a client-supplied identity or unverified token into Principal.
+- Existing API routes are unchanged and do not yet enforce this policy.
+- No server was started and no persistent case database was intentionally modified.

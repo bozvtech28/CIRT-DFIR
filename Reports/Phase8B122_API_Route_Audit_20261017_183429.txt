@@ -1,0 +1,128 @@
+﻿CIRT DFIR PROFESSIONAL - PHASE 8B.122
+API Route Protection and Frontend Auth Source Audit
+Timestamp: 20261017_183429
+Project: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional
+Source files modified: No
+Application servers started: No
+Network requests made: No
+Collector executed: No
+Live Entra authentication enabled: No
+
+========== BACKEND ROUTE DECLARATIONS ==========
+
+FILE: platform\backend\app\main.py
+ROUTE LINE: 57
+55: 
+56: 
+57: @app.get("/api/v1/health", response_model=HealthResponse)
+58: def health() -> HealthResponse:
+59:     return HealthResponse(status="ok", mode="development-scaffold")
+60: 
+61: 
+62: 
+63: 
+64: @app.patch("/api/v1/cases/{case_id}", response_model=DemoCase)
+65: def update_case_endpoint(
+66:     case_id: str,
+67:     payload: CaseUpdateRequest,
+68:     principal = Depends(require_permission("cases:update")),
+69: ) -> DemoCase:
+
+FILE: platform\backend\app\main.py
+ROUTE LINE: 64
+62: 
+63: 
+64: @app.patch("/api/v1/cases/{case_id}", response_model=DemoCase)
+65: def update_case_endpoint(
+66:     case_id: str,
+67:     payload: CaseUpdateRequest,
+68:     principal = Depends(require_permission("cases:update")),
+69: ) -> DemoCase:
+70:     """Development-only case update; uses synthetic development actor."""
+71:     if payload.status is None and payload.severity is None:
+72:         raise HTTPException(
+73:             status_code=422,
+74:             detail="Provide status, severity, or both.",
+75:         )
+76: 
+
+FILE: platform\backend\app\main.py
+ROUTE LINE: 104
+102:     return DemoCase(**updated)
+103: 
+104: @app.get("/api/v1/demo/cases", response_model=list[DemoCase], dependencies=[Depends(require_permission("cases:read"))])
+105: def get_demo_cases() -> list[DemoCase]:
+106:     return [DemoCase(**item) for item in list_demo_cases()]
+107: 
+
+Total route decorator matches: 3
+Note: inspect each route's complete function and dependencies; nearby text alone is not proof of protection.
+
+========== ROUTER REGISTRATION AND SECURITY REFERENCES ==========
+platform\backend\app\auth_dependencies.py:24: def require_permission(permission: str):
+platform\backend\app\auth_dependencies.py:26: def dependency(principal: Principal = Depends(get_current_principal)) -> Principal:
+platform\backend\app\main.py:6: from app.auth_dependencies import require_permission
+platform\backend\app\main.py:68: principal = Depends(require_permission("cases:update")),
+platform\backend\app\main.py:104: @app.get("/api/v1/demo/cases", response_model=list[DemoCase], dependencies=[Depends(require_permission("cases:read"))])
+
+========== FRONTEND AUTH CONFIGURATION AND GATING ==========
+platform\frontend\src\App.tsx:1: import { authenticatedFetch } from "./auth/authenticatedFetch";
+platform\frontend\src\App.tsx:51: const response = await authenticatedFetch(`${API_BASE}/api/v1/demo/cases`, {
+platform\frontend\src\App.tsx.phase5c-prechange.bak:47: const response = await fetch(`${API_BASE}/api/v1/demo/cases`, {
+platform\frontend\src\auth\authenticatedFetch.ts:7: * No browser-supplied role or identity is treated as authorization.
+platform\frontend\src\auth\authenticatedFetch.ts:9: export async function authenticatedFetch(
+platform\frontend\src\auth\authenticatedFetch.ts:16: headers.set("Authorization", `Bearer ${token}`);
+platform\frontend\src\auth\authenticatedFetch.ts:18: return fetch(input, { ...init, headers });
+platform\frontend\src\auth\AuthRoot.tsx:7: getEntraApiScope,
+platform\frontend\src\auth\AuthRoot.tsx:8: isEntraConfigured,
+platform\frontend\src\auth\AuthRoot.tsx:20: await instance.loginRedirect({ scopes: [getEntraApiScope()] });
+platform\frontend\src\auth\AuthRoot.tsx:88: if (isEntraConfigured) {
+platform\frontend\src\auth\AuthRoot.tsx:107: if (!isEntraConfigured) {
+platform\frontend\src\auth\AuthRoot.tsx:111: <strong>Authentication not configured</strong>
+platform\frontend\src\auth\AuthRoot.tsx:131: Initializing Microsoft Entra authentication…
+platform\frontend\src\auth\entraConfig.ts:10: value.includes("REPLACE_WITH_APPROVED") ||
+platform\frontend\src\auth\entraConfig.ts:55: export const isEntraConfigured = entraConfigurationErrors.length === 0;
+platform\frontend\src\auth\entraConfig.ts:58: if (!isEntraConfigured) {
+platform\frontend\src\auth\entraConfig.ts:77: export function getEntraApiScope(): string {
+platform\frontend\src\auth\entraConfig.ts:78: if (!isEntraConfigured) {
+platform\frontend\src\auth\entraToken.ts:2: import { getEntraApiScope } from "./entraConfig";
+platform\frontend\src\auth\entraToken.ts:19: const result = await instance.acquireTokenSilent({
+platform\frontend\src\auth\entraToken.ts:21: scopes: [getEntraApiScope()],
+platform\frontend\src\auth\msalInstance.ts:2: import { getEntraConfiguration, isEntraConfigured } from "./entraConfig";
+platform\frontend\src\auth\msalInstance.ts:8: if (!isEntraConfigured) {
+
+========== TEST INVENTORY ==========
+Test files found: 19
+platform\backend\tests\test_api.py
+platform\backend\tests\test_api_auth_gate.py
+platform\backend\tests\test_api_oidc_fail_closed.py
+platform\backend\tests\test_entra_bearer_adapter.py
+platform\backend\tests\test_entra_end_to_end_offline.py
+platform\backend\tests\test_entra_http_transport.py
+platform\backend\tests\test_entra_jwks.py
+platform\backend\tests\test_entra_jwks_cache.py
+platform\backend\tests\test_entra_jwks_cache_hardening.py
+platform\backend\tests\test_entra_metadata_client.py
+platform\backend\tests\test_entra_principal.py
+platform\backend\tests\test_entra_principal_authorization.py
+platform\backend\tests\test_entra_token_verifier.py
+platform\backend\tests\test_entra_verifier_jwks_integration.py
+platform\backend\tests\test_oidc_claims.py
+platform\backend\tests\test_security.py
+platform\backend\tests\test_synthetic_jwt_harness.py
+platform\backend\tests\test_synthetic_role_mapping.py
+platform\backend\tests\test_synthetic_rs256_harness.py
+
+========== REVIEW CHECKLIST ==========
+[ ] Every route is classified as public, authenticated, or intentionally unavailable.
+[ ] Every case read/update route requires the appropriate permission.
+[ ] No router is mounted without its intended authorization dependencies.
+[ ] Health endpoint reveals no sensitive configuration or secrets.
+[ ] Test-only identity overrides cannot be enabled in production execution.
+[ ] Frontend cannot treat placeholder configuration as valid.
+[ ] API requests fail closed when tokens are absent or rejected.
+[ ] No user-supplied role is accepted as authorization.
+
+This is a static source inventory, not an automated proof of security.
+A route may use dependencies at the router, application, or endpoint level.
+No source changes or live authentication tests were performed.

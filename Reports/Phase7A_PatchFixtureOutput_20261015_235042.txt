@@ -1,0 +1,3 @@
+PASS: update test now requests real status and severity changes.
+PASS: no-change test now matches the fixture's existing status.
+PASS: Python syntax validated.

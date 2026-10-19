@@ -1,0 +1,57 @@
+CIRT-DFIR - PHASE 8B183
+Targeted application configuration source review
+Read-only; excludes virtual environments and historical reports.
+
+============================================================================
+FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\main.py
+============================================================================
+No selected configuration markers found.
+Total lines: 108
+
+============================================================================
+FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\auth_dependencies.py
+============================================================================
+1: """Fail-closed authentication gate pending approved OIDC integration.
+Total lines: 41
+
+============================================================================
+FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_config_preflight.py
+============================================================================
+No selected configuration markers found.
+Total lines: 89
+
+============================================================================
+FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_authenticator.py
+============================================================================
+3: This module is deliberately NOT wired into FastAPI. Configuration must be
+199: def create_entra_authenticator(
+Total lines: 240
+
+============================================================================
+FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\requirements.txt
+============================================================================
+2: uvicorn[standard]>=0.34,<1.0
+Total lines: 10
+
+============================================================================
+FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\.gitignore
+============================================================================
+1: .env
+2: .env.*
+3: !.env.example
+Total lines: 3
+
+============================================================================
+FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\README.md
+============================================================================
+No selected configuration markers found.
+Total lines: 19
+
+============================================================================
+REVIEW CONCLUSION
+============================================================================
+Marker results require manual interpretation.
+No environment values or credentials were printed.
+No source, configuration, or environment variables were changed.
+Authentication must remain fail-closed pending approved configuration.
+STATUS: REVIEW ONLY

@@ -1,0 +1,15 @@
+﻿CIRT DFIR PROFESSIONAL - PHASE 8B.12
+Timestamp: 2026-10-16T00:39:19.2552574+08:00
+Dependency requested: PyJWT[crypto]>=2.10,<3
+Dependency install exit code: 0
+Dependency import verification exit code: 0
+Dependency verification output: PyJWT: 2.15.1
+RSA primitives: available
+
+Backend pytest exit code: 0
+Original requirements SHA256: 79C0260B05030C247E0D1B2D625828FE846DE9C21059B2A21AB2866813D54AB6
+Backup: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\Phase8B12_20261016_003740
+RS256 test active: True
+No server started.
+No identity provider contacted.
+This phase does not implement production OIDC authentication.

@@ -1,0 +1,26 @@
+﻿CIRT DFIR PROFESSIONAL - PHASE 8B.119
+Timestamp: 20261017_182907
+Backup: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\Phase8B119_20261017_182907
+Python compilation exit code: 0
+Focused test exit code: 0
+Authentication dependency modified: No
+Network requests: None
+Servers started: None
+
+========== ENDPOINT CHECK ==========
+64: @app.patch("/api/v1/cases/{case_id}", response_model=DemoCase)
+65: def update_case_endpoint(
+68: principal = Depends(require_permission("cases:update")),
+84: actor_id=principal.subject,
+
+========== PYTEST STDOUT ==========
+........                                                                 [100%]
+============================== warnings summary ===============================
+.venv\Lib\site-packages\fastapi\testclient.py:1
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+8 passed, 1 warning in 0.22s
+
+========== PYTEST STDERR ==========

@@ -1,0 +1,1181 @@
+﻿CIRT DFIR PROFESSIONAL - PHASE 8B.107
+Timestamp: 20261016_152536
+Purpose: Correct empty-log handling and inspect authentication test fixtures
+Application source modified: No
+Network requests: No
+Servers started: No
+
+========== PREVIOUS TEST RESULT ==========
+CIRT DFIR PROFESSIONAL - PHASE 8B.106
+Timestamp: 20261016_150217
+Purpose: Inspect existing authentication fixtures and establish test baseline
+Production authentication changes: None
+Live Entra requests: None
+Application servers started: None
+
+========== PHASE 8B.105 REVIEW CONTENT ==========
+CIRT DFIR PROFESSIONAL - PHASE 8B.105
+Timestamp: 20261016_145919
+Purpose: Review existing test fixtures before designing integration tests
+Source files modified: No
+Network requests: No
+Servers started: No
+
+
+============================================================================
+FILE: tests\conftest.py
+============================================================================
+   1: """Test-only identity override for legacy API tests.
+   2: 
+   3: This fixture is confined to the test suite. It is not used by the application
+   4: outside pytest and does not establish real user identity.
+   5: """
+   6: import pytest
+   7: from fastapi.testclient import TestClient
+   8: 
+   9: from app.auth_dependencies import get_current_principal
+  10: from app.main import app
+  11: from app.security import Principal, ROLE_ANALYST
+  12: 
+  13: @pytest.fixture(autouse=True)
+  14: def test_identity_override():
+  15:     app.dependency_overrides[get_current_principal] = lambda: Principal(
+  16:         subject="synthetic-test-analyst",
+  17:         roles=frozenset({ROLE_ANALYST}),
+  18:     )
+  19:     yield
+  20:     app.dependency_overrides.clear()
+
+============================================================================
+FILE: tests\test_api_auth_gate.py
+============================================================================
+   1: """API access-control tests using synthetic identities only."""
+   2: from fastapi.testclient import TestClient
+   3: 
+   4: from app.auth_dependencies import get_current_principal
+   5: from app.main import app
+   6: from app.security import Principal, ROLE_ADMINISTRATOR, ROLE_VIEWER
+   7: 
+   8: client = TestClient(app)
+   9: 
+  10: def test_demo_cases_reject_unauthenticated_request():
+  11:     app.dependency_overrides.clear()
+  12:     try:
+  13:         response = client.get("/api/v1/demo/cases")
+  14:         assert response.status_code == 401
+  15:         assert "Authentication" in response.json()["detail"]
+  16:     finally:
+  17:         app.dependency_overrides.clear()
+  18: 
+  19: def test_case_update_rejects_unauthenticated_request():
+  20:     app.dependency_overrides.clear()
+  21:     try:
+  22:         response = client.patch(
+  23:             "/api/v1/cases/DEMO-2026-001",
+  24:             json={"status": "Contained"},
+  25:         )
+  26:         assert response.status_code == 401
+  27:     finally:
+  28:         app.dependency_overrides.clear()
+  29: 
+  30: def test_viewer_cannot_update_case():
+  31:     app.dependency_overrides[get_current_principal] = lambda: Principal(
+  32:         subject="synthetic-test-viewer",
+  33:         roles=frozenset({ROLE_VIEWER}),
+  34:     )
+  35:     try:
+  36:         response = client.patch(
+  37:             "/api/v1/cases/DEMO-2026-001",
+  38:             json={"status": "Contained"},
+  39:         )
+  40:         assert response.status_code == 403
+  41:     finally:
+  42:         app.dependency_overrides.clear()
+  43: 
+  44: def test_admin_can_pass_case_update_authorization_gate():
+  45:     # Dependency override represents an already validated synthetic principal.
+  46:     # This test checks authorization only; it does not perform a database update.
+  47:     from app.auth_dependencies import require_permission
+  48:     from fastapi import Depends, FastAPI
+  49:     from fastapi.testclient import TestClient as LocalClient
+  50: 
+  51:     test_app = FastAPI()
+  52:     test_app.dependency_overrides[get_current_principal] = lambda: Principal(
+  53:         subject="synthetic-test-admin",
+  54:         roles=frozenset({ROLE_ADMINISTRATOR}),
+  55:     )
+  56: 
+  57:     @test_app.get("/test-protected-update-permission")
+  58:     def protected_permission_check(principal=Depends(require_permission("cases:update"))):
+  59:         return {"authorized": True}
+  60: 
+  61:     response = LocalClient(test_app).get("/test-protected-update-permission")
+  62:     assert response.status_code == 200
+  63:     assert response.json()["authorized"] is True
+
+============================================================================
+FILE: tests\test_entra_bearer_adapter.py
+============================================================================
+   1: import json
+   2: import time
+   3: 
+   4: import jwt
+   5: import pytest
+   6: from cryptography.hazmat.primitives.asymmetric import rsa
+   7: 
+   8: from app.entra_bearer_adapter import (
+   9:     BearerAuthenticationError,
+  10:     principal_from_authorization_header,
+  11: )
+  12: from app.entra_jwks import build_jwks_resolver
+  13: from app.security import (
+  14:     ROLE_ADMINISTRATOR,
+  15:     ROLE_ANALYST,
+  16:     ROLE_VIEWER,
+  17:     AuthorizationDenied,
+  18:     authorize,
+  19: )
+  20: 
+  21: TENANT = "11111111-2222-4333-8444-555555555555"
+  22: ISSUER = f"https://login.microsoftonline.com/{TENANT}/v2.0"
+  23: AUDIENCE = "api://synthetic-cirt-dfir-api"
+  24: ROLE_MAP = {
+  25:     "CIRT.DFIR.Viewer": ROLE_VIEWER,
+  26:     "CIRT.DFIR.Analyst": ROLE_ANALYST,
+  27:     "CIRT.DFIR.Administrator": ROLE_ADMINISTRATOR,
+  28: }
+  29: 
+  30: 
+  31: @pytest.fixture
+  32: def identity():
+  33:     private_key = rsa.generate_private_key(
+  34:         public_exponent=65537,
+  35:         key_size=2048,
+  36:     )
+  37:     public_jwk = json.loads(
+  38:         jwt.algorithms.RSAAlgorithm.to_jwk(private_key.public_key())
+  39:     )
+  40:     public_jwk.update({
+  41:         "kid": "offline-adapter-test-key",
+  42:         "use": "sig",
+  43:         "alg": "RS256",
+  44:     })
+  45:     resolver = build_jwks_resolver({"keys": [public_jwk]})
+  46: 
+  47:     def issue_token(roles=None, **overrides):
+  48:         now = int(time.time())
+  49:         claims = {
+  50:             "iss": ISSUER,
+  51:             "aud": AUDIENCE,
+  52:             "sub": "synthetic-adapter-user",
+  53:             "tid": TENANT,
+  54:             "iat": now,
+  55:             "nbf": now,
+  56:             "exp": now + 300,
+  57:             "roles": roles if roles is not None else ["CIRT.DFIR.Analyst"],
+  58:         }
+  59:         claims.update(overrides)
+  60:         return jwt.encode(
+  61:             claims,
+  62:             private_key,
+  63:             algorithm="RS256",
+  64:             headers={"kid": "offline-adapter-test-key"},
+  65:         )
+  66: 
+  67:     return resolver, issue_token
+  68: 
+  69: 
+  70: def authenticate(header, resolver):
+  71:     return principal_from_authorization_header(
+  72:         header,
+  73:         trusted_key_resolver=resolver,
+  74:         expected_issuer=ISSUER,
+  75:         expected_audience=AUDIENCE,
+  76:         expected_tenant_id=TENANT,
+  77:         approved_role_map=ROLE_MAP,
+  78:     )
+  79: 
+  80: 
+  81: def test_valid_analyst_bearer_produces_principal(identity):
+  82:     resolver, issue = identity
+  83:     principal = authenticate("Bearer " + issue(), resolver)
+  84:     assert principal.subject == "synthetic-adapter-user"
+  85:     assert principal.roles == frozenset({ROLE_ANALYST})
+  86:     assert authorize(principal, "cases:read")
+  87:     assert authorize(principal, "cases:update")
+  88: 
+  89: 
+  90: def test_viewer_cannot_update(identity):
+  91:     resolver, issue = identity
+  92:     principal = authenticate(
+  93:         "Bearer " + issue(roles=["CIRT.DFIR.Viewer"]),
+  94:         resolver,
+  95:     )
+  96:     with pytest.raises(AuthorizationDenied):
+  97:         authorize(principal, "cases:update")
+  98: 
+  99: 
+ 100: def test_administrator_can_pass_admin_permission(identity):
+ 101:     resolver, issue = identity
+ 102:     principal = authenticate(
+ 103:         "Bearer " + issue(roles=["CIRT.DFIR.Administrator"]),
+ 104:         resolver,
+ 105:     )
+ 106:     assert authorize(principal, "users:manage")
+ 107:     assert authorize(principal, "audit:read")
+ 108: 
+ 109: 
+ 110: @pytest.mark.parametrize(
+ 111:     "header",
+ 112:     [
+ 113:         None,
+ 114:         "",
+ 115:         "Basic abc",
+ 116:         "Bearer",
+ 117:         "Bearer ",
+ 118:         "Bearer first second",
+ 119:     ],
+ 120: )
+ 121: def test_missing_or_malformed_header_is_rejected(identity, header):
+ 122:     resolver, _ = identity
+ 123:     with pytest.raises(BearerAuthenticationError):
+ 124:         authenticate(header, resolver)
+ 125: 
+ 126: 
+ 127: def test_tampered_token_is_rejected(identity):
+ 128:     resolver, issue = identity
+ 129:     token = issue()
+ 130:     header, payload, signature = token.split(".")
+ 131:     altered = ("A" if signature[0] != "A" else "B") + signature[1:]
+ 132:     with pytest.raises(BearerAuthenticationError):
+ 133:         authenticate(f"Bearer {header}.{payload}.{altered}", resolver)
+ 134: 
+ 135: 
+ 136: def test_wrong_tenant_is_rejected(identity):
+ 137:     resolver, issue = identity
+ 138:     with pytest.raises(BearerAuthenticationError):
+ 139:         authenticate(
+ 140:             "Bearer " + issue(tid="aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"),
+ 141:             resolver,
+ 142:         )
+ 143: 
+ 144: 
+ 145: def test_unapproved_role_is_rejected(identity):
+ 146:     resolver, issue = identity
+ 147:     with pytest.raises(BearerAuthenticationError):
+ 148:         authenticate(
+ 149:             "Bearer " + issue(roles=["CIRT.DFIR.Unapproved"]),
+ 150:             resolver,
+ 151:         )
+ 152: 
+ 153: 
+ 154: def test_empty_roles_are_rejected(identity):
+ 155:     resolver, issue = identity
+ 156:     with pytest.raises(BearerAuthenticationError):
+ 157:         authenticate("Bearer " + issue(roles=[]), resolver)
+
+============================================================================
+FILE: app\main.py
+============================================================================
+   1: from fastapi import FastAPI, HTTPException, Depends
+   2: from pydantic import BaseModel, ConfigDict
+   3: from app import case_store
+   4: from app.case_repository import connect, update_case
+   5: from app.case_store import list_demo_cases
+   6: from app.auth_dependencies import require_permission
+   7: 
+   8: app = FastAPI(
+   9:     title="CIRT DFIR Platform API",
+  10:     version="0.1.0",
+  11:     description="Development scaffold only. Synthetic data; no evidence intake.",
+  12: )
+  13: 
+  14: 
+  15: class HealthResponse(BaseModel):
+  16:     status: str
+  17:     mode: str
+  18: 
+  19: 
+  20: 
+  21: 
+  22: class CaseUpdateRequest(BaseModel):
+  23:     model_config = ConfigDict(extra="forbid")
+  24: 
+  25:     status: str | None = None
+  26:     severity: str | None = None
+  27: 
+  28: class DemoCase(BaseModel):
+  29:     case_id: str
+  30:     title: str
+  31:     severity: str
+  32:     status: str
+  33: 
+  34: 
+  35: DEMO_CASES = [
+  36:     DemoCase(
+  37:         case_id="DEMO-2026-001",
+  38:         title="Endpoint Alert Review",
+  39:         severity="High",
+  40:         status="Investigating",
+  41:     ),
+  42:     DemoCase(
+  43:         case_id="DEMO-2026-002",
+  44:         title="Suspicious Login Review",
+  45:         severity="Medium",
+  46:         status="Triage",
+  47:     ),
+  48:     DemoCase(
+  49:         case_id="DEMO-2026-003",
+  50:         title="Mailbox Rule Assessment",
+  51:         severity="Medium",
+  52:         status="Evidence review",
+  53:     ),
+  54: ]
+  55: 
+  56: 
+  57: @app.get("/api/v1/health", response_model=HealthResponse)
+  58: def health() -> HealthResponse:
+  59:     return HealthResponse(status="ok", mode="development-scaffold")
+  60: 
+  61: 
+  62: 
+  63: 
+  64: @app.patch("/api/v1/cases/{case_id}", response_model=DemoCase, dependencies=[Depends(require_permission("cases:update"))])
+  65: def update_case_endpoint(
+  66:     case_id: str,
+  67:     payload: CaseUpdateRequest,
+  68: ) -> DemoCase:
+  69:     """Development-only case update; uses synthetic development actor."""
+  70:     if payload.status is None and payload.severity is None:
+  71:         raise HTTPException(
+  72:             status_code=422,
+  73:             detail="Provide status, severity, or both.",
+  74:         )
+  75: 
+  76:     try:
+  77:         case_store.ensure_database()
+  78:         db = connect(case_store.DB_PATH)
+  79:         try:
+  80:             updated = update_case(
+  81:                 db,
+  82:                 case_id=case_id,
+  83:                 actor_id="DEVELOPMENT-API",
+  84:                 timestamp=__import__("datetime").datetime.now(
+  85:                     __import__("datetime").timezone.utc
+  86:                 ).isoformat(),
+  87:                 status=payload.status,
+  88:                 severity=payload.severity,
+  89:             )
+  90:         finally:
+  91:             db.close()
+  92:     except ValueError as exc:
+  93:         message = str(exc)
+  94:         if message == "Update contains no case changes.":
+  95:             raise HTTPException(status_code=409, detail=message) from exc
+  96:         raise HTTPException(status_code=422, detail=message) from exc
+  97: 
+  98:     if updated is None:
+  99:         raise HTTPException(status_code=404, detail="Case not found.")
+ 100: 
+ 101:     return DemoCase(**updated)
+ 102: 
+ 103: @app.get("/api/v1/demo/cases", response_model=list[DemoCase], dependencies=[Depends(require_permission("cases:read"))])
+ 104: def get_demo_cases() -> list[DemoCase]:
+ 105:     return [DemoCase(**item) for item in list_demo_cases()]
+
+============================================================================
+FILE: app\auth_dependencies.py
+============================================================================
+   1: """Fail-closed authentication gate pending approved OIDC integration.
+   2: 
+   3: This module intentionally authenticates nobody. Replace the placeholder
+   4: identity provider integration only after the organization chooses a provider.
+   5: Never trust roles supplied by a browser or request body.
+   6: """
+   7: from fastapi import Depends, HTTPException
+   8: 
+   9: from app.security import (
+  10:     AuthenticationRequired,
+  11:     AuthorizationDenied,
+  12:     Principal,
+  13:     authorize,
+  14: )
+  15: 
+  16: def get_current_principal() -> Principal:
+  17:     """Reject all requests until real token/session validation is implemented."""
+  18:     raise HTTPException(
+  19:         status_code=401,
+  20:         detail="Authentication is not configured. Access is denied by default.",
+  21:         headers={"WWW-Authenticate": "Bearer"},
+  22:     )
+  23: 
+  24: def require_permission(permission: str):
+  25:     """Require a validated principal and enforce the RBAC permission."""
+  26:     def dependency(principal: Principal = Depends(get_current_principal)) -> Principal:
+  27:         try:
+  28:             authorize(principal, permission)
+  29:         except AuthenticationRequired as exc:
+  30:             raise HTTPException(
+  31:                 status_code=401,
+  32:                 detail="Authentication required.",
+  33:                 headers={"WWW-Authenticate": "Bearer"},
+  34:             ) from exc
+  35:         except AuthorizationDenied as exc:
+  36:             raise HTTPException(
+  37:                 status_code=403,
+  38:                 detail="Insufficient permission.",
+  39:             ) from exc
+  40:         return principal
+  41:     return dependency
+
+NEXT STEP
+Use the reviewed fixtures to design isolated synthetic authentication tests.
+Do not replace the production fail-closed gate without approved configuration.
+
+========== TEST BASELINE ==========
+Pytest exit code: 0
+
+--- PYTEST STDOUT ---
+........................................................................ [ 28%]
+........................................................................ [ 57%]
+........................................................................ [ 86%]
+...................................                                      [100%]
+============================== warnings summary ===============================
+.venv\Lib\site-packages\fastapi\testclient.py:1
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+251 passed, 1 warning in 4.00s
+
+--- PYTEST STDERR ---
+
+========== SECURITY GUARDRAILS ==========
+Production authentication remains fail-closed.
+Test-only dependency overrides must not be used as production authentication.
+Synthetic tests must not contact external identity endpoints.
+
+
+========== PYTEST STDOUT ==========
+........................................................................ [ 28%]
+........................................................................ [ 57%]
+........................................................................ [ 86%]
+...................................                                      [100%]
+============================== warnings summary ===============================
+.venv\Lib\site-packages\fastapi\testclient.py:1
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+251 passed, 1 warning in 4.00s
+
+========== PYTEST STDERR ==========
+[Empty stderr file; this is not itself a failure]
+
+============================================================================
+FILE: tests\conftest.py
+============================================================================
+"""Test-only identity override for legacy API tests.
+
+This fixture is confined to the test suite. It is not used by the application
+outside pytest and does not establish real user identity.
+"""
+import pytest
+from fastapi.testclient import TestClient
+
+from app.auth_dependencies import get_current_principal
+from app.main import app
+from app.security import Principal, ROLE_ANALYST
+
+@pytest.fixture(autouse=True)
+def test_identity_override():
+    app.dependency_overrides[get_current_principal] = lambda: Principal(
+        subject="synthetic-test-analyst",
+        roles=frozenset({ROLE_ANALYST}),
+    )
+    yield
+    app.dependency_overrides.clear()
+
+============================================================================
+FILE: tests\test_api_auth_gate.py
+============================================================================
+"""API access-control tests using synthetic identities only."""
+from fastapi.testclient import TestClient
+
+from app.auth_dependencies import get_current_principal
+from app.main import app
+from app.security import Principal, ROLE_ADMINISTRATOR, ROLE_VIEWER
+
+client = TestClient(app)
+
+def test_demo_cases_reject_unauthenticated_request():
+    app.dependency_overrides.clear()
+    try:
+        response = client.get("/api/v1/demo/cases")
+        assert response.status_code == 401
+        assert "Authentication" in response.json()["detail"]
+    finally:
+        app.dependency_overrides.clear()
+
+def test_case_update_rejects_unauthenticated_request():
+    app.dependency_overrides.clear()
+    try:
+        response = client.patch(
+            "/api/v1/cases/DEMO-2026-001",
+            json={"status": "Contained"},
+        )
+        assert response.status_code == 401
+    finally:
+        app.dependency_overrides.clear()
+
+def test_viewer_cannot_update_case():
+    app.dependency_overrides[get_current_principal] = lambda: Principal(
+        subject="synthetic-test-viewer",
+        roles=frozenset({ROLE_VIEWER}),
+    )
+    try:
+        response = client.patch(
+            "/api/v1/cases/DEMO-2026-001",
+            json={"status": "Contained"},
+        )
+        assert response.status_code == 403
+    finally:
+        app.dependency_overrides.clear()
+
+def test_admin_can_pass_case_update_authorization_gate():
+    # Dependency override represents an already validated synthetic principal.
+    # This test checks authorization only; it does not perform a database update.
+    from app.auth_dependencies import require_permission
+    from fastapi import Depends, FastAPI
+    from fastapi.testclient import TestClient as LocalClient
+
+    test_app = FastAPI()
+    test_app.dependency_overrides[get_current_principal] = lambda: Principal(
+        subject="synthetic-test-admin",
+        roles=frozenset({ROLE_ADMINISTRATOR}),
+    )
+
+    @test_app.get("/test-protected-update-permission")
+    def protected_permission_check(principal=Depends(require_permission("cases:update"))):
+        return {"authorized": True}
+
+    response = LocalClient(test_app).get("/test-protected-update-permission")
+    assert response.status_code == 200
+    assert response.json()["authorized"] is True
+
+============================================================================
+FILE: tests\test_entra_bearer_adapter.py
+============================================================================
+import json
+import time
+
+import jwt
+import pytest
+from cryptography.hazmat.primitives.asymmetric import rsa
+
+from app.entra_bearer_adapter import (
+    BearerAuthenticationError,
+    principal_from_authorization_header,
+)
+from app.entra_jwks import build_jwks_resolver
+from app.security import (
+    ROLE_ADMINISTRATOR,
+    ROLE_ANALYST,
+    ROLE_VIEWER,
+    AuthorizationDenied,
+    authorize,
+)
+
+TENANT = "11111111-2222-4333-8444-555555555555"
+ISSUER = f"https://login.microsoftonline.com/{TENANT}/v2.0"
+AUDIENCE = "api://synthetic-cirt-dfir-api"
+ROLE_MAP = {
+    "CIRT.DFIR.Viewer": ROLE_VIEWER,
+    "CIRT.DFIR.Analyst": ROLE_ANALYST,
+    "CIRT.DFIR.Administrator": ROLE_ADMINISTRATOR,
+}
+
+
+@pytest.fixture
+def identity():
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048,
+    )
+    public_jwk = json.loads(
+        jwt.algorithms.RSAAlgorithm.to_jwk(private_key.public_key())
+    )
+    public_jwk.update({
+        "kid": "offline-adapter-test-key",
+        "use": "sig",
+        "alg": "RS256",
+    })
+    resolver = build_jwks_resolver({"keys": [public_jwk]})
+
+    def issue_token(roles=None, **overrides):
+        now = int(time.time())
+        claims = {
+            "iss": ISSUER,
+            "aud": AUDIENCE,
+            "sub": "synthetic-adapter-user",
+            "tid": TENANT,
+            "iat": now,
+            "nbf": now,
+            "exp": now + 300,
+            "roles": roles if roles is not None else ["CIRT.DFIR.Analyst"],
+        }
+        claims.update(overrides)
+        return jwt.encode(
+            claims,
+            private_key,
+            algorithm="RS256",
+            headers={"kid": "offline-adapter-test-key"},
+        )
+
+    return resolver, issue_token
+
+
+def authenticate(header, resolver):
+    return principal_from_authorization_header(
+        header,
+        trusted_key_resolver=resolver,
+        expected_issuer=ISSUER,
+        expected_audience=AUDIENCE,
+        expected_tenant_id=TENANT,
+        approved_role_map=ROLE_MAP,
+    )
+
+
+def test_valid_analyst_bearer_produces_principal(identity):
+    resolver, issue = identity
+    principal = authenticate("Bearer " + issue(), resolver)
+    assert principal.subject == "synthetic-adapter-user"
+    assert principal.roles == frozenset({ROLE_ANALYST})
+    assert authorize(principal, "cases:read")
+    assert authorize(principal, "cases:update")
+
+
+def test_viewer_cannot_update(identity):
+    resolver, issue = identity
+    principal = authenticate(
+        "Bearer " + issue(roles=["CIRT.DFIR.Viewer"]),
+        resolver,
+    )
+    with pytest.raises(AuthorizationDenied):
+        authorize(principal, "cases:update")
+
+
+def test_administrator_can_pass_admin_permission(identity):
+    resolver, issue = identity
+    principal = authenticate(
+        "Bearer " + issue(roles=["CIRT.DFIR.Administrator"]),
+        resolver,
+    )
+    assert authorize(principal, "users:manage")
+    assert authorize(principal, "audit:read")
+
+
+@pytest.mark.parametrize(
+    "header",
+    [
+        None,
+        "",
+        "Basic abc",
+        "Bearer",
+        "Bearer ",
+        "Bearer first second",
+    ],
+)
+def test_missing_or_malformed_header_is_rejected(identity, header):
+    resolver, _ = identity
+    with pytest.raises(BearerAuthenticationError):
+        authenticate(header, resolver)
+
+
+def test_tampered_token_is_rejected(identity):
+    resolver, issue = identity
+    token = issue()
+    header, payload, signature = token.split(".")
+    altered = ("A" if signature[0] != "A" else "B") + signature[1:]
+    with pytest.raises(BearerAuthenticationError):
+        authenticate(f"Bearer {header}.{payload}.{altered}", resolver)
+
+
+def test_wrong_tenant_is_rejected(identity):
+    resolver, issue = identity
+    with pytest.raises(BearerAuthenticationError):
+        authenticate(
+            "Bearer " + issue(tid="aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"),
+            resolver,
+        )
+
+
+def test_unapproved_role_is_rejected(identity):
+    resolver, issue = identity
+    with pytest.raises(BearerAuthenticationError):
+        authenticate(
+            "Bearer " + issue(roles=["CIRT.DFIR.Unapproved"]),
+            resolver,
+        )
+
+
+def test_empty_roles_are_rejected(identity):
+    resolver, issue = identity
+    with pytest.raises(BearerAuthenticationError):
+        authenticate("Bearer " + issue(roles=[]), resolver)
+
+============================================================================
+FILE: app\main.py
+============================================================================
+from fastapi import FastAPI, HTTPException, Depends
+from pydantic import BaseModel, ConfigDict
+from app import case_store
+from app.case_repository import connect, update_case
+from app.case_store import list_demo_cases
+from app.auth_dependencies import require_permission
+
+app = FastAPI(
+    title="CIRT DFIR Platform API",
+    version="0.1.0",
+    description="Development scaffold only. Synthetic data; no evidence intake.",
+)
+
+
+class HealthResponse(BaseModel):
+    status: str
+    mode: str
+
+
+
+
+class CaseUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: str | None = None
+    severity: str | None = None
+
+class DemoCase(BaseModel):
+    case_id: str
+    title: str
+    severity: str
+    status: str
+
+
+DEMO_CASES = [
+    DemoCase(
+        case_id="DEMO-2026-001",
+        title="Endpoint Alert Review",
+        severity="High",
+        status="Investigating",
+    ),
+    DemoCase(
+        case_id="DEMO-2026-002",
+        title="Suspicious Login Review",
+        severity="Medium",
+        status="Triage",
+    ),
+    DemoCase(
+        case_id="DEMO-2026-003",
+        title="Mailbox Rule Assessment",
+        severity="Medium",
+        status="Evidence review",
+    ),
+]
+
+
+@app.get("/api/v1/health", response_model=HealthResponse)
+def health() -> HealthResponse:
+    return HealthResponse(status="ok", mode="development-scaffold")
+
+
+
+
+@app.patch("/api/v1/cases/{case_id}", response_model=DemoCase, dependencies=[Depends(require_permission("cases:update"))])
+def update_case_endpoint(
+    case_id: str,
+    payload: CaseUpdateRequest,
+) -> DemoCase:
+    """Development-only case update; uses synthetic development actor."""
+    if payload.status is None and payload.severity is None:
+        raise HTTPException(
+            status_code=422,
+            detail="Provide status, severity, or both.",
+        )
+
+    try:
+        case_store.ensure_database()
+        db = connect(case_store.DB_PATH)
+        try:
+            updated = update_case(
+                db,
+                case_id=case_id,
+                actor_id="DEVELOPMENT-API",
+                timestamp=__import__("datetime").datetime.now(
+                    __import__("datetime").timezone.utc
+                ).isoformat(),
+                status=payload.status,
+                severity=payload.severity,
+            )
+        finally:
+            db.close()
+    except ValueError as exc:
+        message = str(exc)
+        if message == "Update contains no case changes.":
+            raise HTTPException(status_code=409, detail=message) from exc
+        raise HTTPException(status_code=422, detail=message) from exc
+
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Case not found.")
+
+    return DemoCase(**updated)
+
+@app.get("/api/v1/demo/cases", response_model=list[DemoCase], dependencies=[Depends(require_permission("cases:read"))])
+def get_demo_cases() -> list[DemoCase]:
+    return [DemoCase(**item) for item in list_demo_cases()]
+
+============================================================================
+FILE: app\auth_dependencies.py
+============================================================================
+"""Fail-closed authentication gate pending approved OIDC integration.
+
+This module intentionally authenticates nobody. Replace the placeholder
+identity provider integration only after the organization chooses a provider.
+Never trust roles supplied by a browser or request body.
+"""
+from fastapi import Depends, HTTPException
+
+from app.security import (
+    AuthenticationRequired,
+    AuthorizationDenied,
+    Principal,
+    authorize,
+)
+
+def get_current_principal() -> Principal:
+    """Reject all requests until real token/session validation is implemented."""
+    raise HTTPException(
+        status_code=401,
+        detail="Authentication is not configured. Access is denied by default.",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+def require_permission(permission: str):
+    """Require a validated principal and enforce the RBAC permission."""
+    def dependency(principal: Principal = Depends(get_current_principal)) -> Principal:
+        try:
+            authorize(principal, permission)
+        except AuthenticationRequired as exc:
+            raise HTTPException(
+                status_code=401,
+                detail="Authentication required.",
+                headers={"WWW-Authenticate": "Bearer"},
+            ) from exc
+        except AuthorizationDenied as exc:
+            raise HTTPException(
+                status_code=403,
+                detail="Insufficient permission.",
+            ) from exc
+        return principal
+    return dependency
+
+============================================================================
+FILE: app\entra_bearer_adapter.py
+============================================================================
+"""Offline-tested bearer-token adapter for the CIRT DFIR Entra integration.
+
+This module does not fetch metadata or JWKS and is not wired into FastAPI.
+The caller must supply a trusted key resolver and approved server-side config.
+"""
+from collections.abc import Mapping
+from typing import Any
+
+from jwt import InvalidTokenError
+
+from app.entra_principal import (
+    PrincipalMappingError,
+    principal_from_verified_claims,
+)
+from app.entra_token_verifier import verify_entra_access_token
+from app.security import Principal
+
+
+class BearerAuthenticationError(Exception):
+    """Raised when a bearer token cannot produce a trusted principal."""
+
+
+def principal_from_authorization_header(
+    authorization: str | None,
+    *,
+    trusted_key_resolver,
+    expected_issuer: str,
+    expected_audience: str,
+    expected_tenant_id: str,
+    approved_role_map: Mapping[str, str],
+) -> Principal:
+    """Validate a Bearer header, verify its JWT, and map verified roles.
+
+    This function deliberately performs no network requests. Do not pass
+    untrusted JWKS data or configuration supplied by a browser/request body.
+    """
+    if not isinstance(authorization, str):
+        raise BearerAuthenticationError("A Bearer authorization header is required.")
+
+    scheme, separator, raw_token = authorization.partition(" ")
+    token = raw_token.strip()
+
+    if (
+        not separator
+        or scheme.lower() != "bearer"
+        or not token
+        or any(character.isspace() for character in token)
+    ):
+        raise BearerAuthenticationError("The authorization header is malformed.")
+
+    try:
+        claims = verify_entra_access_token(
+            token,
+            trusted_key_resolver=trusted_key_resolver,
+            expected_issuer=expected_issuer,
+            expected_audience=expected_audience,
+            expected_tenant_id=expected_tenant_id,
+        )
+        return principal_from_verified_claims(
+            claims,
+            approved_role_map=approved_role_map,
+        )
+    except (InvalidTokenError, PrincipalMappingError, ValueError) as exc:
+        raise BearerAuthenticationError(
+            "Bearer token validation or role mapping failed."
+        ) from exc
+
+============================================================================
+FILE: app\entra_token_verifier.py
+============================================================================
+"""Isolated Microsoft Entra access-token verification foundation.
+
+SECURITY BOUNDARY:
+- This module is NOT wired into application routes.
+- The caller must provide a key resolver backed by trusted Microsoft
+  OpenID Connect metadata/JWKS, with HTTPS and safe key-rotation handling.
+- Never use a token-provided URL or arbitrary token-provided key as trusted.
+- Never use this verifier until tenant, issuer, and audience are approved.
+"""
+from collections.abc import Callable
+from typing import Any
+
+import jwt
+from jwt import InvalidTokenError
+
+TrustedKeyResolver = Callable[[str], Any]
+
+
+def verify_entra_access_token(
+    token: str,
+    *,
+    trusted_key_resolver: TrustedKeyResolver,
+    expected_issuer: str,
+    expected_audience: str,
+    expected_tenant_id: str,
+) -> dict[str, Any]:
+    """Verify an RS256 token against a trusted key resolver and fixed config.
+
+    The resolver must obtain keys only from an administrator-approved,
+    trusted JWKS source. This function deliberately performs no network access.
+    """
+    if not isinstance(token, str) or not token.strip():
+        raise InvalidTokenError("A non-empty bearer token is required.")
+
+    for name, value in (
+        ("expected_issuer", expected_issuer),
+        ("expected_audience", expected_audience),
+        ("expected_tenant_id", expected_tenant_id),
+    ):
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(f"{name} must be configured before verification.")
+
+    if not callable(trusted_key_resolver):
+        raise ValueError("A trusted signing-key resolver is required.")
+
+    # The key resolver must select a key from a trusted JWKS source.
+    # The token's algorithm is not allowed to select the accepted algorithm.
+    signing_key = trusted_key_resolver(token)
+    if signing_key is None:
+        raise InvalidTokenError("No trusted signing key was found.")
+
+    claims = jwt.decode(
+        token,
+        key=signing_key,
+        algorithms=["RS256"],
+        issuer=expected_issuer,
+        audience=expected_audience,
+        options={
+            "require": ["exp", "iat", "nbf", "iss", "aud", "sub", "tid"],
+            "verify_signature": True,
+            "verify_exp": True,
+            "verify_iat": True,
+            "verify_nbf": True,
+            "verify_iss": True,
+            "verify_aud": True,
+        },
+        leeway=0,
+    )
+
+    if not isinstance(claims.get("sub"), str) or not claims["sub"].strip():
+        raise InvalidTokenError("The subject claim is missing or invalid.")
+
+    if claims.get("tid") != expected_tenant_id:
+        raise InvalidTokenError("The token tenant does not match the configured tenant.")
+
+    return claims
+
+============================================================================
+FILE: app\entra_principal.py
+============================================================================
+"""Map verified Entra application-role claims to internal CIRT DFIR roles.
+
+SECURITY BOUNDARY:
+Only pass the claims returned by verify_entra_access_token after successful
+cryptographic and issuer/audience/tenant validation. This module does not
+validate token signatures or establish claim provenance.
+
+approved_role_map must come from trusted server-side configuration. Never
+accept it, the claims, or role assignments from browser-controlled input.
+"""
+from collections.abc import Mapping
+from typing import Any
+
+from app.security import KNOWN_ROLES, Principal
+
+
+class PrincipalMappingError(ValueError):
+    """Raised when verified claims cannot safely become an application principal."""
+
+
+def principal_from_verified_claims(
+    claims: Mapping[str, Any],
+    *,
+    approved_role_map: Mapping[str, str],
+) -> Principal:
+    """Create an internal Principal from verified claims and an explicit role map."""
+    if not isinstance(claims, Mapping):
+        raise PrincipalMappingError("Verified claims must be a mapping.")
+
+    subject = claims.get("sub")
+    if not isinstance(subject, str) or not subject.strip():
+        raise PrincipalMappingError("A non-empty subject claim is required.")
+
+    if not isinstance(approved_role_map, Mapping) or not approved_role_map:
+        raise PrincipalMappingError("An explicit server-side role map is required.")
+
+    for app_role, internal_role in approved_role_map.items():
+        if not isinstance(app_role, str) or not app_role.strip():
+            raise PrincipalMappingError("Role-map keys must be non-empty strings.")
+        if not isinstance(internal_role, str) or internal_role not in KNOWN_ROLES:
+            raise PrincipalMappingError("Role map contains an unrecognized internal role.")
+
+    raw_roles = claims.get("roles")
+    if not isinstance(raw_roles, list) or not raw_roles:
+        raise PrincipalMappingError("A non-empty roles array is required.")
+
+    if any(not isinstance(role, str) or not role.strip() for role in raw_roles):
+        raise PrincipalMappingError("Every application role must be a non-empty string.")
+
+    if len(set(raw_roles)) != len(raw_roles):
+        raise PrincipalMappingError("Duplicate application roles are not accepted.")
+
+    unknown_roles = [role for role in raw_roles if role not in approved_role_map]
+    if unknown_roles:
+        raise PrincipalMappingError("Claims contain an unapproved application role.")
+
+    internal_roles = frozenset(approved_role_map[role] for role in raw_roles)
+    if not internal_roles:
+        raise PrincipalMappingError("No approved internal roles were resolved.")
+
+    return Principal(subject=subject.strip(), roles=internal_roles)
+
+============================================================================
+FILE: app\security.py
+============================================================================
+"""RBAC policy foundation for CIRT DFIR Professional.
+
+This module authorizes an already authenticated principal.
+It does not authenticate users or validate OIDC tokens.
+Do not treat a caller-created Principal as proof of identity.
+"""
+
+from dataclasses import dataclass
+from typing import FrozenSet
+
+
+ROLE_ADMINISTRATOR = "Administrator"
+ROLE_ANALYST = "DFIR Analyst"
+ROLE_VIEWER = "Viewer"
+
+KNOWN_ROLES: FrozenSet[str] = frozenset({
+    ROLE_ADMINISTRATOR,
+    ROLE_ANALYST,
+    ROLE_VIEWER,
+})
+
+PERMISSIONS = {
+    "cases:read": frozenset({
+        ROLE_ADMINISTRATOR,
+        ROLE_ANALYST,
+        ROLE_VIEWER,
+    }),
+    "cases:update": frozenset({
+        ROLE_ADMINISTRATOR,
+        ROLE_ANALYST,
+    }),
+    "users:manage": frozenset({
+        ROLE_ADMINISTRATOR,
+    }),
+    "audit:read": frozenset({
+        ROLE_ADMINISTRATOR,
+    }),
+}
+
+
+@dataclass(frozen=True)
+class Principal:
+    """Identity and roles supplied by a trusted authentication layer."""
+    subject: str
+    roles: FrozenSet[str]
+
+
+class AuthenticationRequired(PermissionError):
+    """Raised when no authenticated principal is available."""
+
+
+class AuthorizationDenied(PermissionError):
+    """Raised when the principal lacks the required permission."""
+
+
+def validate_principal(principal: Principal | None) -> Principal:
+    if principal is None:
+        raise AuthenticationRequired("Authentication is required.")
+    if not isinstance(principal, Principal):
+        raise AuthenticationRequired("A trusted principal is required.")
+    if not isinstance(principal.subject, str) or not principal.subject.strip():
+        raise AuthenticationRequired("Principal subject is missing.")
+    if not principal.roles:
+        raise AuthorizationDenied("Principal has no assigned roles.")
+    if not principal.roles.issubset(KNOWN_ROLES):
+        raise AuthorizationDenied("Principal contains an unknown role.")
+    return principal
+
+
+def authorize(principal: Principal | None, permission: str) -> bool:
+    """Authorize a trusted principal for a named permission.
+
+    The caller must obtain the principal from a verified authentication
+    mechanism, such as validated OIDC claims. Never build it from request
+    fields supplied by the client.
+    """
+    trusted = validate_principal(principal)
+    allowed_roles = PERMISSIONS.get(permission)
+    if allowed_roles is None:
+        raise AuthorizationDenied("Unknown permission.")
+    if trusted.roles.isdisjoint(allowed_roles):
+        raise AuthorizationDenied("Permission denied.")
+    return True

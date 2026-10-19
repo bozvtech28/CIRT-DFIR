@@ -1,0 +1,44 @@
+﻿CIRT DFIR PROFESSIONAL - PHASE 8B.120
+Timestamp: 20261017_183024
+Backend pytest exit code: 0
+Frontend build exit code: 0
+Backend stdout: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase8B120_Logs_20261017_183024\backend_pytest_stdout.txt
+Backend stderr: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase8B120_Logs_20261017_183024\backend_pytest_stderr.txt
+Frontend stdout: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase8B120_Logs_20261017_183024\frontend_build_stdout.txt
+Frontend stderr: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase8B120_Logs_20261017_183024\frontend_build_stderr.txt
+Application servers started: No
+Live Entra authentication enabled: No
+
+========== BACKEND TEST OUTPUT ==========
+........................................................................ [ 28%]
+........................................................................ [ 56%]
+........................................................................ [ 84%]
+........................................                                 [100%]
+============================== warnings summary ===============================
+.venv\Lib\site-packages\fastapi\testclient.py:1
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+256 passed, 1 warning in 3.85s
+
+========== FRONTEND BUILD OUTPUT ==========
+
+> cirt-dfir-platform-frontend@0.1.0 build
+> tsc -b && vite build
+
+[36mvite v7.3.7 [32mbuilding client environment for production...[36m[39m
+transforming...
+[32mâœ“[39m 200 modules transformed.
+rendering chunks...
+computing gzip size...
+[2mdist/[22m[32mindex.html                 [39m[1m[2m  0.45 kB[22m[1m[22m[2m â”‚ gzip:   0.30 kB[22m
+[2mdist/[22m[35massets/index-BPJY-tX1.css  [39m[1m[2m  4.87 kB[22m[1m[22m[2m â”‚ gzip:   1.64 kB[22m
+[2mdist/[22m[36massets/index-CIqGSHiu.js   [39m[1m[2m496.33 kB[22m[1m[22m[2m â”‚ gzip: 140.28 kB[22m
+[32mâœ“ built in 1.75s[39m
+
+========== AUDIT ATTRIBUTION SOURCE CHECK ==========
+64: @app.patch("/api/v1/cases/{case_id}", response_model=DemoCase)
+65: def update_case_endpoint(
+68: principal = Depends(require_permission("cases:update")),
+84: actor_id=principal.subject,

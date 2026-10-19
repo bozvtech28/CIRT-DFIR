@@ -1,0 +1,56 @@
+﻿CIRT DFIR PROFESSIONAL - PHASE 8B.13
+Timestamp: 2026-10-16T00:44:03.2073921+08:00
+Identity provider target: Microsoft Entra ID
+Deployment target: Internal organization network
+Execution mode: Static inspection and documentation only
+
+=== BACKUP MANIFEST ===
+BACKED UP: requirements.txt
+BACKED UP: app\main.py
+BACKED UP: app\security.py
+BACKED UP: app\auth_dependencies.py
+BACKED UP: app\oidc_claims.py
+BACKED UP: tests\conftest.py
+BACKED UP: tests\test_api_auth_gate.py
+BACKED UP: tests\test_api_oidc_fail_closed.py
+BACKED UP: tests\test_oidc_claims.py
+BACKED UP: tests\test_security.py
+BACKED UP: tests\test_synthetic_rs256_harness.py
+BACKED UP: synthetic_test_support\rs256_harness.py
+
+=== SOURCE HASHES ===
+requirements.txt SHA256=8BB22C30443951A3A1B13B26CCB1DE16A637FA30F7C1F9614913BA02B947B614
+app\main.py SHA256=55D66D658ED9182535E1FFD6F98507958CB52AFAD3A4DEFFECECEC960A5F17B6
+app\security.py SHA256=0022274BA349E8B72A26590814909D3A327403BAD44C63A200E8B1807584AB28
+app\auth_dependencies.py SHA256=79502FBC9DD630408C2694DD6B4C1CD4E3B9D84B944CEB326F051980A0DAEF11
+app\oidc_claims.py SHA256=CC2EB813B999C669F8A0E26C74BB92AA18968F107E4416736F3738FF1EB3CFCE
+tests\conftest.py SHA256=A4F17BDF5B03C97F6A2A6698A7988F5CBBBEEEF40A2C1A44CE158B9B0797485C
+tests\test_api_auth_gate.py SHA256=ABC212FCB6F25E9968C41375B78510FFF4E55205BC0E8F9D2F4986A07A9B66AF
+tests\test_api_oidc_fail_closed.py SHA256=500809FC8AA3720AB13D24B9960F68D2585F6F5CE3BA06BB46A0A73A52787456
+tests\test_oidc_claims.py SHA256=774D49EA91750FCE9625EEDBDBD4E875E9A6EA310EDF01ADF304D128092827C0
+tests\test_security.py SHA256=C498A420C97DE213CB0B29E92950845018AEF3345B25EC8823BAE103A4AF9D5F
+tests\test_synthetic_rs256_harness.py SHA256=D1A545E9BCAF2F39B074C61EEEB62E1179C63CC6268574DB201B7C041D6652AE
+synthetic_test_support\rs256_harness.py SHA256=7B82C05EE8C3F594791C874860AEFBC7D2354A95D207C662571BF3B232BBE9EB
+
+=== READINESS CHECKS ===
+Fail-closed auth gate marker: True
+Main API source present: True
+OIDC claims module present: True
+RBAC policy module present: True
+Requirements file present: True
+PyJWT declared: True
+Cases-read permission referenced in API source: True
+Cases-update permission referenced in API source: True
+OIDC issuer/audience claim-validation markers: True
+OIDC signature verification implementation confirmed: NO - static inspection only
+Trusted Microsoft discovery/JWKS integration confirmed: NO
+Microsoft tenant and client IDs configured: NOT CHECKED OR CONFIGURED
+Production identity provider contacted: NO
+Server started: NO
+Application source changed by this phase: NO
+Packages installed by this phase: NO
+
+Design document: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\docs\Phase8B13_Microsoft_Entra_ID_Integration_Plan.md
+Backup directory: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\Phase8B13_20261016_004401
+No provider contacted; no server started; no package installed.
+Production OIDC integration remains NOT IMPLEMENTED.

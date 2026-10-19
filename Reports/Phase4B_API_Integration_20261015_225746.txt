@@ -1,0 +1,12 @@
+﻿Phase 4B API integration
+Timestamp: 2026-10-15 22:57:48
+Backup directory: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\Phase4B_API_Integration_20261015_225746
+Frontend build exit code: 2
+Backend test exit code: 1
+Original App.tsx SHA256: 2491F247554F75D24C504D2EAEBF8C83594927B011CF4286BE88722EF2F09080
+Final App.tsx SHA256: 2491F247554F75D24C504D2EAEBF8C83594927B011CF4286BE88722EF2F09080
+Source restored after failure: Yes
+Server started by this script: No
+Evidence accessed: No
+Production collector changed: No
+Validation error: Frontend build failed with exit code 2

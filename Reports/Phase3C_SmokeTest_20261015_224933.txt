@@ -1,0 +1,9 @@
+﻿CIRT DFIR Phase 3C Local API Smoke Test
+Timestamp: 2026-10-15 22:49:35 +08:00
+URL: http://127.0.0.1:18765
+Binding: 127.0.0.1 only
+PASS: GET /api/v1/health returned status=ok, mode=development-scaffold
+PASS: GET /api/v1/demo/cases returned 3 synthetic demo cases
+Server stopped after test: YES
+Evidence accessed: NO
+Production collector files modified: NO

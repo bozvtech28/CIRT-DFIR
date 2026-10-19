@@ -1,0 +1,19 @@
+﻿Phase 6D - Frontend Compatibility
+Timestamp: 2026-10-15 23:35:32
+API test exit code: 0
+Repository test exit code: 0
+Frontend build exit code: 0
+Frontend dist/index.html exists: True
+API stdout: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase6D_API_stdout_20261015_233526.txt
+API stderr: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase6D_API_stderr_20261015_233526.txt
+Repository stdout: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase6D_Repository_stdout_20261015_233526.txt
+Repository stderr: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase6D_Repository_stderr_20261015_233526.txt
+Build stdout: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase6D_Build_stdout_20261015_233526.txt
+Build stderr: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase6D_Build_stderr_20261015_233526.txt
+API database: temporary synthetic SQLite database
+Persistent application database accessed: No
+Production collector executed: No
+Real evidence accessed: No
+Server started: No
+
+Overall result: PASS - API, repository, and frontend build checks passed

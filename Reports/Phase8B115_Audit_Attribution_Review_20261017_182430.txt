@@ -1,0 +1,121 @@
+﻿CIRT DFIR PROFESSIONAL - PHASE 8B.115
+Timestamp: 20261017_182430
+Mode: Read-only audit attribution review
+Network requests: None
+Servers started: None
+Application source modifications: None
+
+========== BACKUP AND FILE INVENTORY ==========
+PRESENT AND BACKED UP: platform\backend\app\main.py
+PRESENT AND BACKED UP: platform\backend\app\security.py
+PRESENT AND BACKED UP: platform\backend\app\auth_dependencies.py
+NOT FOUND: platform\backend\app\repository.py
+PRESENT AND BACKED UP: platform\backend\app\case_repository.py
+NOT FOUND: platform\backend\app\audit.py
+NOT FOUND: platform\backend\app\audit_repository.py
+PRESENT AND BACKED UP: platform\backend\tests\test_api_auth_gate.py
+Backup directory: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\Phase8B115_20261017_182430
+
+========== AUDIT AND IDENTITY REFERENCES ==========
+platform\backend\app\auth_dependencies.py:16: def get_current_principal() -> Principal:
+platform\backend\app\auth_dependencies.py:24: def require_permission(permission: str):
+platform\backend\app\auth_dependencies.py:26: def dependency(principal: Principal = Depends(get_current_principal)) -> Principal:
+platform\backend\app\case_repository.py:9: connection.row_factory = sqlite3.Row
+platform\backend\app\case_repository.py:31: actor_id: str,
+platform\backend\app\case_repository.py:35: case_id, title, severity, status, actor_id, timestamp
+platform\backend\app\case_repository.py:37: raise ValueError("Case fields, actor, and timestamp must be non-empty strings.")
+platform\backend\app\case_repository.py:50: (case_id, title, severity, status, timestamp, timestamp, actor_id),
+platform\backend\app\case_repository.py:53: """INSERT INTO audit_events
+platform\backend\app\case_repository.py:54: (case_id, event_type, actor_id, event_time, details_json)
+platform\backend\app\case_repository.py:56: (case_id, "CASE_CREATED", actor_id, timestamp, details),
+platform\backend\app\case_repository.py:66: actor_id: str,
+platform\backend\app\case_repository.py:71: """Update case status/severity and append an audit event atomically."""
+platform\backend\app\case_repository.py:74: if not isinstance(actor_id, str) or not actor_id.strip():
+platform\backend\app\case_repository.py:75: raise ValueError("actor_id must be a non-empty string.")
+platform\backend\app\case_repository.py:134: """INSERT INTO audit_events
+platform\backend\app\case_repository.py:135: (case_id, event_type, actor_id, event_time, details_json)
+platform\backend\app\case_repository.py:137: (case_id, "CASE_UPDATED", actor_id.strip(), timestamp, details),
+platform\backend\app\case_repository.py:172: def list_audit_events(
+platform\backend\app\case_repository.py:176: """SELECT event_id, case_id, event_type, actor_id,
+platform\backend\app\case_repository.py:178: FROM audit_events
+platform\backend\app\case_store.py:47: actor_id="DEMO-SYSTEM",
+platform\backend\app\entra_http_transport.py:27: client_factory: Callable[..., Any] = httpx.Client,
+platform\backend\app\entra_http_transport.py:75: with client_factory(
+platform\backend\app\entra_principal.py:61: return Principal(subject=subject.strip(), roles=internal_roles)
+platform\backend\app\main.py:6: from app.auth_dependencies import require_permission
+platform\backend\app\main.py:64: @app.patch("/api/v1/cases/{case_id}", response_model=DemoCase, dependencies=[Depends(require_permission("cases:update"))])
+platform\backend\app\main.py:69: """Development-only case update; uses synthetic development actor."""
+platform\backend\app\main.py:83: actor_id="DEVELOPMENT-API",
+platform\backend\app\main.py:103: @app.get("/api/v1/demo/cases", response_model=list[DemoCase], dependencies=[Depends(require_permission("cases:read"))])
+platform\backend\app\security.py:35: "audit:read": frozenset({
+platform\backend\app\security.py:56: def validate_principal(principal: Principal | None) -> Principal:
+platform\backend\app\security.py:77: trusted = validate_principal(principal)
+platform\backend\tests\conftest.py:9: from app.auth_dependencies import get_current_principal
+platform\backend\tests\conftest.py:15: app.dependency_overrides[get_current_principal] = lambda: Principal(
+platform\backend\tests\conftest.py:20: app.dependency_overrides.clear()
+platform\backend\tests\test_api_auth_gate.py:4: from app.auth_dependencies import get_current_principal
+platform\backend\tests\test_api_auth_gate.py:11: app.dependency_overrides.clear()
+platform\backend\tests\test_api_auth_gate.py:17: app.dependency_overrides.clear()
+platform\backend\tests\test_api_auth_gate.py:20: app.dependency_overrides.clear()
+platform\backend\tests\test_api_auth_gate.py:28: app.dependency_overrides.clear()
+platform\backend\tests\test_api_auth_gate.py:31: app.dependency_overrides[get_current_principal] = lambda: Principal(
+platform\backend\tests\test_api_auth_gate.py:42: app.dependency_overrides.clear()
+platform\backend\tests\test_api_auth_gate.py:47: from app.auth_dependencies import require_permission
+platform\backend\tests\test_api_auth_gate.py:52: test_app.dependency_overrides[get_current_principal] = lambda: Principal(
+platform\backend\tests\test_api_auth_gate.py:58: def protected_permission_check(principal=Depends(require_permission("cases:update"))):
+platform\backend\tests\test_api_oidc_fail_closed.py:3: from app.auth_dependencies import get_current_principal
+platform\backend\tests\test_api_oidc_fail_closed.py:11: app.dependency_overrides.clear()
+platform\backend\tests\test_api_oidc_fail_closed.py:16: app.dependency_overrides.clear()
+platform\backend\tests\test_api_oidc_fail_closed.py:20: app.dependency_overrides.clear()
+platform\backend\tests\test_api_oidc_fail_closed.py:28: app.dependency_overrides.clear()
+platform\backend\tests\test_api_oidc_fail_closed.py:32: app.dependency_overrides.clear()
+platform\backend\tests\test_api_oidc_fail_closed.py:40: app.dependency_overrides.clear()
+platform\backend\tests\test_entra_bearer_adapter.py:81: def test_valid_analyst_bearer_produces_principal(identity):
+platform\backend\tests\test_entra_bearer_adapter.py:107: assert authorize(principal, "audit:read")
+platform\backend\tests\test_entra_http_transport.py:15: def make_client_factory(handler):
+platform\backend\tests\test_entra_http_transport.py:40: client_factory=make_client_factory(handler),
+platform\backend\tests\test_entra_http_transport.py:69: client_factory=make_client_factory(handler),
+platform\backend\tests\test_entra_http_transport.py:89: client_factory=make_client_factory(handler),
+platform\backend\tests\test_entra_http_transport.py:103: client_factory=make_client_factory(handler),
+platform\backend\tests\test_entra_http_transport.py:115: client_factory=make_client_factory(handler),
+platform\backend\tests\test_entra_http_transport.py:135: client_factory=make_client_factory(handler),
+platform\backend\tests\test_entra_http_transport.py:152: client_factory=make_client_factory(handler),
+platform\backend\tests\test_entra_http_transport.py:169: client_factory=make_client_factory(handler),
+platform\backend\tests\test_entra_http_transport.py:196: client_factory=make_client_factory(handler),
+platform\backend\tests\test_entra_http_transport.py:213: client_factory=make_client_factory(handler),
+platform\backend\tests\test_entra_http_transport.py:235: client_factory=make_client_factory(handler),
+platform\backend\tests\test_entra_http_transport.py:249: client_factory=make_client_factory(handler),
+platform\backend\tests\test_entra_http_transport.py:274: client_factory=make_client_factory(handler),
+platform\backend\tests\test_entra_principal_authorization.py:14: def make_principal(app_role):
+platform\backend\tests\test_entra_principal_authorization.py:25: principal = make_principal("CIRT.DFIR.Viewer")
+platform\backend\tests\test_entra_principal_authorization.py:30: principal = make_principal("CIRT.DFIR.Viewer")
+platform\backend\tests\test_entra_principal_authorization.py:36: principal = make_principal("CIRT.DFIR.Analyst")
+platform\backend\tests\test_entra_principal_authorization.py:41: principal = make_principal("CIRT.DFIR.Analyst")
+platform\backend\tests\test_entra_principal_authorization.py:46: principal = make_principal("CIRT.DFIR.Analyst")
+platform\backend\tests\test_entra_principal_authorization.py:52: principal = make_principal("CIRT.DFIR.Administrator")
+platform\backend\tests\test_entra_principal_authorization.py:57: principal = make_principal("CIRT.DFIR.Administrator")
+platform\backend\tests\test_entra_principal_authorization.py:62: principal = make_principal("CIRT.DFIR.Administrator")
+platform\backend\tests\test_entra_principal_authorization.py:66: def test_administrator_can_read_audit():
+platform\backend\tests\test_entra_principal_authorization.py:67: principal = make_principal("CIRT.DFIR.Administrator")
+platform\backend\tests\test_entra_principal_authorization.py:68: authorize(principal, "audit:read")
+platform\backend\tests\test_entra_principal_authorization.py:72: principal = make_principal("CIRT.DFIR.Administrator")
+platform\backend\tests\test_security.py:16: self.admin = Principal("synthetic-admin", frozenset({ROLE_ADMINISTRATOR}))
+platform\backend\tests\test_security.py:17: self.analyst = Principal("synthetic-analyst", frozenset({ROLE_ANALYST}))
+platform\backend\tests\test_security.py:18: self.viewer = Principal("synthetic-viewer", frozenset({ROLE_VIEWER}))
+platform\backend\tests\test_security.py:20: def test_admin_can_read_update_manage_users_and_read_audit(self):
+platform\backend\tests\test_security.py:21: for permission in ("cases:read", "cases:update", "users:manage", "audit:read"):
+platform\backend\tests\test_security.py:29: def test_analyst_cannot_manage_users_or_read_audit(self):
+platform\backend\tests\test_security.py:30: for permission in ("users:manage", "audit:read"):
+platform\backend\tests\test_security.py:47: principal = Principal("synthetic-user", frozenset({"SuperUser"}))
+platform\backend\tests\test_security.py:56: principal = Principal(" ", frozenset({ROLE_ADMINISTRATOR}))
+platform\backend\tests\test_security.py:61: principal = Principal("synthetic-user", frozenset())
+platform\backend\tests\test_synthetic_role_mapping.py:26: "audit:read",
+
+========== REVIEW GUIDANCE ==========
+1. Audit actor identity must originate from a verified server-side Principal.
+2. Do not accept actor identity or roles from request bodies or browser-only claims.
+3. Preserve test-only dependency overrides; they do not authenticate production users.
+4. Keep the fail-closed authentication gate until approved identity configuration exists.
+5. After review, design a small targeted change and add regression tests before applying it.
+
+This phase makes no source changes and does not certify production readiness.

@@ -1,0 +1,217 @@
+﻿CIRT-DFIR - PHASE 8B166
+Baseline-Matched httpx2 Compatibility Trial
+Timestamp: 2026-10-17 20:11:57
+Original environment: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\.venv\Scripts\python.exe
+Trial environment: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\.venv_phase8b166
+Original environment will not be modified.
+
+
+===== 1. Create fresh isolated virtual environment =====
+COMMAND: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\.venv\Scripts\python.exe -m venv C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\.venv_phase8b166
+(no stdout)
+EXIT CODE: 0
+
+===== 2. Install declared project requirements =====
+COMMAND: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\.venv_phase8b166\Scripts\python.exe -m pip install -r C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\requirements.txt
+Collecting fastapi<1.0,>=0.115 (from -r C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\requirements.txt (line 1))
+  Using cached fastapi-0.143.3-py3-none-any.whl.metadata (26 kB)
+Collecting uvicorn<1.0,>=0.34 (from uvicorn[standard]<1.0,>=0.34->-r C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\requirements.txt (line 2))
+  Using cached uvicorn-0.54.0-py3-none-any.whl.metadata (6.6 kB)
+Collecting pydantic<3.0,>=2.10 (from -r C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\requirements.txt (line 3))
+  Using cached pydantic-2.14.1-py3-none-any.whl.metadata (133 kB)
+Collecting pytest<9.0,>=8.3 (from -r C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\requirements.txt (line 4))
+  Using cached pytest-8.4.2-py3-none-any.whl.metadata (7.7 kB)
+Collecting httpx<1.0,>=0.28 (from -r C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\requirements.txt (line 5))
+  Using cached httpx-0.28.1-py3-none-any.whl.metadata (7.1 kB)
+Collecting PyJWT==2.15.1 (from -r C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\requirements.txt (line 6))
+  Using cached pyjwt-2.15.1-py3-none-any.whl.metadata (3.5 kB)
+Collecting cryptography==50.0.2 (from -r C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\requirements.txt (line 9))
+  Using cached cryptography-50.0.2-cp311-abi3-win_amd64.whl.metadata (4.4 kB)
+Collecting cffi>=2.0.0 (from cryptography==50.0.2->-r C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\requirements.txt (line 9))
+  Using cached cffi-2.1.1-cp312-cp312-win_amd64.whl.metadata (2.6 kB)
+Collecting starlette>=0.46.0 (from fastapi<1.0,>=0.115->-r C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\requirements.txt (line 1))
+  Using cached starlette-1.8.0-py3-none-any.whl.metadata (6.6 kB)
+Collecting typing-extensions>=4.8.0 (from fastapi<1.0,>=0.115->-r C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\requirements.txt (line 1))
+  Using cached typing_extensions-4.16.0-py3-none-any.whl.metadata (3.3 kB)
+Collecting typing-inspection>=0.4.2 (from fastapi<1.0,>=0.115->-r C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\requirements.txt (line 1))
+  Using cached typing_inspection-0.4.4-py3-none-any.whl.metadata (2.6 kB)
+Collecting annotated-doc>=0.0.2 (from fastapi<1.0,>=0.115->-r C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\requirements.txt (line 1))
+  Using cached annotated_doc-0.0.5-py3-none-any.whl.metadata (6.5 kB)
+Collecting opentelemetry-api>=1.44.0 (from fastapi<1.0,>=0.115->-r C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\requirements.txt (line 1))
+  Using cached opentelemetry_api-1.45.1-py3-none-any.whl.metadata (1.4 kB)
+Collecting click>=7.0 (from uvicorn<1.0,>=0.34->uvicorn[standard]<1.0,>=0.34->-r C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\requirements.txt (line 2))
+  Using cached click-8.5.0-py3-none-any.whl.metadata (2.6 kB)
+Collecting h11>=0.8 (from uvicorn<1.0,>=0.34->uvicorn[standard]<1.0,>=0.34->-r C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\requirements.txt (line 2))
+  Using cached h11-0.16.0-py3-none-any.whl.metadata (8.3 kB)
+Collecting annotated-types>=0.6.0 (from pydantic<3.0,>=2.10->-r C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\requirements.txt (line 3))
+  Using cached annotated_types-0.8.0-py3-none-any.whl.metadata (15 kB)
+Collecting pydantic-core==2.50.1 (from pydantic<3.0,>=2.10->-r C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\requirements.txt (line 3))
+  Using cached pydantic_core-2.50.1-cp312-cp312-win_amd64.whl.metadata (6.7 kB)
+Collecting colorama>=0.4 (from pytest<9.0,>=8.3->-r C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\requirements.txt (line 4))
+  Using cached colorama-0.4.6-py2.py3-none-any.whl.metadata (17 kB)
+Collecting iniconfig>=1 (from pytest<9.0,>=8.3->-r C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\requirements.txt (line 4))
+  Using cached iniconfig-2.3.1-py3-none-any.whl.metadata (2.8 kB)
+Collecting packaging>=20 (from pytest<9.0,>=8.3->-r C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\requirements.txt (line 4))
+  Using cached packaging-26.3-py3-none-any.whl.metadata (3.5 kB)
+Collecting pluggy<2,>=1.5 (from pytest<9.0,>=8.3->-r C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\requirements.txt (line 4))
+  Using cached pluggy-1.7.0-py3-none-any.whl.metadata (5.0 kB)
+Collecting pygments>=2.7.2 (from pytest<9.0,>=8.3->-r C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\requirements.txt (line 4))
+  Using cached pygments-2.21.0-py3-none-any.whl.metadata (2.5 kB)
+Collecting anyio (from httpx<1.0,>=0.28->-r C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\requirements.txt (line 5))
+  Using cached anyio-4.15.1-py3-none-any.whl.metadata (4.7 kB)
+Collecting certifi (from httpx<1.0,>=0.28->-r C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\requirements.txt (line 5))
+  Using cached certifi-2026.7.22-py3-none-any.whl.metadata (2.5 kB)
+Collecting httpcore==1.* (from httpx<1.0,>=0.28->-r C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\requirements.txt (line 5))
+  Using cached httpcore-1.0.9-py3-none-any.whl.metadata (21 kB)
+Collecting idna (from httpx<1.0,>=0.28->-r C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\requirements.txt (line 5))
+  Using cached idna-3.20-py3-none-any.whl.metadata (7.2 kB)
+Collecting httptools>=0.8.0 (from uvicorn[standard]<1.0,>=0.34->-r C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\requirements.txt (line 2))
+  Using cached httptools-0.9.0-cp312-cp312-win_amd64.whl.metadata (3.7 kB)
+Collecting python-dotenv>=0.13 (from uvicorn[standard]<1.0,>=0.34->-r C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\requirements.txt (line 2))
+  Using cached python_dotenv-1.2.4-py3-none-any.whl.metadata (29 kB)
+Collecting pyyaml>=5.1 (from uvicorn[standard]<1.0,>=0.34->-r C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\requirements.txt (line 2))
+  Using cached pyyaml-6.0.3-cp312-cp312-win_amd64.whl.metadata (2.4 kB)
+Collecting watchfiles>=0.20 (from uvicorn[standard]<1.0,>=0.34->-r C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\requirements.txt (line 2))
+  Using cached watchfiles-1.3.0-cp310-abi3-win_amd64.whl.metadata (5.0 kB)
+Collecting websockets>=13.0 (from uvicorn[standard]<1.0,>=0.34->-r C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\requirements.txt (line 2))
+  Using cached websockets-17.2-cp312-cp312-win_amd64.whl.metadata (6.5 kB)
+Collecting pycparser (from cffi>=2.0.0->cryptography==50.0.2->-r C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\requirements.txt (line 9))
+  Using cached pycparser-3.11-py3-none-any.whl.metadata (8.2 kB)
+Using cached pyjwt-2.15.1-py3-none-any.whl (33 kB)
+Using cached cryptography-50.0.2-cp311-abi3-win_amd64.whl (3.8 MB)
+Using cached fastapi-0.143.3-py3-none-any.whl (144 kB)
+Using cached uvicorn-0.54.0-py3-none-any.whl (87 kB)
+Using cached pydantic-2.14.1-py3-none-any.whl (488 kB)
+Using cached pydantic_core-2.50.1-cp312-cp312-win_amd64.whl (2.2 MB)
+Using cached pytest-8.4.2-py3-none-any.whl (365 kB)
+Using cached httpx-0.28.1-py3-none-any.whl (73 kB)
+Using cached httpcore-1.0.9-py3-none-any.whl (78 kB)
+Using cached annotated_doc-0.0.5-py3-none-any.whl (5.3 kB)
+Using cached annotated_types-0.8.0-py3-none-any.whl (13 kB)
+Using cached cffi-2.1.1-cp312-cp312-win_amd64.whl (185 kB)
+Using cached click-8.5.0-py3-none-any.whl (125 kB)
+Using cached colorama-0.4.6-py2.py3-none-any.whl (25 kB)
+Using cached h11-0.16.0-py3-none-any.whl (37 kB)
+Using cached httptools-0.9.0-cp312-cp312-win_amd64.whl (92 kB)
+Using cached iniconfig-2.3.1-py3-none-any.whl (7.6 kB)
+Using cached opentelemetry_api-1.45.1-py3-none-any.whl (60 kB)
+Using cached packaging-26.3-py3-none-any.whl (129 kB)
+Using cached pluggy-1.7.0-py3-none-any.whl (27 kB)
+Using cached pygments-2.21.0-py3-none-any.whl (1.3 MB)
+Using cached python_dotenv-1.2.4-py3-none-any.whl (23 kB)
+Using cached pyyaml-6.0.3-cp312-cp312-win_amd64.whl (154 kB)
+Using cached starlette-1.8.0-py3-none-any.whl (79 kB)
+Using cached anyio-4.15.1-py3-none-any.whl (132 kB)
+Using cached idna-3.20-py3-none-any.whl (69 kB)
+Using cached typing_extensions-4.16.0-py3-none-any.whl (45 kB)
+Using cached typing_inspection-0.4.4-py3-none-any.whl (14 kB)
+Using cached watchfiles-1.3.0-cp310-abi3-win_amd64.whl (290 kB)
+Using cached websockets-17.2-cp312-cp312-win_amd64.whl (218 kB)
+Using cached certifi-2026.7.22-py3-none-any.whl (136 kB)
+Using cached pycparser-3.11-py3-none-any.whl (51 kB)
+Installing collected packages: websockets, typing-extensions, pyyaml, python-dotenv, PyJWT, pygments, pycparser, pluggy, packaging, iniconfig, idna, httptools, h11, colorama, click, certifi, annotated-types, annotated-doc, uvicorn, typing-inspection, pytest, pydantic-core, opentelemetry-api, httpcore, cffi, anyio, watchfiles, starlette, pydantic, httpx, cryptography, fastapi
+Successfully installed PyJWT-2.15.1 annotated-doc-0.0.5 annotated-types-0.8.0 anyio-4.15.1 certifi-2026.7.22 cffi-2.1.1 click-8.5.0 colorama-0.4.6 cryptography-50.0.2 fastapi-0.143.3 h11-0.16.0 httpcore-1.0.9 httptools-0.9.0 httpx-0.28.1 idna-3.20 iniconfig-2.3.1 opentelemetry-api-1.45.1 packaging-26.3 pluggy-1.7.0 pycparser-3.11 pydantic-2.14.1 pydantic-core-2.50.1 pygments-2.21.0 pytest-8.4.2 python-dotenv-1.2.4 pyyaml-6.0.3 starlette-1.8.0 typing-extensions-4.16.0 typing-inspection-0.4.4 uvicorn-0.54.0 watchfiles-1.3.0 websockets-17.2
+
+EXIT CODE: 0
+
+===== 3. Align relevant package versions with original baseline =====
+COMMAND: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\.venv_phase8b166\Scripts\python.exe -m pip install fastapi==0.143.2 starlette==1.8.0 httpx==0.28.1 pytest==8.4.2 pydantic==2.14.1
+Collecting fastapi==0.143.2
+  Using cached fastapi-0.143.2-py3-none-any.whl.metadata (26 kB)
+Requirement already satisfied: starlette==1.8.0 in c:\users\bozvlenovo7\desktop\project\cirt_dfir_professional\platform\backend\.venv_phase8b166\lib\site-packages (1.8.0)
+Requirement already satisfied: httpx==0.28.1 in c:\users\bozvlenovo7\desktop\project\cirt_dfir_professional\platform\backend\.venv_phase8b166\lib\site-packages (0.28.1)
+Requirement already satisfied: pytest==8.4.2 in c:\users\bozvlenovo7\desktop\project\cirt_dfir_professional\platform\backend\.venv_phase8b166\lib\site-packages (8.4.2)
+Requirement already satisfied: pydantic==2.14.1 in c:\users\bozvlenovo7\desktop\project\cirt_dfir_professional\platform\backend\.venv_phase8b166\lib\site-packages (2.14.1)
+Requirement already satisfied: typing-extensions>=4.8.0 in c:\users\bozvlenovo7\desktop\project\cirt_dfir_professional\platform\backend\.venv_phase8b166\lib\site-packages (from fastapi==0.143.2) (4.16.0)
+Requirement already satisfied: typing-inspection>=0.4.2 in c:\users\bozvlenovo7\desktop\project\cirt_dfir_professional\platform\backend\.venv_phase8b166\lib\site-packages (from fastapi==0.143.2) (0.4.4)
+Requirement already satisfied: annotated-doc>=0.0.2 in c:\users\bozvlenovo7\desktop\project\cirt_dfir_professional\platform\backend\.venv_phase8b166\lib\site-packages (from fastapi==0.143.2) (0.0.5)
+Requirement already satisfied: opentelemetry-api>=1.44.0 in c:\users\bozvlenovo7\desktop\project\cirt_dfir_professional\platform\backend\.venv_phase8b166\lib\site-packages (from fastapi==0.143.2) (1.45.1)
+Requirement already satisfied: anyio<5,>=4.0.0 in c:\users\bozvlenovo7\desktop\project\cirt_dfir_professional\platform\backend\.venv_phase8b166\lib\site-packages (from starlette==1.8.0) (4.15.1)
+Requirement already satisfied: certifi in c:\users\bozvlenovo7\desktop\project\cirt_dfir_professional\platform\backend\.venv_phase8b166\lib\site-packages (from httpx==0.28.1) (2026.7.22)
+Requirement already satisfied: httpcore==1.* in c:\users\bozvlenovo7\desktop\project\cirt_dfir_professional\platform\backend\.venv_phase8b166\lib\site-packages (from httpx==0.28.1) (1.0.9)
+Requirement already satisfied: idna in c:\users\bozvlenovo7\desktop\project\cirt_dfir_professional\platform\backend\.venv_phase8b166\lib\site-packages (from httpx==0.28.1) (3.20)
+Requirement already satisfied: colorama>=0.4 in c:\users\bozvlenovo7\desktop\project\cirt_dfir_professional\platform\backend\.venv_phase8b166\lib\site-packages (from pytest==8.4.2) (0.4.6)
+Requirement already satisfied: iniconfig>=1 in c:\users\bozvlenovo7\desktop\project\cirt_dfir_professional\platform\backend\.venv_phase8b166\lib\site-packages (from pytest==8.4.2) (2.3.1)
+Requirement already satisfied: packaging>=20 in c:\users\bozvlenovo7\desktop\project\cirt_dfir_professional\platform\backend\.venv_phase8b166\lib\site-packages (from pytest==8.4.2) (26.3)
+Requirement already satisfied: pluggy<2,>=1.5 in c:\users\bozvlenovo7\desktop\project\cirt_dfir_professional\platform\backend\.venv_phase8b166\lib\site-packages (from pytest==8.4.2) (1.7.0)
+Requirement already satisfied: pygments>=2.7.2 in c:\users\bozvlenovo7\desktop\project\cirt_dfir_professional\platform\backend\.venv_phase8b166\lib\site-packages (from pytest==8.4.2) (2.21.0)
+Requirement already satisfied: annotated-types>=0.6.0 in c:\users\bozvlenovo7\desktop\project\cirt_dfir_professional\platform\backend\.venv_phase8b166\lib\site-packages (from pydantic==2.14.1) (0.8.0)
+Requirement already satisfied: pydantic-core==2.50.1 in c:\users\bozvlenovo7\desktop\project\cirt_dfir_professional\platform\backend\.venv_phase8b166\lib\site-packages (from pydantic==2.14.1) (2.50.1)
+Requirement already satisfied: h11>=0.16 in c:\users\bozvlenovo7\desktop\project\cirt_dfir_professional\platform\backend\.venv_phase8b166\lib\site-packages (from httpcore==1.*->httpx==0.28.1) (0.16.0)
+Using cached fastapi-0.143.2-py3-none-any.whl (144 kB)
+Installing collected packages: fastapi
+  Attempting uninstall: fastapi
+    Found existing installation: fastapi 0.143.3
+    Uninstalling fastapi-0.143.3:
+      Successfully uninstalled fastapi-0.143.3
+Successfully installed fastapi-0.143.2
+
+--- STDERR ---
+
+[notice] A new release of pip is available: 25.0.1 -> 26.2.1
+[notice] To update, run: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\.venv_phase8b166\Scripts\python.exe -m pip install --upgrade pip
+
+EXIT CODE: 0
+
+===== 4. Install httpx2 candidate in isolated environment only =====
+COMMAND: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\.venv_phase8b166\Scripts\python.exe -m pip install httpx2
+Collecting httpx2
+  Using cached httpx2-2.13.1-py3-none-any.whl.metadata (9.8 kB)
+Requirement already satisfied: anyio>=4.10 in c:\users\bozvlenovo7\desktop\project\cirt_dfir_professional\platform\backend\.venv_phase8b166\lib\site-packages (from httpx2) (4.15.1)
+Collecting httpcore2==2.13.1 (from httpx2)
+  Using cached httpcore2-2.13.1-py3-none-any.whl.metadata (26 kB)
+Requirement already satisfied: idna>=3.18 in c:\users\bozvlenovo7\desktop\project\cirt_dfir_professional\platform\backend\.venv_phase8b166\lib\site-packages (from httpx2) (3.20)
+Collecting truststore>=0.10 (from httpx2)
+  Using cached truststore-0.10.5-py3-none-any.whl.metadata (4.5 kB)
+Requirement already satisfied: typing-extensions>=4.5.0 in c:\users\bozvlenovo7\desktop\project\cirt_dfir_professional\platform\backend\.venv_phase8b166\lib\site-packages (from httpx2) (4.16.0)
+Requirement already satisfied: h11>=0.16 in c:\users\bozvlenovo7\desktop\project\cirt_dfir_professional\platform\backend\.venv_phase8b166\lib\site-packages (from httpcore2==2.13.1->httpx2) (0.16.0)
+Using cached httpx2-2.13.1-py3-none-any.whl (95 kB)
+Using cached httpcore2-2.13.1-py3-none-any.whl (83 kB)
+Using cached truststore-0.10.5-py3-none-any.whl (19 kB)
+Installing collected packages: truststore, httpcore2, httpx2
+Successfully installed httpcore2-2.13.1 httpx2-2.13.1 truststore-0.10.5
+
+--- STDERR ---
+
+[notice] A new release of pip is available: 25.0.1 -> 26.2.1
+[notice] To update, run: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\.venv_phase8b166\Scripts\python.exe -m pip install --upgrade pip
+
+EXIT CODE: 0
+
+===== 5. Record relevant package versions =====
+COMMAND: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\.venv_phase8b166\Scripts\python.exe -c import sys; from importlib import metadata; print('Python:', sys.version); [print(n + '==' + metadata.version(n)) for n in ('fastapi','starlette','httpx','httpx2','pytest','pydantic')]
+Python: 3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]
+fastapi==0.143.2
+starlette==1.8.0
+httpx==0.28.1
+httpx2==2.13.1
+pytest==8.4.2
+pydantic==2.14.1
+
+EXIT CODE: 0
+
+===== 6. Check TestClient import and deprecation warning =====
+COMMAND: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\.venv_phase8b166\Scripts\python.exe -W default -c import warnings; warnings.simplefilter('default'); from fastapi.testclient import TestClient; print('FastAPI TestClient import succeeded.')
+FastAPI TestClient import succeeded.
+
+EXIT CODE: 0
+
+===== 7. Run complete backend regression suite =====
+COMMAND: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\.venv_phase8b166\Scripts\python.exe -m pytest -q -W default
+........................................................................ [ 24%]
+........................................................................ [ 49%]
+........................................................................ [ 74%]
+........................................................................ [ 99%]
+..                                                                       [100%]
+290 passed in 3.77s
+
+EXIT CODE: 0
+
+===== 8. Validate dependency consistency =====
+COMMAND: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\.venv_phase8b166\Scripts\python.exe -m pip check
+No broken requirements found.
+
+EXIT CODE: 0
+
+FINAL STATUS: PASS - baseline-matched isolated trial succeeded.
+Review the import stderr and package versions before any adoption.

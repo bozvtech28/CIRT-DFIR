@@ -1,0 +1,72 @@
+﻿MICROSOFT ENTRA CONFIGURATION WORKSHEET
+Phase 8B.34 - Fill in only through the approved administrative process.
+
+Tenant ID:
+[WAITING FOR AUTHORIZED ADMIN]
+
+API audience:
+[WAITING FOR AUTHORIZED ADMIN]
+
+Expected issuer:
+[WAITING FOR AUTHORIZED ADMIN]
+
+Frontend client ID:
+[WAITING FOR AUTHORIZED ADMIN]
+
+Approved API scope:
+[WAITING FOR AUTHORIZED ADMIN]
+
+Exact app-role values:
+[WAITING FOR AUTHORIZED ADMIN]
+
+Frontend redirect URI:
+[WAITING FOR AUTHORIZED ADMIN]
+
+Logout redirect URI:
+[WAITING FOR AUTHORIZED ADMIN]
+
+Token version / claim contract:
+[WAITING FOR AUTHORIZED ADMIN]
+
+Approved deployment origin:
+[WAITING FOR AUTHORIZED ADMIN]
+
+HTTPS / reverse-proxy / CORS requirements:
+[WAITING FOR AUTHORIZED ADMIN]
+
+Administrator approval reference:
+[WAITING FOR AUTHORIZED ADMIN]
+
+SECURITY: Do not record secrets, private keys, access tokens, or refresh tokens here.
+
+API APPLICATION SCOPE
+Approved scope name: [WAITING FOR AUTHORIZED ADMIN]
+Scope identifier / full scope value: [WAITING FOR AUTHORIZED ADMIN]
+Approval status: PENDING
+
+Administrator instructions:
+- Enter the exact delegated API scope registered for the DFIR API.
+- Confirm the frontend application is authorized to request this scope.
+- Confirm the access token audience matches the DFIR API.
+- Do not enter client secrets, passwords, private keys, or access tokens.
+- Do not substitute a guessed or example scope for an approved value.
+
+MICROSOFT ENTRA APPLICATION ROLES
+Approval status: PENDING
+
+Record only the exact role values approved by the Entra administrator.
+Do not assume the provisional development roles are the production role contract.
+
+Approved role name: [WAITING FOR AUTHORIZED ADMIN]
+Description / allowed actions: [WAITING FOR AUTHORIZED ADMIN]
+Assigned to approved API application: [WAITING FOR AUTHORIZED ADMIN]
+Approval reference or reviewer: [WAITING FOR AUTHORIZED ADMIN]
+
+Repeat the role fields above for each approved role.
+
+Security validation requirements:
+- Roles must be issued for the intended API and validated from a trusted access token.
+- The backend must map only explicitly approved role values to permissions.
+- Unknown, missing, or malformed roles must fail closed.
+- Never accept role names or permissions supplied only by the browser.
+- Do not enter passwords, client secrets, private keys, or access tokens.

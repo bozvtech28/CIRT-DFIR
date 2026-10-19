@@ -1,0 +1,204 @@
+﻿CIRT DFIR PROFESSIONAL - PHASE 8B.121
+Read-only Security and Integration-Readiness Review
+Timestamp: 20261017_183311
+Project: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional
+Source changes: None intended
+Network requests: None
+Application servers started: No
+Collector executed: No
+Original evidence modified: No
+Live Entra authentication enabled: No
+
+========== FILE INVENTORY AND BACKUPS ==========
+PRESENT + BACKED UP: platform\backend\app\main.py
+PRESENT + BACKED UP: platform\backend\app\auth_dependencies.py
+PRESENT + BACKED UP: platform\backend\app\security.py
+PRESENT + BACKED UP: platform\backend\app\case_repository.py
+PRESENT + BACKED UP: platform\backend\app\entra_bearer_adapter.py
+PRESENT + BACKED UP: platform\backend\app\entra_token_verifier.py
+PRESENT + BACKED UP: platform\backend\app\entra_principal.py
+PRESENT + BACKED UP: platform\backend\app\entra_metadata_client.py
+PRESENT + BACKED UP: platform\backend\app\entra_http_transport.py
+PRESENT + BACKED UP: platform\backend\app\entra_jwks_cache.py
+PRESENT + BACKED UP: platform\backend\tests\conftest.py
+PRESENT + BACKED UP: platform\backend\tests\test_api_auth_gate.py
+PRESENT + BACKED UP: platform\backend\tests\test_api_oidc_fail_closed.py
+PRESENT + BACKED UP: platform\frontend\src\App.tsx
+PRESENT + BACKED UP: platform\frontend\src\main.tsx
+PRESENT + BACKED UP: platform\frontend\src\auth\entraConfig.ts
+PRESENT + BACKED UP: platform\frontend\src\auth\entraToken.ts
+PRESENT + BACKED UP: platform\frontend\src\auth\msalInstance.ts
+PRESENT + BACKED UP: platform\frontend\src\auth\authenticatedFetch.ts
+PRESENT + BACKED UP: platform\frontend\src\auth\AuthRoot.tsx
+PRESENT + BACKED UP: platform\frontend\.env.example
+PRESENT + BACKED UP: platform\frontend\package.json
+PRESENT + BACKED UP: platform\backend\requirements.txt
+PRESENT + BACKED UP: docs\ENTRA_AUTH_INTEGRATION_DESIGN.md
+PRESENT + BACKED UP: docs\ENTRA_ADMIN_CONFIGURATION_REQUEST.txt
+Files present and backed up: 25
+Expected files missing: 0
+Backup directory: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\Phase8B121_20261017_183311
+
+========== API ROUTES AND AUTHORIZATION ==========
+platform\backend\app\main.py:57: @app.get("/api/v1/health", response_model=HealthResponse)
+platform\backend\app\main.py:64: @app.patch("/api/v1/cases/{case_id}", response_model=DemoCase)
+platform\backend\app\main.py:68: principal = Depends(require_permission("cases:update")),
+platform\backend\app\main.py:84: actor_id=principal.subject,
+platform\backend\app\main.py:104: @app.get("/api/v1/demo/cases", response_model=list[DemoCase], dependencies=[Depends(require_permission("cases:read"))])
+
+========== FAIL-CLOSED AUTHENTICATION GATE ==========
+platform\backend\app\auth_dependencies.py:16: def get_current_principal() -> Principal:
+platform\backend\app\auth_dependencies.py:19: status_code=401,
+platform\backend\app\auth_dependencies.py:20: detail="Authentication is not configured. Access is denied by default.",
+platform\backend\app\auth_dependencies.py:24: def require_permission(permission: str):
+platform\backend\app\auth_dependencies.py:28: authorize(principal, permission)
+platform\backend\app\auth_dependencies.py:31: status_code=401,
+
+========== RBAC POLICY ==========
+platform\backend\app\security.py:12: ROLE_ADMINISTRATOR = "Administrator"
+platform\backend\app\security.py:13: ROLE_ANALYST = "DFIR Analyst"
+platform\backend\app\security.py:14: ROLE_VIEWER = "Viewer"
+platform\backend\app\security.py:17: ROLE_ADMINISTRATOR,
+platform\backend\app\security.py:18: ROLE_ANALYST,
+platform\backend\app\security.py:19: ROLE_VIEWER,
+platform\backend\app\security.py:23: "cases:read": frozenset({
+platform\backend\app\security.py:24: ROLE_ADMINISTRATOR,
+platform\backend\app\security.py:25: ROLE_ANALYST,
+platform\backend\app\security.py:26: ROLE_VIEWER,
+platform\backend\app\security.py:28: "cases:update": frozenset({
+platform\backend\app\security.py:29: ROLE_ADMINISTRATOR,
+platform\backend\app\security.py:30: ROLE_ANALYST,
+platform\backend\app\security.py:32: "users:manage": frozenset({
+platform\backend\app\security.py:33: ROLE_ADMINISTRATOR,
+platform\backend\app\security.py:35: "audit:read": frozenset({
+platform\backend\app\security.py:36: ROLE_ADMINISTRATOR,
+platform\backend\app\security.py:42: class Principal:
+platform\backend\app\security.py:70: def authorize(principal: Principal | None, permission: str) -> bool:
+
+========== AUDIT REPOSITORY ==========
+platform\backend\app\case_repository.py:19: db.commit()
+platform\backend\app\case_repository.py:31: actor_id: str,
+platform\backend\app\case_repository.py:35: case_id, title, severity, status, actor_id, timestamp
+platform\backend\app\case_repository.py:50: (case_id, title, severity, status, timestamp, timestamp, actor_id),
+platform\backend\app\case_repository.py:53: """INSERT INTO audit_events
+platform\backend\app\case_repository.py:54: (case_id, event_type, actor_id, event_time, details_json)
+platform\backend\app\case_repository.py:56: (case_id, "CASE_CREATED", actor_id, timestamp, details),
+platform\backend\app\case_repository.py:62: def update_case(
+platform\backend\app\case_repository.py:66: actor_id: str,
+platform\backend\app\case_repository.py:71: """Update case status/severity and append an audit event atomically."""
+platform\backend\app\case_repository.py:74: if not isinstance(actor_id, str) or not actor_id.strip():
+platform\backend\app\case_repository.py:75: raise ValueError("actor_id must be a non-empty string.")
+platform\backend\app\case_repository.py:134: """INSERT INTO audit_events
+platform\backend\app\case_repository.py:135: (case_id, event_type, actor_id, event_time, details_json)
+platform\backend\app\case_repository.py:137: (case_id, "CASE_UPDATED", actor_id.strip(), timestamp, details),
+platform\backend\app\case_repository.py:139: db.commit()
+platform\backend\app\case_repository.py:141: db.rollback()
+platform\backend\app\case_repository.py:172: def list_audit_events(
+platform\backend\app\case_repository.py:176: """SELECT event_id, case_id, event_type, actor_id,
+platform\backend\app\case_repository.py:178: FROM audit_events
+
+========== ENTRA TOKEN VERIFICATION AND ROLE MAPPING ==========
+platform\backend\app\entra_bearer_adapter.py:15: from app.entra_token_verifier import verify_entra_access_token
+platform\backend\app\entra_bearer_adapter.py:19: class BearerAuthenticationError(Exception):
+platform\backend\app\entra_bearer_adapter.py:23: def principal_from_authorization_header(
+platform\backend\app\entra_bearer_adapter.py:27: expected_issuer: str,
+platform\backend\app\entra_bearer_adapter.py:28: expected_audience: str,
+platform\backend\app\entra_bearer_adapter.py:29: expected_tenant_id: str,
+platform\backend\app\entra_bearer_adapter.py:30: approved_role_map: Mapping[str, str],
+platform\backend\app\entra_bearer_adapter.py:52: claims = verify_entra_access_token(
+platform\backend\app\entra_bearer_adapter.py:55: expected_issuer=expected_issuer,
+platform\backend\app\entra_bearer_adapter.py:56: expected_audience=expected_audience,
+platform\backend\app\entra_bearer_adapter.py:57: expected_tenant_id=expected_tenant_id,
+platform\backend\app\entra_bearer_adapter.py:61: approved_role_map=approved_role_map,
+platform\backend\app\entra_bearer_adapter.py:63: except (InvalidTokenError, PrincipalMappingError, ValueError) as exc:
+
+========== TEST-ONLY IDENTITY OVERRIDES ==========
+platform\backend\tests\conftest.py:13: @pytest.fixture(autouse=True)
+platform\backend\tests\conftest.py:15: app.dependency_overrides[get_current_principal] = lambda: Principal(
+platform\backend\tests\conftest.py:16: subject="synthetic-test-analyst",
+platform\backend\tests\conftest.py:19: yield
+platform\backend\tests\conftest.py:20: app.dependency_overrides.clear()
+
+========== AUTHENTICATION AND AUTHORIZATION TEST COVERAGE ==========
+platform\backend\tests\test_api_auth_gate.py:6: from app.security import Principal, ROLE_ADMINISTRATOR, ROLE_VIEWER
+platform\backend\tests\test_api_auth_gate.py:14: assert response.status_code == 401
+platform\backend\tests\test_api_auth_gate.py:22: response = client.patch(
+platform\backend\tests\test_api_auth_gate.py:26: assert response.status_code == 401
+platform\backend\tests\test_api_auth_gate.py:30: def test_viewer_cannot_update_case():
+platform\backend\tests\test_api_auth_gate.py:32: subject="synthetic-test-viewer",
+platform\backend\tests\test_api_auth_gate.py:33: roles=frozenset({ROLE_VIEWER}),
+platform\backend\tests\test_api_auth_gate.py:36: response = client.patch(
+platform\backend\tests\test_api_auth_gate.py:40: assert response.status_code == 403
+platform\backend\tests\test_api_auth_gate.py:44: def test_case_update_audit_actor_comes_from_principal(tmp_path, monkeypatch):
+platform\backend\tests\test_api_auth_gate.py:46: from app.case_repository import connect, initialize, create_case, list_audit_events
+platform\backend\tests\test_api_auth_gate.py:49: database_path = tmp_path / "audit-attribution.sqlite"
+platform\backend\tests\test_api_auth_gate.py:62: case_id="TEST-AUDIT-001",
+platform\backend\tests\test_api_auth_gate.py:63: title="Synthetic audit attribution test",
+platform\backend\tests\test_api_auth_gate.py:66: actor_id="synthetic-test-creator",
+platform\backend\tests\test_api_auth_gate.py:72: monkeypatch.setattr(case_store, "DB_PATH", database_path)
+platform\backend\tests\test_api_auth_gate.py:74: subject="synthetic-audit-analyst-117",
+platform\backend\tests\test_api_auth_gate.py:78: response = client.patch(
+platform\backend\tests\test_api_auth_gate.py:79: "/api/v1/cases/TEST-AUDIT-001",
+platform\backend\tests\test_api_auth_gate.py:86: events = list_audit_events(db, "TEST-AUDIT-001")
+platform\backend\tests\test_api_auth_gate.py:92: assert update_events[0]["actor_id"] == "synthetic-audit-analyst-117"
+platform\backend\tests\test_api_auth_gate.py:106: roles=frozenset({ROLE_ADMINISTRATOR}),
+
+========== FRONTEND AUTHENTICATION CONFIGURATION ==========
+platform\frontend\src\auth\entraConfig.ts:3: const tenantId = (import.meta.env.VITE_ENTRA_TENANT_ID ?? "").trim();
+platform\frontend\src\auth\entraConfig.ts:4: const clientId = (import.meta.env.VITE_ENTRA_CLIENT_ID ?? "").trim();
+platform\frontend\src\auth\entraConfig.ts:5: const apiScope = (import.meta.env.VITE_ENTRA_API_SCOPE ?? "").trim();
+platform\frontend\src\auth\entraConfig.ts:6: const redirectUri = (import.meta.env.VITE_ENTRA_REDIRECT_URI ?? "").trim();
+platform\frontend\src\auth\entraConfig.ts:10: value.includes("REPLACE_WITH_APPROVED") ||
+platform\frontend\src\auth\entraConfig.ts:36: if (isPlaceholder(redirectUri)) {
+platform\frontend\src\auth\entraConfig.ts:40: const redirect = new URL(redirectUri);
+platform\frontend\src\auth\entraConfig.ts:67: authority: `https://login.microsoftonline.com/${tenantId}`,
+platform\frontend\src\auth\entraConfig.ts:68: redirectUri,
+platform\frontend\src\auth\entraConfig.ts:69: postLogoutRedirectUri: redirectUri,
+
+========== FRONTEND TOKEN AND API REQUEST HANDLING ==========
+platform\frontend\src\auth\authenticatedFetch.ts:7: * No browser-supplied role or identity is treated as authorization.
+platform\frontend\src\auth\authenticatedFetch.ts:9: export async function authenticatedFetch(
+platform\frontend\src\auth\authenticatedFetch.ts:16: headers.set("Authorization", `Bearer ${token}`);
+platform\frontend\src\auth\authenticatedFetch.ts:18: return fetch(input, { ...init, headers });
+
+========== FRONTEND MSAL INITIALIZATION ==========
+platform\frontend\src\main.tsx:3: import AuthRoot from "./auth/AuthRoot";
+platform\frontend\src\main.tsx:7: <React.StrictMode>
+platform\frontend\src\main.tsx:8: <AuthRoot />
+platform\frontend\src\main.tsx:9: </React.StrictMode>,
+
+========== FRONTEND AUTH ROOT ==========
+platform\frontend\src\auth\AuthRoot.tsx:12: function AuthenticationControls() {
+platform\frontend\src\auth\AuthRoot.tsx:20: await instance.loginRedirect({ scopes: [getEntraApiScope()] });
+platform\frontend\src\auth\AuthRoot.tsx:46: aria-label="Microsoft Entra authentication"
+platform\frontend\src\auth\AuthRoot.tsx:49: <strong>Microsoft Entra authentication</strong>
+platform\frontend\src\auth\AuthRoot.tsx:52: ? "Authentication in progress…"
+platform\frontend\src\auth\AuthRoot.tsx:75: <AuthenticationControls />
+platform\frontend\src\auth\AuthRoot.tsx:111: <strong>Authentication not configured</strong>
+platform\frontend\src\auth\AuthRoot.tsx:131: Initializing Microsoft Entra authentication…
+
+========== CONFIGURATION TEMPLATE ==========
+platform\frontend\.env.example:5: VITE_ENTRA_TENANT_ID=REPLACE_WITH_APPROVED_TENANT_ID
+platform\frontend\.env.example:6: VITE_ENTRA_CLIENT_ID=REPLACE_WITH_APPROVED_SPA_CLIENT_ID
+platform\frontend\.env.example:7: VITE_ENTRA_API_SCOPE=REPLACE_WITH_APPROVED_API_SCOPE
+platform\frontend\.env.example:8: VITE_ENTRA_REDIRECT_URI=http://localhost:5173/
+platform\frontend\.env.example:9: VITE_API_BASE_URL=/api
+
+========== LOCAL ENVIRONMENT FILE STATUS ==========
+Frontend .env exists: False
+Frontend .env.local exists: False
+Environment file contents: NOT READ OR RECORDED
+
+========== REQUIRED FOOTER CHECK ==========
+Footer class marker present: True
+BozV signature marker present: True
+Developed by marker present: True
+Powered by marker present: True
+
+========== READINESS INTERPRETATION ==========
+This phase is a source review, not a penetration test.
+Source matches do not prove that every route is protected.
+No live identity provider was contacted.
+No production readiness certification is implied.
+Review the report before approving any future authentication wiring.
+

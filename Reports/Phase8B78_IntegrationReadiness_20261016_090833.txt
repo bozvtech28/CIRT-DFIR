@@ -1,0 +1,51 @@
+﻿Phase 8B.78 - Production Integration Readiness Audit
+Timestamp: 20261016_090833
+Project: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional
+Mode: read-only source inspection
+No application source changes, package installations, or network requests.
+
+=== FILE INVENTORY AND SHA256 ===
+PRESENT | 79502FBC9DD630408C2694DD6B4C1CD4E3B9D84B944CEB326F051980A0DAEF11 | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\auth_dependencies.py
+PRESENT | 0022274BA349E8B72A26590814909D3A327403BAD44C63A200E8B1807584AB28 | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\security.py
+PRESENT | 55D66D658ED9182535E1FFD6F98507958CB52AFAD3A4DEFFECECEC960A5F17B6 | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\main.py
+PRESENT | AC23C3998F1A02878EC51B37901ED4D7F35F10E7DEF2A56B3E11B244B1F14BCE | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_token_verifier.py
+PRESENT | CA1464237691EF3A86D90A20ADFF37197EF54DE6D769E2006D92F50D63FF1E5B | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_jwks.py
+PRESENT | 97907A3B3A7EB074155C18D8700668ABF330AAFE4FF57F6FCAA776C96B87C4DD | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_jwks_cache.py
+PRESENT | FB08AC8C3F164EC335B99273872DB7E92CF67B6F3FC20CDFF9223C1E736A8472 | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_metadata_client.py
+PRESENT | 4D86E55ED32D451095EE9979E3EC11D78639A31469E8D02BA9A811DED475D466 | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_http_transport.py
+PRESENT | 8DE81A7794810EB8624B35238D8565565268CDF3A5426A3F7A5B5FA2CC4DFC0B | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_principal.py
+PRESENT | 059A6E005F889183E5C0089D19C3EABA36148449CC16B793D482FC5F696CB864 | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\package.json
+PRESENT | DBEAED9BED6258804A1A37F13185426929E977D45C1F4005AE1E511A2E2538DC | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\App.tsx
+PRESENT | 5BE2DEA921643EB3575395555F64DFF1E483DAA2F15BC72C25E2FAF834F29614 | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\docs\Phase8B64_Entra_Configuration_Gate.md
+PRESENT | 918E212E48C8609C1F32F9A61FC8C9A3EBEDD32309980CF005C9710B838B270D | C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\docs\Phase8B66_Entra_Frontend_Integration_Design.md
+
+=== STATIC READINESS CHECKS ===
+MET | Authentication gate contains unconditional fail-closed denial
+MET | Verifier uses RS256 algorithm restriction
+MET | Verifier checks configured issuer, audience, and tenant
+MET | Claims mapper requires an explicit approved role map
+NOT MET | Frontend MSAL package declared
+NOT MET | Frontend includes explicit sign-in/token acquisition integration
+MET | No obvious bearer token integration in current frontend fetch
+
+=== BACKEND REGRESSION ===
+........................................................................ [ 31%]
+........................................................................ [ 63%]
+........................................................................ [ 94%]
+............                                                             [100%]
+============================== warnings summary ===============================
+.venv\Lib\site-packages\fastapi\testclient.py:1
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+228 passed, 1 warning in 2.35s
+Backend regression exit code: 0
+
+=== AUDIT SUMMARY ===
+Files missing: 0
+Static checks met: 5 / 7
+Static checks not met: 2
+This is a static readiness audit, not production security approval.
+Do not enable live authentication until tenant, API audience, role values, SPA client, redirect URIs, HTTPS, CORS, audit attribution, and security approval are confirmed.
+

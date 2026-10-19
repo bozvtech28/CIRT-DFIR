@@ -1,0 +1,21 @@
+﻿CIRT-DFIR - PHASE 8B167
+Baseline-Matched Trial Inspection
+Timestamp: 2026-10-17 20:14:43
+Trial: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\.venv_phase8b166
+Read-only inspection; no package changes.
+
+Trial directory exists.
+Python: 3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]
+fastapi==0.143.2
+starlette==1.8.0
+httpx==0.28.1
+httpx2==2.13.1
+pytest==8.4.2
+pydantic==2.14.1
+Version inspection exit code: 0
+No broken requirements found.
+pip check exit code: 0
+TestClient import succeeded.
+TestClient import exit code: 0
+Report: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase8B166_Baseline_Matched_Trial_20261017_201409.txt; modified: 10/17/2026 20:14:11
+Report: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase8B166_Baseline_Matched_Trial_20261017_201156.txt; modified: 10/17/2026 20:13:41

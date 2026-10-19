@@ -1,0 +1,408 @@
+﻿Phase 5B - Case module source review
+Timestamp: 2026-10-15 23:17:37
+Read-only inspection; no application source changes.
+
+========== FRONTEND APP.TSX ==========
+import { useEffect, useMemo, useState } from "react";
+
+type DemoCase = {
+  case_id: string;
+  title: string;
+  severity: string;
+  status: string;
+};
+
+const navigation = [
+  "Dashboard",
+  "Cases",
+  "Assets & Scans",
+  "Findings",
+  "Evidence Vault",
+  "Response Actions",
+  "Reports",
+  "Administration",
+];
+
+const fallbackCases: DemoCase[] = [
+  { case_id: "DEMO-2026-001", title: "Endpoint Alert Review", severity: "High", status: "Investigating" },
+  { case_id: "DEMO-2026-002", title: "Suspicious Login Review", severity: "Medium", status: "Triage" },
+  { case_id: "DEMO-2026-003", title: "Mailbox Rule Assessment", severity: "Medium", status: "Evidence review" },
+];
+
+const API_BASE = "";
+
+function App() {
+  const [page, setPage] = useState("Dashboard");
+  const [search, setSearch] = useState("");
+  const [cases, setCases] = useState<DemoCase[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [usingFallback, setUsingFallback] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadCases() {
+      setLoading(true);
+      setError("");
+      setUsingFallback(false);
+
+      try {
+        const response = await fetch(`${API_BASE}/api/v1/demo/cases`, {
+          headers: { Accept: "application/json" },
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error(`API returned HTTP ${response.status}`);
+        }
+
+        const payload: unknown = await response.json();
+
+        if (
+          !Array.isArray(payload) ||
+          !payload.every(
+            (item) =>
+              item !== null &&
+              typeof item === "object" &&
+              typeof item.case_id === "string" &&
+              typeof item.title === "string" &&
+              typeof item.severity === "string" &&
+              typeof item.status === "string",
+          )
+        ) {
+          throw new Error("Unexpected API response format.");
+        }
+
+        if (!controller.signal.aborted) setCases(payload as DemoCase[]);
+      } catch (err) {
+        if (controller.signal.aborted) return;
+
+        const message = err instanceof Error ? err.message : "Unknown connection error";
+        setError(`Could not load cases from the localhost development API: ${message}`);
+        setCases(fallbackCases);
+        setUsingFallback(true);
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    }
+
+    void loadCases();
+    return () => controller.abort();
+  }, [refreshKey]);
+
+  const filteredCases = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return cases;
+
+    return cases.filter((item) =>
+      `${item.case_id} ${item.title} ${item.severity} ${item.status}`
+        .toLowerCase()
+        .includes(term),
+    );
+  }, [cases, search]);
+
+  return (
+    <div className="shell">
+      <aside className="sidebar">
+        <div className="brand">
+          <div className="brand-mark">DFIR</div>
+          <div><strong>CIRT RESPONSE</strong><small>Investigation Platform</small></div>
+        </div>
+        <p className="nav-label">WORKSPACE</p>
+        <nav aria-label="Main navigation">
+          {navigation.map((item) => (
+            <button
+              className={`nav-item ${page === item ? "active" : ""}`}
+              key={item}
+              onClick={() => setPage(item)}
+              aria-current={page === item ? "page" : undefined}
+            >
+              <span aria-hidden="true">{item === "Dashboard" ? "▦" : "◇"}</span>
+              {item}
+            </button>
+          ))}
+        </nav>
+        <div className="side-note">
+          <span className="status-dot" /> Development mode
+          <small>Synthetic records only. No scanner or evidence repository connected.</small>
+        </div>
+      </aside>
+
+      <main className="main">
+        <header className="topbar">
+          <span>CIRT / DFIR <span className="muted"> / {page}</span></span>
+          <span className="demo-label">DEVELOPMENT SCAFFOLD</span>
+        </header>
+
+        <div className="content">
+          <div className="page-heading">
+            <div>
+              <span className="eyebrow">SECURITY OPERATIONS</span>
+              <h1>{page === "Dashboard" ? "Incident Response Overview" : page}</h1>
+              <p className="muted">Case management and forensic workflow development.</p>
+            </div>
+          </div>
+
+          <div className="notice" role="note">
+            DEVELOPMENT ONLY — records are synthetic. This is not an operational
+            incident-response or evidence-management system.
+          </div>
+
+          {page === "Dashboard" || page === "Cases" ? (
+            <>
+              <div className="metrics">
+                <article className="metric"><span>Cases returned</span><strong>{loading ? "…" : cases.length}</strong><small>Current case-list response</small></article>
+                <article className="metric"><span>High severity</span><strong>{cases.filter((item) => item.severity.toLowerCase() === "high").length}</strong><small>Synthetic records only</small></article>
+                <article className="metric"><span>Investigating</span><strong>{cases.filter((item) => item.status.toLowerCase() === "investigating").length}</strong><small>Returned case data</small></article>
+                <article className="metric"><span>API state</span><strong>{loading ? "Loading" : usingFallback ? "Offline" : "Ready"}</strong><small>Local development endpoint</small></article>
+              </div>
+
+              {loading && <section className="panel" role="status">Loading synthetic cases from the development API…</section>}
+
+              {error && (
+                <section className="panel" role="alert">
+                  <h2>API connection notice</h2>
+                  <p>{error}</p>
+                  <p>Showing clearly identified local synthetic fallback records.</p>
+                </section>
+              )}
+
+              <section className="panel">
+                <div className="panel-heading">
+                  <h2>Case Register</h2>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <input
+                      aria-label="Search synthetic cases"
+                      placeholder="Search cases..."
+                      value={search}
+                      onChange={(event) => setSearch(event.target.value)}
+                    />
+                    <button type="button" onClick={() => setRefreshKey((value) => value + 1)} disabled={loading}>
+                      {loading ? "Loading…" : "Refresh"}
+                    </button>
+                  </div>
+                </div>
+                <div className="table-wrap">
+                  <table>
+                    <thead><tr><th>Case ID</th><th>Incident</th><th>Severity</th><th>Status</th></tr></thead>
+                    <tbody>
+                      {filteredCases.map((item) => (
+                        <tr key={item.case_id}>
+                          <td>{item.case_id}</td>
+                          <td>{item.title}</td>
+                          <td><span className={`pill ${item.severity.toLowerCase()}`}>{item.severity}</span></td>
+                          <td>{item.status}</td>
+                        </tr>
+                      ))}
+                      {!loading && filteredCases.length === 0 && <tr><td colSpan={4}>No matching synthetic cases.</td></tr>}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="muted">{usingFallback ? "Data source: local fallback; API unavailable." : "Data source: development API response."}</p>
+              </section>
+            </>
+          ) : (
+            <section className="panel placeholder">
+              <h2>{page}</h2>
+              <p>This module is a scaffold; its workflow has not been implemented.</p>
+              <p>Production access controls, audit logging, evidence safeguards, and security review are required before operational use.</p>
+            </section>
+          )}
+        </div>
+        <footer className="app-footer">
+          <div>CIRT DFIR · Development scaffold · Synthetic data · Not for operational use</div>
+          <div className="bozv-signature">
+            <span>Developed by: <strong>BozV</strong></span>
+            <span>Powered by: <strong>BozV</strong></span>
+          </div>
+        </footer>
+      </main>
+    </div>
+  );
+}
+
+export default App;
+
+========== CASE-RELATED CSS ==========
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\style.css:2:*{box-sizing:border-box}
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\style.css:3:body{margin:0;min-width:320px;min-height:100vh}
+> C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\style.css:4:button,input{font:inherit}
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\style.css:5:.shell{min-height:100vh;display:grid;grid-template-columns:245px minmax(0,1fr)}
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\style.css:6:.sidebar{background:#0d1627;border-right:1px solid #26354d;padding:22px 14px}
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\style.css:7:.brand{display:flex;align-items:center;gap:11px;padding:0 7px 23px;border-bottom:1px solid #26354d}
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\style.css:8:.brand-mark{background:#1b3c70;border:1px solid #3767a8;color:#a9ceff;padding:10px;border-radius:9px;font-weight:800}
+*{box-sizing:border-box}
+body{margin:0;min-width:320px;min-height:100vh}
+.shell{min-height:100vh;display:grid;grid-template-columns:245px minmax(0,1fr)}
+.sidebar{background:#0d1627;border-right:1px solid #26354d;padding:22px 14px}
+.brand{display:flex;align-items:center;gap:11px;padding:0 7px 23px;border-bottom:1px solid #26354d}
+.brand-mark{background:#1b3c70;border:1px solid #3767a8;color:#a9ceff;padding:10px;border-radius:9px;font-weight:800}
+
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\style.css:30:.notice{background:#192a41;border:1px solid #304967;color:#b8cce5;padding:13px 15px;border-radius:8px;font-size:12px;line-height:1.6}
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\style.css:31:.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin:20px 0}
+> C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\style.css:32:.metric,.panel{background:#111b2e;border:1px solid #26354d;border-radius:10px}
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\style.css:33:.metric{padding:17px}
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\style.css:34:.metric span,.metric small{display:block;color:#8fa1ba;font-size:12px}
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\style.css:35:.metric strong{display:block;font-size:29px;margin:12px 0}
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\style.css:36:.metric small{font-size:11px}
+.notice{background:#192a41;border:1px solid #304967;color:#b8cce5;padding:13px 15px;border-radius:8px;font-size:12px;line-height:1.6}
+.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin:20px 0}
+.metric{padding:17px}
+.metric span,.metric small{display:block;color:#8fa1ba;font-size:12px}
+.metric strong{display:block;font-size:29px;margin:12px 0}
+.metric small{font-size:11px}
+
+> C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\style.css:37:.panel{padding:18px;margin-top:16px}
+.metric strong{display:block;font-size:29px;margin:12px 0}
+.metric small{font-size:11px}
+.panel-heading{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-bottom:15px}
+input{background:#0b1424;border:1px solid #30405a;border-radius:7px;padding:10px 12px;color:#e6edf7;max-width:100%}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;white-space:nowrap}
+
+> C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\style.css:38:.panel-heading{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-bottom:15px}
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\style.css:39:input{background:#0b1424;border:1px solid #30405a;border-radius:7px;padding:10px 12px;color:#e6edf7;max-width:100%}
+.metric small{font-size:11px}
+.panel{padding:18px;margin-top:16px}
+input{background:#0b1424;border:1px solid #30405a;border-radius:7px;padding:10px 12px;color:#e6edf7;max-width:100%}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;white-space:nowrap}
+th,td{text-align:left;padding:13px 10px;border-bottom:1px solid #223047;font-size:12px}
+
+> C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\style.css:40:.table-wrap{overflow-x:auto}
+.panel-heading{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-bottom:15px}
+input{background:#0b1424;border:1px solid #30405a;border-radius:7px;padding:10px 12px;color:#e6edf7;max-width:100%}
+table{width:100%;border-collapse:collapse;white-space:nowrap}
+th,td{text-align:left;padding:13px 10px;border-bottom:1px solid #223047;font-size:12px}
+th{font-size:10px;letter-spacing:.8px;color:#8fa1ba;text-transform:uppercase}
+tbody tr:last-child td{border-bottom:0}
+
+> C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\style.css:41:table{width:100%;border-collapse:collapse;white-space:nowrap}
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\style.css:42:th,td{text-align:left;padding:13px 10px;border-bottom:1px solid #223047;font-size:12px}
+input{background:#0b1424;border:1px solid #30405a;border-radius:7px;padding:10px 12px;color:#e6edf7;max-width:100%}
+.table-wrap{overflow-x:auto}
+th,td{text-align:left;padding:13px 10px;border-bottom:1px solid #223047;font-size:12px}
+th{font-size:10px;letter-spacing:.8px;color:#8fa1ba;text-transform:uppercase}
+tbody tr:last-child td{border-bottom:0}
+.pill{display:inline-block;padding:5px 8px;border-radius:20px;font-size:10px;background:#24344a}
+
+> C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\style.css:43:th{font-size:10px;letter-spacing:.8px;color:#8fa1ba;text-transform:uppercase}
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\style.css:44:tbody tr:last-child td{border-bottom:0}
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\style.css:45:.pill{display:inline-block;padding:5px 8px;border-radius:20px;font-size:10px;background:#24344a}
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\style.css:46:.pill.high{background:#48252e;color:#ff9ba3}
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\style.css:47:.pill.medium{background:#45361f;color:#f4cb78}
+table{width:100%;border-collapse:collapse;white-space:nowrap}
+th,td{text-align:left;padding:13px 10px;border-bottom:1px solid #223047;font-size:12px}
+tbody tr:last-child td{border-bottom:0}
+.pill{display:inline-block;padding:5px 8px;border-radius:20px;font-size:10px;background:#24344a}
+.pill.high{background:#48252e;color:#ff9ba3}
+.pill.medium{background:#45361f;color:#f4cb78}
+
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\style.css:50:footer{text-align:center;padding:20px;color:#6f829b;font-size:10px}
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\style.css:51:@media(max-width:950px){.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.shell{grid-template-columns:205px minmax(0,1fr)}.content{padding:22px 18px}}
+> C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\style.css:52:@media(max-width:650px){.shell{grid-template-columns:1fr}.sidebar{padding:12px}.brand{padding-bottom:12px}.nav-label,.side-note{display:none}nav{display:flex;flex-wrap:wrap;margin-top:12px}.nav-item{padding:9px;font-size:12px}.topbar{padding:0 14px}.content{padding:18px 12px}.metrics{gap:8px}.metric{padding:12px}.metric strong{font-size:23px}.panel-heading{align-items:flex-start;flex-direction:column}}
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\style.css:53:
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\style.css:54:/* BozV application signature */
+footer{text-align:center;padding:20px;color:#6f829b;font-size:10px}
+@media(max-width:950px){.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.shell{grid-template-columns:205px minmax(0,1fr)}.content{padding:22px 18px}}
+
+/* BozV application signature */
+.app-footer {
+  text-align: center;
+
+> C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\style.css:55:.app-footer {
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\style.css:56:  text-align: center;
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\style.css:57:  padding: 20px 16px;
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\style.css:58:  color: #6f829b;
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\style.css:59:  font-size: 10px;
+
+/* BozV application signature */
+  text-align: center;
+  padding: 20px 16px;
+  color: #6f829b;
+  font-size: 10px;
+
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\style.css:61:}
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\style.css:62:
+> C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\style.css:63:.bozv-signature {
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\style.css:64:  display: flex;
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\style.css:65:  justify-content: center;
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\style.css:66:  flex-wrap: wrap;
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\style.css:67:  gap: 8px 22px;
+}
+
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\style.css:71:}
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\style.css:72:
+> C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\style.css:73:.bozv-signature strong {
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\style.css:74:  color: #8fc0ff;
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\style.css:75:  font-weight: 700;
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\style.css:76:}
+}
+
+  color: #8fc0ff;
+  font-weight: 700;
+}
+
+
+========== BACKEND MAIN.PY ==========
+from fastapi import FastAPI
+from pydantic import BaseModel
+
+app = FastAPI(
+    title="CIRT DFIR Platform API",
+    version="0.1.0",
+    description="Development scaffold only. Synthetic data; no evidence intake.",
+)
+
+
+class HealthResponse(BaseModel):
+    status: str
+    mode: str
+
+
+class DemoCase(BaseModel):
+    case_id: str
+    title: str
+    severity: str
+    status: str
+
+
+DEMO_CASES = [
+    DemoCase(
+        case_id="DEMO-2026-001",
+        title="Endpoint Alert Review",
+        severity="High",
+        status="Investigating",
+    ),
+    DemoCase(
+        case_id="DEMO-2026-002",
+        title="Suspicious Login Review",
+        severity="Medium",
+        status="Triage",
+    ),
+    DemoCase(
+        case_id="DEMO-2026-003",
+        title="Mailbox Rule Assessment",
+        severity="Medium",
+        status="Evidence review",
+    ),
+]
+
+
+@app.get("/api/v1/health", response_model=HealthResponse)
+def health() -> HealthResponse:
+    return HealthResponse(status="ok", mode="development-scaffold")
+
+
+@app.get("/api/v1/demo/cases", response_model=list[DemoCase])
+def list_demo_cases() -> list[DemoCase]:
+    return DEMO_CASES
+
+

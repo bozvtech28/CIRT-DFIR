@@ -1,0 +1,9 @@
+Traceback (most recent call last):
+  File "C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase6E_Validation_20261015_233726.py", line 22, in check
+    detail = function()
+             ^^^^^^^^^^
+  File "C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase6E_Validation_20261015_233726.py", line 182, in initialization_idempotent
+    initialize(database, SCHEMA)
+  File "C:\\Users\\BOZVLENOVO7\\Desktop\\PROJECT\\CIRT_DFIR_Professional\\platform\\database-design\case_repository.py", line 18, in initialize
+    db.executescript(schema)
+sqlite3.OperationalError: table cases already exists

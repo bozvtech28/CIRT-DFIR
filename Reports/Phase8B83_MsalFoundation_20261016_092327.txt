@@ -1,0 +1,43 @@
+﻿Phase 8B.83 - MSAL Authentication Foundation
+Timestamp: 20261016_092327
+Backup folder: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\Phase8B83_20261016_092327
+Configuration module: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\auth\entraConfig.ts
+Token helper: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\auth\entraToken.ts
+Design document: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\docs\Phase8B83_MsalFoundation.md
+No tenant sign-in or network requests performed.
+No application routes or auth dependencies changed.
+
+Configuration module exists: True
+Token helper exists: True
+Design document exists: True
+
+Frontend build exit code: 0
+
+> cirt-dfir-platform-frontend@0.1.0 build
+> tsc -b && vite build
+
+[36mvite v7.3.7 [32mbuilding client environment for production...[36m[39m
+transforming...
+[32mâœ“[39m 29 modules transformed.
+rendering chunks...
+computing gzip size...
+[2mdist/[22m[32mindex.html                 [39m[1m[2m  0.45 kB[22m[1m[22m[2m â”‚ gzip:  0.30 kB[22m
+[2mdist/[22m[35massets/index-BPJY-tX1.css  [39m[1m[2m  4.87 kB[22m[1m[22m[2m â”‚ gzip:  1.64 kB[22m
+[2mdist/[22m[36massets/index-CfTLV-Tt.js   [39m[1m[2m231.03 kB[22m[1m[22m[2m â”‚ gzip: 72.02 kB[22m
+[32mâœ“ built in 720ms[39m
+
+Backend regression exit code: 0
+........................................................................ [ 31%]
+........................................................................ [ 63%]
+........................................................................ [ 94%]
+............                                                             [100%]
+============================== warnings summary ===============================
+.venv\Lib\site-packages\fastapi\testclient.py:1
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+228 passed, 1 warning in 2.49s
+
+Backend fail-closed message present: True
+OVERALL RESULT: True

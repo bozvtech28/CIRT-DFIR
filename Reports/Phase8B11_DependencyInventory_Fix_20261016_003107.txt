@@ -1,0 +1,30 @@
+﻿CIRT DFIR PROFESSIONAL - PHASE 8B.11 DEPENDENCY INVENTORY CORRECTION
+Timestamp: 2026-10-16T00:31:07.7273683+08:00
+Python process exit code: 0
+
+STANDARD OUTPUT:
+REQUIREMENTS_FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\requirements.txt
+FASTAPI_DECLARED: True
+CRYPTOGRAPHY_DECLARED: False
+MODULE_AVAILABLE_CRYPTOGRAPHY: False
+MODULE_AVAILABLE_JWT: False
+MODULE_AVAILABLE_JOSE: False
+MODULE_AVAILABLE_FASTAPI: True
+MODULE_AVAILABLE_PYTEST: True
+PACKAGE_VERSION_cryptography: NOT INSTALLED
+PACKAGE_VERSION_PyJWT: NOT INSTALLED
+PACKAGE_VERSION_python-jose: NOT INSTALLED
+PACKAGE_VERSION_fastapi: 0.143.2
+PACKAGE_VERSION_pytest: 8.4.2
+
+
+STANDARD ERROR:
+
+
+Authentication gate 401 marker present: True
+RS256 test remains deferred: True
+No packages installed or updated.
+No server started.
+No identity provider contacted.
+Production OIDC authentication: NOT IMPLEMENTED.
+Temporary work directory: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\Phase8B11_Fix_20261016_003107

@@ -1,0 +1,69 @@
+﻿CIRT DFIR PROFESSIONAL - PHASE 8B.50
+Microsoft Entra Authentication Blocker Review
+Timestamp: 2026-10-16T01:49:32.3146960+08:00
+Mode: READ-ONLY SOURCE REVIEW
+Project root: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional
+Backup directory: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\Phase8B50_20261016_014932
+Report path: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase8B50_EntraBlockerReview_20261016_014932.txt
+
+SAFETY
+Application source modifications: NONE
+Packages installed: NO
+Application server started: NO
+Microsoft endpoints contacted: NO
+Access tokens requested: NO
+Authentication gate changed: NO
+Environment variable values or secrets printed: NO
+
+SECTION 1 - REVIEW FILE INVENTORY
+Existing files backed up: 17
+Missing expected files: 0
+
+SECTION 2 - BACKEND AUTHENTICATION
+Fail-closed auth gate marker found: True
+Case read permission dependency found: True
+Case update permission dependency found: True
+Offline Entra token verifier file exists: True
+Offline JWKS resolver file exists: True
+OIDC claims module exists: True
+Verifier referenced by main.py: False
+JWKS resolver referenced by main.py: False
+Verifier referenced by auth_dependencies.py: False
+JWKS resolver referenced by auth_dependencies.py: False
+PyJWT dependency declaration present: True
+cryptography dependency declaration present: True
+
+SECTION 3 - FRONTEND AUTHENTICATION READINESS
+Frontend package.json parses: True
+MSAL browser dependency declared: False
+MSAL React dependency declared: False
+Frontend sign-in/token acquisition marker found: False
+Frontend bearer/access-token marker found: False
+Vite API proxy marker found: True
+
+SECTION 4 - CONFIGURATION PRESENCE
+Worksheet exists: True
+Admin checklist exists: True
+ENTRA_TENANT_ID configured in process/user/machine environment: False
+ENTRA_API_AUDIENCE configured in process/user/machine environment: False
+ENTRA_EXPECTED_ISSUER configured in process/user/machine environment: False
+ENTRA_FRONTEND_CLIENT_ID configured in process/user/machine environment: False
+Worksheet placeholder matches: 18
+Configuration values themselves were not recorded.
+
+SECTION 5 - REVIEW CONCLUSION
+Fail-closed protection preserved: True
+Production integration static readiness indicators all present: False
+This report does not prove real-token verification or deployment security.
+No Microsoft identity endpoints were contacted.
+No application source files were modified.
+Overall result: BLOCKED - CONTINUE DESIGN AND ADMIN CONFIGURATION INTAKE
+
+NEXT REQUIRED ITEMS
+1. Obtain approved Entra tenant, API audience/issuer, frontend client ID, scope, and app-role values from the authorized administrator.
+2. Implement a trusted discovery/JWKS retrieval and key-rotation strategy before using the offline verifier in production.
+3. Integrate verification into the fail-closed authentication dependency and map only trusted Entra app roles.
+4. Implement frontend sign-in and attach the correct API access token.
+5. Validate audit subject attribution, HTTPS, CORS, logging, and deployment security before enabling access.
+
+END OF REPORT

@@ -1,0 +1,27 @@
+﻿PHASE 8B139 - PRODUCTION READINESS AUDIT
+Timestamp: 20261017_193720
+Mode: READ ONLY
+
+CIRT_DFIR_ENTRA_TENANT_ID : Configured=False; Scopes=
+CIRT_DFIR_ENTRA_EXPECTED_ISSUER : Configured=False; Scopes=
+CIRT_DFIR_ENTRA_AUDIENCE : Configured=False; Scopes=
+
+=== FILE PRESENCE ===
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\.env : Exists=False
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\.env.example : Exists=False
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\.env.sample : Exists=False
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\.env : Exists=False
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\.env.example : Exists=False
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\.env.sample : Exists=False
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\README.md : Exists=False
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\README.md : Exists=True
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\requirements.txt : Exists=True
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_authenticator.py : Exists=True
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\auth_dependencies.py : Exists=True
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\main.py : Exists=True
+
+RESULT: BLOCKED - required Entra configuration is not present in environment scopes.
+Missing: CIRT_DFIR_ENTRA_TENANT_ID
+Missing: CIRT_DFIR_ENTRA_EXPECTED_ISSUER
+Missing: CIRT_DFIR_ENTRA_AUDIENCE
+Production files modified: No

@@ -1,0 +1,11 @@
+﻿CIRT DFIR PROFESSIONAL - PHASE 8B.10 RECOVERY
+Timestamp: 2026-10-16T00:28:54.2526309+08:00
+Backend pytest exit code: 0
+Authentication gate fail-closed marker present: True
+RS256 test source preserved outside pytest collection: True
+Backup directory: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\Phase8B10_Recovery_20261016_002852
+No dependencies installed.
+No server started.
+No identity provider contacted.
+RS256 tests: DEFERRED pending approved cryptography dependency.
+Production OIDC authentication: NOT IMPLEMENTED.

@@ -1,0 +1,42 @@
+﻿Phase 6C - API Test Discovery Diagnostic
+Timestamp: 2026-10-15 23:32:47
+API test file: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_api.py
+pytest available: False
+Test exit code: 5
+Test stdout file: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase6C_APITest_stdout_20261015_233245.txt
+Test stderr file: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase6C_APITest_stderr_20261015_233245.txt
+
+=== TEST SOURCE ===
+from fastapi.testclient import TestClient
+
+from app.main import app
+
+client = TestClient(app)
+
+
+def test_health_endpoint() -> None:
+    response = client.get("/api/v1/health")
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
+    assert response.json()["mode"] == "development-scaffold"
+
+
+def test_demo_cases_are_synthetic() -> None:
+    response = client.get("/api/v1/demo/cases")
+    assert response.status_code == 200
+    cases = response.json()
+    assert len(cases) == 3
+    assert all(item["case_id"].startswith("DEMO-") for item in cases)
+
+
+=== TEST OUTPUT ===
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+  from starlette.testclient import TestClient as TestClient  # noqa
+
+----------------------------------------------------------------------
+Ran 0 tests in 0.000s
+
+NO TESTS RAN
+
+
+Result: FAIL - inspect output before changing anything

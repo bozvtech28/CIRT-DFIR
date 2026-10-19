@@ -1,0 +1,177 @@
+...F....                                                                 [100%]
+================================== FAILURES ===================================
+______________ test_case_update_audit_actor_comes_from_principal ______________
+
+tmp_path = WindowsPath('C:/Users/BOZVLENOVO7/AppData/Local/Temp/pytest-of-DESKTOP-LNVO7/pytest-0/test_case_update_audit_actor_c0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001EEDE3DEC30>
+
+    def test_case_update_audit_actor_comes_from_principal(tmp_path, monkeypatch):
+        import app.case_store as case_store
+        from app.case_repository import connect, initialize, create_case, list_audit_events
+        from app.security import ROLE_ANALYST
+    
+        database_path = tmp_path / "audit-attribution.sqlite"
+        schema_path = __import__("pathlib").Path(__file__).resolve().parents[1] / "schema.sql"
+        if not schema_path.is_file():
+            # Find the project's schema file without touching the configured application database.
+            candidates = list(__import__("pathlib").Path(__file__).resolve().parents[1].rglob("*.sql"))
+            assert candidates, "No SQL schema file found for isolated test database."
+            schema_path = candidates[0]
+    
+        initialize(database_path, schema_path)
+        db = connect(database_path)
+        try:
+            create_case(
+                db,
+                case_id="TEST-AUDIT-001",
+                title="Synthetic audit attribution test",
+                severity="Medium",
+                status="Triage",
+                actor_id="synthetic-test-creator",
+                timestamp="2026-01-01T00:00:00+00:00",
+            )
+        finally:
+            db.close()
+    
+        monkeypatch.setattr(case_store, "DB_PATH", database_path)
+        app.dependency_overrides[get_current_principal] = lambda: Principal(
+            subject="synthetic-audit-analyst-117",
+            roles=frozenset({ROLE_ANALYST}),
+        )
+        try:
+>           response = client.patch(
+                "/api/v1/cases/TEST-AUDIT-001",
+                json={"status": "Contained"},
+            )
+
+tests\test_api_auth_gate.py:78: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+.venv\Lib\site-packages\httpx\_client.py:1218: in patch
+    return self.request(
+.venv\Lib\site-packages\starlette\testclient.py:457: in request
+    return super().request(
+.venv\Lib\site-packages\httpx\_client.py:825: in request
+    return self.send(request, auth=auth, follow_redirects=follow_redirects)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\httpx\_client.py:914: in send
+    response = self._send_handling_auth(
+.venv\Lib\site-packages\httpx\_client.py:942: in _send_handling_auth
+    response = self._send_handling_redirects(
+.venv\Lib\site-packages\httpx\_client.py:979: in _send_handling_redirects
+    response = self._send_single_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\httpx\_client.py:1014: in _send_single_request
+    response = transport.handle_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\starlette\testclient.py:354: in handle_request
+    raise exc
+.venv\Lib\site-packages\starlette\testclient.py:351: in handle_request
+    portal.call(self.app, scope, receive, send)
+..\..\..\CIRT_DFIR_Collector_Tools\Upgrade-Workspace\CIRT_DFIR_Upgrade_20261015_223611\platform\backend\.venv\Lib\site-packages\anyio\from_thread.py:340: in call
+    return cast(T_Retval, self.start_task_soon(func, *args).result())
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\concurrent\futures\_base.py:456: in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+..\..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\concurrent\futures\_base.py:401: in __get_result
+    raise self._exception
+..\..\..\CIRT_DFIR_Collector_Tools\Upgrade-Workspace\CIRT_DFIR_Upgrade_20261015_223611\platform\backend\.venv\Lib\site-packages\anyio\from_thread.py:265: in _call_func
+    retval = await retval_or_awaitable
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\fastapi\applications.py:1216: in __call__
+    await super().__call__(scope, receive, send)
+.venv\Lib\site-packages\starlette\applications.py:96: in __call__
+    await self.middleware_stack(scope, receive, send)
+.venv\Lib\site-packages\starlette\middleware\errors.py:186: in __call__
+    raise exc
+.venv\Lib\site-packages\starlette\middleware\errors.py:164: in __call__
+    await self.app(scope, receive, _send)
+.venv\Lib\site-packages\fastapi\telemetry\_asgi.py:151: in __call__
+    await self.app(scope, receive, send)
+.venv\Lib\site-packages\starlette\middleware\exceptions.py:63: in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+.venv\Lib\site-packages\starlette\_exception_handler.py:53: in wrapped_app
+    raise exc
+.venv\Lib\site-packages\starlette\_exception_handler.py:42: in wrapped_app
+    await app(scope, receive, sender)
+.venv\Lib\site-packages\fastapi\middleware\asyncexitstack.py:18: in __call__
+    await self.app(scope, receive, send)
+.venv\Lib\site-packages\starlette\routing.py:676: in __call__
+    await self.middleware_stack(scope, receive, send)
+.venv\Lib\site-packages\fastapi\routing.py:2791: in app
+    await route.handle(scope, receive, send)
+.venv\Lib\site-packages\fastapi\routing.py:1310: in handle
+    await super().handle(scope, receive, send)
+.venv\Lib\site-packages\starlette\routing.py:282: in handle
+    await self.app(scope, receive, send)
+.venv\Lib\site-packages\fastapi\routing.py:165: in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+.venv\Lib\site-packages\starlette\_exception_handler.py:53: in wrapped_app
+    raise exc
+.venv\Lib\site-packages\starlette\_exception_handler.py:42: in wrapped_app
+    await app(scope, receive, sender)
+.venv\Lib\site-packages\fastapi\routing.py:151: in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\fastapi\routing.py:727: in app
+    raw_response = await run_endpoint_function(
+.venv\Lib\site-packages\fastapi\routing.py:362: in run_endpoint_function
+    return await run_in_threadpool(
+.venv\Lib\site-packages\starlette\concurrency.py:34: in run_in_threadpool
+    return await anyio.to_thread.run_sync(func)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\CIRT_DFIR_Collector_Tools\Upgrade-Workspace\CIRT_DFIR_Upgrade_20261015_223611\platform\backend\.venv\Lib\site-packages\anyio\to_thread.py:65: in run_sync
+    return await get_async_backend().run_sync_in_worker_thread(
+..\..\..\CIRT_DFIR_Collector_Tools\Upgrade-Workspace\CIRT_DFIR_Upgrade_20261015_223611\platform\backend\.venv\Lib\site-packages\anyio\_backends\_asyncio.py:2706: in run_sync_in_worker_thread
+    return await future
+           ^^^^^^^^^^^^
+..\..\..\CIRT_DFIR_Collector_Tools\Upgrade-Workspace\CIRT_DFIR_Upgrade_20261015_223611\platform\backend\.venv\Lib\site-packages\anyio\_backends\_asyncio.py:1100: in run
+    result = context.run(func, *args)
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\fastapi\telemetry\_api.py:244: in _run_sync_endpoint
+    return function(**arguments)
+           ^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+case_id = 'TEST-AUDIT-001'
+payload = CaseUpdateRequest(status='Contained', severity=None)
+
+    @app.patch("/api/v1/cases/{case_id}", response_model=DemoCase, dependencies=[Depends(require_permission("cases:update"))])
+    def update_case_endpoint(
+        case_id: str,
+        payload: CaseUpdateRequest,
+    ) -> DemoCase:
+        """Development-only case update; uses synthetic development actor."""
+        if payload.status is None and payload.severity is None:
+            raise HTTPException(
+                status_code=422,
+                detail="Provide status, severity, or both.",
+            )
+    
+        try:
+            case_store.ensure_database()
+            db = connect(case_store.DB_PATH)
+            try:
+                updated = update_case(
+                    db,
+                    case_id=case_id,
+>                   actor_id=principal.subject,
+                             ^^^^^^^^^
+                    timestamp=__import__("datetime").datetime.now(
+                        __import__("datetime").timezone.utc
+                    ).isoformat(),
+                    status=payload.status,
+                    severity=payload.severity,
+                )
+E               NameError: name 'principal' is not defined
+
+app\main.py:83: NameError
+============================== warnings summary ===============================
+.venv\Lib\site-packages\fastapi\testclient.py:1
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/test_api_auth_gate.py::test_case_update_audit_actor_comes_from_principal
+1 failed, 7 passed, 1 warning in 0.88s

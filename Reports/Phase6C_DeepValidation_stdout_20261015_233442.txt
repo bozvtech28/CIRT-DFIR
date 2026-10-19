@@ -1,0 +1,8 @@
+PASS: SQLite database initializes
+PASS: Exactly three synthetic cases are available
+PASS: Three case-creation audit events exist
+PASS: Repeated initialization does not duplicate records
+PASS: Health and demo-case API endpoints return HTTP 200
+
+Checks passed: 5/5
+Checks failed: 0

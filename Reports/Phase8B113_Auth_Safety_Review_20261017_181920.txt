@@ -1,0 +1,69 @@
+﻿CIRT DFIR PROFESSIONAL - PHASE 8B.113
+Timestamp: 20261017_181920
+Mode: Read-only source inspection
+Network requests: None
+Servers started: None
+Production source changes: None
+Original collector/evidence changes: None
+
+========== BACKUP ==========
+BACKED UP: platform\backend\app\auth_dependencies.py
+BACKED UP: platform\backend\app\main.py
+BACKED UP: platform\backend\app\entra_bearer_adapter.py
+BACKED UP: platform\backend\app\entra_token_verifier.py
+BACKED UP: platform\backend\app\entra_principal.py
+BACKED UP: platform\backend\app\entra_jwks.py
+BACKED UP: platform\backend\app\entra_metadata_client.py
+BACKED UP: platform\backend\app\entra_http_transport.py
+BACKED UP: platform\backend\app\entra_jwks_cache.py
+BACKED UP: platform\backend\app\security.py
+BACKED UP: platform\backend\tests\test_api_auth_gate.py
+BACKED UP: platform\backend\tests\test_entra_bearer_adapter.py
+BACKED UP: platform\backend\tests\conftest.py
+Backup directory: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\Phase8B113_20261017_181920
+
+========== STATIC SAFETY CHECKS ==========
+PASS: Fail-closed authentication guard markers found.
+INFO: Bearer adapter is not directly referenced by auth_dependencies.py.
+FOUND adapter configuration marker: principal_from_authorization_header
+FOUND adapter configuration marker: trusted_key_resolver
+FOUND adapter configuration marker: expected_issuer
+FOUND adapter configuration marker: expected_audience
+FOUND adapter configuration marker: expected_tenant_id
+FOUND adapter configuration marker: approved_role_map
+FOUND token verifier marker: RS256
+FOUND token verifier marker: issuer
+FOUND token verifier marker: audience
+FOUND token verifier marker: expected_tenant_id
+FOUND token verifier marker: exp
+FOUND token verifier marker: nbf
+FOUND token verifier marker: sub
+REVIEW transport marker missing: allow_redirects
+FOUND transport marker: verify
+FOUND transport marker: trust_env
+FOUND transport marker: timeout
+FOUND transport marker: https
+FOUND JWKS key-selection marker: kid
+REVIEW: Confirm JWKS is obtained only from an approved trusted metadata flow.
+REVIEW REQUIRED: Development actor placeholder is present in API source.
+PASS: Case read/update permission dependencies found.
+NOTE: Static text checks are indicators, not proof of security.
+
+========== TEST INVENTORY ==========
+PRESENT: test_api_auth_gate.py
+PRESENT: test_entra_bearer_adapter.py
+PRESENT: test_entra_token_verifier.py
+PRESENT: test_entra_metadata_client.py
+PRESENT: test_entra_http_transport.py
+PRESENT: test_entra_jwks_cache.py
+PASS: Backend virtual environment Python exists.
+
+========== DECISION ==========
+Do not wire the Entra adapter into the live API yet.
+First obtain system-owner-approved tenant, issuer, audience, scope,
+application roles, role mapping, and trusted metadata/JWKS settings.
+Replace development audit attribution only through a reviewed change.
+Test with synthetic tokens and a test-only dependency override.
+Keep production authentication fail-closed until integration is approved.
+
+This report does not certify the system as production-ready.

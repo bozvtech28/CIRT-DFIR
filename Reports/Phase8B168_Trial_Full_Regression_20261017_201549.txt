@@ -1,0 +1,46 @@
+﻿CIRT-DFIR - PHASE 8B168
+Full Regression Test: Baseline-Matched Trial
+Timestamp: 2026-10-17 20:15:50
+Backend: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend
+Trial Python: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\.venv_phase8b166\Scripts\python.exe
+Original .venv will not be modified.
+
+Python: 3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]
+fastapi==0.143.2
+starlette==1.8.0
+httpx==0.28.1
+httpx2==2.13.1
+pytest==8.4.2
+pydantic==2.14.1
+
+====================================================================
+DEPENDENCY INTEGRITY
+====================================================================
+No broken requirements found.
+EXIT_CODE=0
+
+====================================================================
+TESTCLIENT WARNING PROBE
+====================================================================
+TestClient import succeeded.
+EXIT_CODE=0
+
+====================================================================
+FULL PYTEST REGRESSION
+====================================================================
+........................................................................ [ 24%]
+........................................................................ [ 49%]
+........................................................................ [ 74%]
+........................................................................ [ 99%]
+..                                                                       [100%]
+290 passed in 4.03s
+EXIT_CODE=0
+
+====================================================================
+PHASE 8B168 SUMMARY
+====================================================================
+Failed check groups: 0
+RESULT: PASS
+
+Driver exit code: 0
+Completed: 2026-10-17 20:15:58

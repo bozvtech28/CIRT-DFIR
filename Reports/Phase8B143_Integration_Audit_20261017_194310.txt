@@ -1,0 +1,71 @@
+﻿CIRT-DFIR - PHASE 8B143
+Read-only authentication integration audit
+Timestamp: 20261017_194310
+
+=== EXPECTED MODULES ===
+main.py : Exists=True
+auth_dependencies.py : Exists=True
+security.py : Exists=True
+entra_bearer_adapter.py : Exists=True
+entra_token_verifier.py : Exists=True
+entra_principal.py : Exists=True
+entra_jwks.py : Exists=True
+entra_jwks_cache.py : Exists=True
+entra_metadata_client.py : Exists=True
+entra_http_transport.py : Exists=True
+entra_authenticator.py : Exists=True
+
+=== AUTHENTICATION REFERENCES IN main.py ===
+Line 6: from app.auth_dependencies import require_permission
+Line 8: app = FastAPI(
+Line 68: principal = Depends(require_permission("cases:update")),
+Line 104: @app.get("/api/v1/demo/cases", response_model=list[DemoCase], dependencies=[Depends(require_permission("cases:read"))])
+
+=== AUTH DEPENDENCY REFERENCES ===
+Line 7: from fastapi import Depends, HTTPException
+Line 16: def get_current_principal() -> Principal:
+Line 18: raise HTTPException(
+Line 21: headers={"WWW-Authenticate": "Bearer"},
+Line 24: def require_permission(permission: str):
+Line 28: authorize(principal, permission)
+Line 30: raise HTTPException(
+Line 33: headers={"WWW-Authenticate": "Bearer"},
+Line 36: raise HTTPException(
+
+=== ROUTE AND TEST FILE INVENTORY ===
+Directory: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\routers
+  Directory not present.
+Directory: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\conftest.py
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_api.py
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_api_auth_gate.py
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_api_oidc_fail_closed.py
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_entra_authenticator.py
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_entra_bearer_adapter.py
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_entra_end_to_end_offline.py
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_entra_http_transport.py
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_entra_jwks.py
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_entra_jwks_cache.py
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_entra_jwks_cache_hardening.py
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_entra_metadata_client.py
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_entra_principal.py
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_entra_principal_authorization.py
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_entra_token_verifier.py
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_entra_verifier_jwks_integration.py
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_oidc_claims.py
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_security.py
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_synthetic_jwt_harness.py
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_synthetic_role_mapping.py
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_synthetic_rs256_harness.py
+
+=== REQUIRED CONFIGURATION PRESENCE ===
+CIRT_DFIR_ENTRA_TENANT_ID : Configured=False
+CIRT_DFIR_ENTRA_EXPECTED_ISSUER : Configured=False
+CIRT_DFIR_ENTRA_AUDIENCE : Configured=False
+
+=== AUDIT CONCLUSION ===
+This report is an inventory only; it does not establish that
+authentication integration is correct or production-ready.
+No source files or environment variables were changed.
+Production wiring remains blocked until configuration and role
+mapping are approved and the integration is security-tested.

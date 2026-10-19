@@ -1,0 +1,10 @@
+PASS | Synthetic fixture initialization | Initial status=Investigating; severity=High
+PASS | Case update fields | Status, severity, and updated_at verified
+PASS | Audit event before/after integrity | Exactly one update event; actor and before/after values verified
+PASS | Invalid update is non-mutating | Rejected update left case and audit history unchanged
+PASS | No-change update is rejected | No-change update rejected without mutation
+PASS | Audit failure rollback | Failed audit insert rolled back case changes
+
+SUMMARY | Passed=6 | Failed=0 | Total=6
+SCOPE | Temporary SQLite databases and synthetic case data only
+SCOPE | No server started; no production collector or real evidence accessed

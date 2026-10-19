@@ -1,0 +1,61 @@
+﻿CIRT DFIR PROFESSIONAL - PHASE 8B.100
+Timestamp: 20261016_125211
+Project: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional
+Backup: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\Phase8B100_20261016_125211
+Report: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase8B100_Entra_Preflight_20261016_125211.txt
+
+SAFETY
+Live Entra authentication enabled by this script: No
+Microsoft network requests made by this script: No
+Application source intentionally modified: No
+Collector or evidence accessed: No
+Servers started: No
+
+BACKUP RESULTS
+BACKED UP: platform\backend\app\auth_dependencies.py
+BACKED UP: platform\backend\app\entra_bearer_adapter.py
+BACKED UP: platform\backend\app\entra_token_verifier.py
+BACKED UP: platform\backend\app\entra_principal.py
+BACKED UP: platform\backend\app\security.py
+NOT PRESENT: platform\backend\main.py
+BACKED UP: platform\backend\tests\test_api_auth_gate.py
+BACKED UP: platform\backend\tests\test_entra_bearer_adapter.py
+BACKED UP: platform\frontend\src\App.tsx
+BACKED UP: platform\frontend\src\auth\entraConfig.ts
+BACKED UP: platform\frontend\src\auth\entraToken.ts
+BACKED UP: platform\frontend\src\auth\msalInstance.ts
+BACKED UP: platform\frontend\src\auth\authenticatedFetch.ts
+BACKED UP: platform\frontend\src\auth\AuthRoot.tsx
+BACKED UP: platform\frontend\.env.example
+BACKED UP: docs\ENTRA_AUTH_INTEGRATION_DESIGN.md
+BACKED UP: docs\ENTRA_ADMIN_CONFIGURATION_REQUEST.txt
+
+AUTHENTICATION GATE
+Fail-closed message present: True
+API source exists: False
+Frontend Entra configuration source exists: True
+Frontend .env.example has placeholders: True
+Local frontend .env exists: False
+
+BACKEND TESTS
+Command: project virtual environment Python -m pytest -q
+Exit code: 0
+Stdout log: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase8B100_Logs_20261016_125211\backend-tests.stdout.txt
+Stderr log: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase8B100_Logs_20261016_125211\backend-tests.stderr.txt
+
+FRONTEND BUILD
+Command: npm run build
+Exit code: 0
+Stdout log: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase8B100_Logs_20261016_125211\frontend-build.stdout.txt
+Stderr log: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase8B100_Logs_20261016_125211\frontend-build.stderr.txt
+
+FINAL STATUS
+Backend tests passed: True
+Frontend build passed: True
+Fail-closed message detected: True
+Preflight successful: True
+
+NEXT ACTION
+Review this report and the test/build logs.
+Do not enable live authentication until approved Entra settings are available.
+A passing test suite does not establish live Microsoft Entra integration.

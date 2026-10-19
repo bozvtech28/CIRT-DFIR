@@ -1,0 +1,143 @@
+﻿CIRT-DFIR PROFESSIONAL
+PHASE 8B.130 - READ-ONLY AUTHENTICATION AUDIT
+Timestamp: 20261017_190740
+Project root: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional
+Backend: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend
+Source edits: NONE
+Packages installed: NONE
+Servers started: NONE
+Secrets/environment files read: NO
+Network requests intentionally made: NONE
+
+=== 1. KEY FILES ===
+PRESENT | app\main.py | 3093 bytes
+PRESENT | app\auth_dependencies.py | 1522 bytes
+PRESENT | app\security.py | 2530 bytes
+PRESENT | app\entra_bearer_adapter.py | 2198 bytes
+PRESENT | app\entra_token_verifier.py | 2691 bytes
+PRESENT | app\entra_metadata_client.py | 5738 bytes
+PRESENT | app\entra_http_transport.py | 5208 bytes
+PRESENT | app\entra_jwks_cache.py | 3707 bytes
+PRESENT | app\entra_principal.py | 2671 bytes
+PRESENT | tests\test_api_auth_gate.py | 4287 bytes
+PRESENT | tests\test_api_oidc_fail_closed.py | 1063 bytes
+PRESENT | tests\test_entra_bearer_adapter.py | 5219 bytes
+PRESENT | tests\test_entra_token_verifier.py | 5078 bytes
+PRESENT | tests\test_entra_end_to_end_offline.py | 4688 bytes
+PRESENT | requirements.txt | 217 bytes
+
+=== 2. AUTHENTICATION WIRING ===
+
+--- app\main.py ---
+6: from app.auth_dependencies import require_permission
+57: @app.get("/api/v1/health", response_model=HealthResponse)
+64: @app.patch("/api/v1/cases/{case_id}", response_model=DemoCase)
+68: principal = Depends(require_permission("cases:update")),
+104: @app.get("/api/v1/demo/cases", response_model=list[DemoCase], dependencies=[Depends(require_permission("cases:read"))])
+
+--- app\auth_dependencies.py ---
+16: def get_current_principal() -> Principal:
+20: detail="Authentication is not configured. Access is denied by default.",
+24: def require_permission(permission: str):
+26: def dependency(principal: Principal = Depends(get_current_principal)) -> Principal:
+
+--- app\security.py ---
+23: "cases:read": frozenset({
+28: "cases:update": frozenset({
+
+=== 3. ENTRA ADAPTER AND VERIFIER INTERFACES ===
+
+--- app\entra_bearer_adapter.py ---
+1: """Offline-tested bearer-token adapter for the CIRT DFIR Entra integration.
+3: This module does not fetch metadata or JWKS and is not wired into FastAPI.
+11: from app.entra_principal import (
+12: PrincipalMappingError,
+13: principal_from_verified_claims,
+15: from app.entra_token_verifier import verify_entra_access_token
+16: from app.security import Principal
+19: class BearerAuthenticationError(Exception):
+20: """Raised when a bearer token cannot produce a trusted principal."""
+23: def principal_from_authorization_header(
+27: expected_issuer: str,
+28: expected_audience: str,
+29: expected_tenant_id: str,
+31: ) -> Principal:
+32: """Validate a Bearer header, verify its JWT, and map verified roles.
+35: untrusted JWKS data or configuration supplied by a browser/request body.
+38: raise BearerAuthenticationError("A Bearer authorization header is required.")
+45: or scheme.lower() != "bearer"
+49: raise BearerAuthenticationError("The authorization header is malformed.")
+52: claims = verify_entra_access_token(
+55: expected_issuer=expected_issuer,
+56: expected_audience=expected_audience,
+57: expected_tenant_id=expected_tenant_id,
+59: return principal_from_verified_claims(
+63: except (InvalidTokenError, PrincipalMappingError, ValueError) as exc:
+64: raise BearerAuthenticationError(
+65: "Bearer token validation or role mapping failed."
+
+--- app\entra_token_verifier.py ---
+6: OpenID Connect metadata/JWKS, with HTTPS and safe key-rotation handling.
+8: - Never use this verifier until tenant, issuer, and audience are approved.
+19: def verify_entra_access_token(
+23: expected_issuer: str,
+24: expected_audience: str,
+25: expected_tenant_id: str,
+27: """Verify an RS256 token against a trusted key resolver and fixed config.
+30: trusted JWKS source. This function deliberately performs no network access.
+33: raise InvalidTokenError("A non-empty bearer token is required.")
+36: ("expected_issuer", expected_issuer),
+37: ("expected_audience", expected_audience),
+38: ("expected_tenant_id", expected_tenant_id),
+46: # The key resolver must select a key from a trusted JWKS source.
+56: issuer=expected_issuer,
+57: audience=expected_audience,
+60: "verify_signature": True,
+61: "verify_exp": True,
+62: "verify_iat": True,
+63: "verify_nbf": True,
+64: "verify_iss": True,
+65: "verify_aud": True,
+73: if claims.get("tid") != expected_tenant_id:
+74: raise InvalidTokenError("The token tenant does not match the configured tenant.")
+
+--- app\entra_principal.py ---
+4: Only pass the claims returned by verify_entra_access_token after successful
+5: cryptographic and issuer/audience/tenant validation. This module does not
+6: validate token signatures or establish claim provenance.
+14: from app.security import KNOWN_ROLES, Principal
+17: class PrincipalMappingError(ValueError):
+18: """Raised when verified claims cannot safely become an application principal."""
+21: def principal_from_verified_claims(
+25: ) -> Principal:
+26: """Create an internal Principal from verified claims and an explicit role map."""
+28: raise PrincipalMappingError("Verified claims must be a mapping.")
+32: raise PrincipalMappingError("A non-empty subject claim is required.")
+35: raise PrincipalMappingError("An explicit server-side role map is required.")
+39: raise PrincipalMappingError("Role-map keys must be non-empty strings.")
+41: raise PrincipalMappingError("Role map contains an unrecognized internal role.")
+45: raise PrincipalMappingError("A non-empty roles array is required.")
+48: raise PrincipalMappingError("Every application role must be a non-empty string.")
+51: raise PrincipalMappingError("Duplicate application roles are not accepted.")
+55: raise PrincipalMappingError("Claims contain an unapproved application role.")
+59: raise PrincipalMappingError("No approved internal roles were resolved.")
+61: return Principal(subject=subject.strip(), roles=internal_roles)
+
+=== 4. AUTHENTICATION TEST NAMES ===
+
+
+=== 5. DEPENDENCY SUMMARY ===
+fastapi>=0.115,<1.0
+uvicorn[standard]>=0.34,<1.0
+pydantic>=2.10,<3.0
+pytest>=8.3,<9.0
+httpx>=0.28,<1.0
+PyJWT==2.15.1
+cryptography==50.0.2
+
+=== 6. AUDIT LIMITATIONS ===
+This report inventories source patterns and test names; it does not certify production readiness.
+No production authentication integration was performed.
+Keep authentication fail-closed until the implementation and HTTP-level tests are reviewed.
+
+AUDIT REPORT WRITTEN

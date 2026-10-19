@@ -1,0 +1,2492 @@
+﻿
+================================================================================
+FILE: app\auth_dependencies.py
+EXISTS: True
+================================================================================
+"""Fail-closed authentication gate pending approved OIDC integration.
+
+This module intentionally authenticates nobody. Replace the placeholder
+identity provider integration only after the organization chooses a provider.
+Never trust roles supplied by a browser or request body.
+"""
+from fastapi import Depends, HTTPException
+
+from app.security import (
+    AuthenticationRequired,
+    AuthorizationDenied,
+    Principal,
+    authorize,
+)
+
+def get_current_principal() -> Principal:
+    """Reject all requests until real token/session validation is implemented."""
+    raise HTTPException(
+        status_code=401,
+        detail="Authentication is not configured. Access is denied by default.",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+def require_permission(permission: str):
+    """Require a validated principal and enforce the RBAC permission."""
+    def dependency(principal: Principal = Depends(get_current_principal)) -> Principal:
+        try:
+            authorize(principal, permission)
+        except AuthenticationRequired as exc:
+            raise HTTPException(
+                status_code=401,
+                detail="Authentication required.",
+                headers={"WWW-Authenticate": "Bearer"},
+            ) from exc
+        except AuthorizationDenied as exc:
+            raise HTTPException(
+                status_code=403,
+                detail="Insufficient permission.",
+            ) from exc
+        return principal
+    return dependency
+
+
+================================================================================
+FILE: app\main.py
+EXISTS: True
+================================================================================
+from fastapi import FastAPI, HTTPException, Depends
+from pydantic import BaseModel, ConfigDict
+from app import case_store
+from app.case_repository import connect, update_case
+from app.case_store import list_demo_cases
+from app.auth_dependencies import require_permission
+
+app = FastAPI(
+    title="CIRT DFIR Platform API",
+    version="0.1.0",
+    description="Development scaffold only. Synthetic data; no evidence intake.",
+)
+
+
+class HealthResponse(BaseModel):
+    status: str
+    mode: str
+
+
+
+
+class CaseUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: str | None = None
+    severity: str | None = None
+
+class DemoCase(BaseModel):
+    case_id: str
+    title: str
+    severity: str
+    status: str
+
+
+DEMO_CASES = [
+    DemoCase(
+        case_id="DEMO-2026-001",
+        title="Endpoint Alert Review",
+        severity="High",
+        status="Investigating",
+    ),
+    DemoCase(
+        case_id="DEMO-2026-002",
+        title="Suspicious Login Review",
+        severity="Medium",
+        status="Triage",
+    ),
+    DemoCase(
+        case_id="DEMO-2026-003",
+        title="Mailbox Rule Assessment",
+        severity="Medium",
+        status="Evidence review",
+    ),
+]
+
+
+@app.get("/api/v1/health", response_model=HealthResponse)
+def health() -> HealthResponse:
+    return HealthResponse(status="ok", mode="development-scaffold")
+
+
+
+
+@app.patch("/api/v1/cases/{case_id}", response_model=DemoCase)
+def update_case_endpoint(
+    case_id: str,
+    payload: CaseUpdateRequest,
+    principal = Depends(require_permission("cases:update")),
+) -> DemoCase:
+    """Update a case; audit attribution uses the authenticated principal subject."""
+    if payload.status is None and payload.severity is None:
+        raise HTTPException(
+            status_code=422,
+            detail="Provide status, severity, or both.",
+        )
+
+    try:
+        case_store.ensure_database()
+        db = connect(case_store.DB_PATH)
+        try:
+            updated = update_case(
+                db,
+                case_id=case_id,
+                actor_id=principal.subject,
+                timestamp=__import__("datetime").datetime.now(
+                    __import__("datetime").timezone.utc
+                ).isoformat(),
+                status=payload.status,
+                severity=payload.severity,
+            )
+        finally:
+            db.close()
+    except ValueError as exc:
+        message = str(exc)
+        if message == "Update contains no case changes.":
+            raise HTTPException(status_code=409, detail=message) from exc
+        raise HTTPException(status_code=422, detail=message) from exc
+
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Case not found.")
+
+    return DemoCase(**updated)
+
+@app.get("/api/v1/demo/cases", response_model=list[DemoCase], dependencies=[Depends(require_permission("cases:read"))])
+def get_demo_cases() -> list[DemoCase]:
+    return [DemoCase(**item) for item in list_demo_cases()]
+
+
+
+
+================================================================================
+FILE: app\security.py
+EXISTS: True
+================================================================================
+"""RBAC policy foundation for CIRT DFIR Professional.
+
+This module authorizes an already authenticated principal.
+It does not authenticate users or validate OIDC tokens.
+Do not treat a caller-created Principal as proof of identity.
+"""
+
+from dataclasses import dataclass
+from typing import FrozenSet
+
+
+ROLE_ADMINISTRATOR = "Administrator"
+ROLE_ANALYST = "DFIR Analyst"
+ROLE_VIEWER = "Viewer"
+
+KNOWN_ROLES: FrozenSet[str] = frozenset({
+    ROLE_ADMINISTRATOR,
+    ROLE_ANALYST,
+    ROLE_VIEWER,
+})
+
+PERMISSIONS = {
+    "cases:read": frozenset({
+        ROLE_ADMINISTRATOR,
+        ROLE_ANALYST,
+        ROLE_VIEWER,
+    }),
+    "cases:update": frozenset({
+        ROLE_ADMINISTRATOR,
+        ROLE_ANALYST,
+    }),
+    "users:manage": frozenset({
+        ROLE_ADMINISTRATOR,
+    }),
+    "audit:read": frozenset({
+        ROLE_ADMINISTRATOR,
+    }),
+}
+
+
+@dataclass(frozen=True)
+class Principal:
+    """Identity and roles supplied by a trusted authentication layer."""
+    subject: str
+    roles: FrozenSet[str]
+
+
+class AuthenticationRequired(PermissionError):
+    """Raised when no authenticated principal is available."""
+
+
+class AuthorizationDenied(PermissionError):
+    """Raised when the principal lacks the required permission."""
+
+
+def validate_principal(principal: Principal | None) -> Principal:
+    if principal is None:
+        raise AuthenticationRequired("Authentication is required.")
+    if not isinstance(principal, Principal):
+        raise AuthenticationRequired("A trusted principal is required.")
+    if not isinstance(principal.subject, str) or not principal.subject.strip():
+        raise AuthenticationRequired("Principal subject is missing.")
+    if not principal.roles:
+        raise AuthorizationDenied("Principal has no assigned roles.")
+    if not principal.roles.issubset(KNOWN_ROLES):
+        raise AuthorizationDenied("Principal contains an unknown role.")
+    return principal
+
+
+def authorize(principal: Principal | None, permission: str) -> bool:
+    """Authorize a trusted principal for a named permission.
+
+    The caller must obtain the principal from a verified authentication
+    mechanism, such as validated OIDC claims. Never build it from request
+    fields supplied by the client.
+    """
+    trusted = validate_principal(principal)
+    allowed_roles = PERMISSIONS.get(permission)
+    if allowed_roles is None:
+        raise AuthorizationDenied("Unknown permission.")
+    if trusted.roles.isdisjoint(allowed_roles):
+        raise AuthorizationDenied("Permission denied.")
+    return True
+
+
+================================================================================
+FILE: requirements.txt
+EXISTS: True
+================================================================================
+fastapi>=0.115,<1.0
+uvicorn[standard]>=0.34,<1.0
+pydantic>=2.10,<3.0
+pytest>=8.3,<9.0
+httpx>=0.28,<1.0
+PyJWT==2.15.1
+
+# Phase 8B.48 - versions verified in the project virtual environment
+cryptography==50.0.2
+
+
+================================================================================
+FILE: pyproject.toml
+EXISTS: False
+================================================================================
+
+================================================================================
+RELEVANT TEST FILES
+================================================================================
+
+--------------------------------------------------------------------------------
+TEST FILE: tests\test_api_auth_gate.py
+--------------------------------------------------------------------------------
+"""API access-control tests using synthetic identities only."""
+from fastapi.testclient import TestClient
+
+from app.auth_dependencies import get_current_principal
+from app.main import app
+from app.security import Principal, ROLE_ADMINISTRATOR, ROLE_VIEWER
+
+client = TestClient(app)
+
+def test_demo_cases_reject_unauthenticated_request():
+    app.dependency_overrides.clear()
+    try:
+        response = client.get("/api/v1/demo/cases")
+        assert response.status_code == 401
+        assert "Authentication" in response.json()["detail"]
+    finally:
+        app.dependency_overrides.clear()
+
+def test_case_update_rejects_unauthenticated_request():
+    app.dependency_overrides.clear()
+    try:
+        response = client.patch(
+            "/api/v1/cases/DEMO-2026-001",
+            json={"status": "Contained"},
+        )
+        assert response.status_code == 401
+    finally:
+        app.dependency_overrides.clear()
+
+def test_viewer_cannot_update_case():
+    app.dependency_overrides[get_current_principal] = lambda: Principal(
+        subject="synthetic-test-viewer",
+        roles=frozenset({ROLE_VIEWER}),
+    )
+    try:
+        response = client.patch(
+            "/api/v1/cases/DEMO-2026-001",
+            json={"status": "Contained"},
+        )
+        assert response.status_code == 403
+    finally:
+        app.dependency_overrides.clear()
+
+def test_case_update_audit_actor_comes_from_principal(tmp_path, monkeypatch):
+    import app.case_store as case_store
+    from app.case_repository import connect, initialize, create_case, list_audit_events
+    from app.security import ROLE_ANALYST
+
+    database_path = tmp_path / "audit-attribution.sqlite"
+    schema_path = __import__("pathlib").Path(__file__).resolve().parents[1] / "schema.sql"
+    if not schema_path.is_file():
+        # Find the project's schema file without touching the configured application database.
+        candidates = list(__import__("pathlib").Path(__file__).resolve().parents[1].rglob("*.sql"))
+        assert candidates, "No SQL schema file found for isolated test database."
+        schema_path = candidates[0]
+
+    initialize(database_path, schema_path)
+    db = connect(database_path)
+    try:
+        create_case(
+            db,
+            case_id="TEST-AUDIT-001",
+            title="Synthetic audit attribution test",
+            severity="Medium",
+            status="Triage",
+            actor_id="synthetic-test-creator",
+            timestamp="2026-01-01T00:00:00+00:00",
+        )
+    finally:
+        db.close()
+
+    monkeypatch.setattr(case_store, "DB_PATH", database_path)
+    app.dependency_overrides[get_current_principal] = lambda: Principal(
+        subject="synthetic-audit-analyst-117",
+        roles=frozenset({ROLE_ANALYST}),
+    )
+    try:
+        response = client.patch(
+            "/api/v1/cases/TEST-AUDIT-001",
+            json={"status": "Contained"},
+        )
+        assert response.status_code == 200, response.text
+
+        db = connect(database_path)
+        try:
+            events = list_audit_events(db, "TEST-AUDIT-001")
+        finally:
+            db.close()
+
+        update_events = [event for event in events if event["event_type"] == "CASE_UPDATED"]
+        assert len(update_events) == 1
+        assert update_events[0]["actor_id"] == "synthetic-audit-analyst-117"
+    finally:
+        app.dependency_overrides.clear()
+
+def test_admin_can_pass_case_update_authorization_gate():
+    # Dependency override represents an already validated synthetic principal.
+    # This test checks authorization only; it does not perform a database update.
+    from app.auth_dependencies import require_permission
+    from fastapi import Depends, FastAPI
+    from fastapi.testclient import TestClient as LocalClient
+
+    test_app = FastAPI()
+    test_app.dependency_overrides[get_current_principal] = lambda: Principal(
+        subject="synthetic-test-admin",
+        roles=frozenset({ROLE_ADMINISTRATOR}),
+    )
+
+    @test_app.get("/test-protected-update-permission")
+    def protected_permission_check(principal=Depends(require_permission("cases:update"))):
+        return {"authorized": True}
+
+    response = LocalClient(test_app).get("/test-protected-update-permission")
+    assert response.status_code == 200
+    assert response.json()["authorized"] is True
+
+
+
+--------------------------------------------------------------------------------
+TEST FILE: tests\test_entra_bearer_adapter.py
+--------------------------------------------------------------------------------
+import json
+import time
+
+import jwt
+import pytest
+from cryptography.hazmat.primitives.asymmetric import rsa
+
+from app.entra_bearer_adapter import (
+    BearerAuthenticationError,
+    principal_from_authorization_header,
+)
+from app.entra_jwks import build_jwks_resolver
+from app.security import (
+    ROLE_ADMINISTRATOR,
+    ROLE_ANALYST,
+    ROLE_VIEWER,
+    AuthorizationDenied,
+    authorize,
+)
+
+TENANT = "11111111-2222-4333-8444-555555555555"
+ISSUER = f"https://login.microsoftonline.com/{TENANT}/v2.0"
+AUDIENCE = "api://synthetic-cirt-dfir-api"
+ROLE_MAP = {
+    "CIRT.DFIR.Viewer": ROLE_VIEWER,
+    "CIRT.DFIR.Analyst": ROLE_ANALYST,
+    "CIRT.DFIR.Administrator": ROLE_ADMINISTRATOR,
+}
+
+
+@pytest.fixture
+def identity():
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048,
+    )
+    public_jwk = json.loads(
+        jwt.algorithms.RSAAlgorithm.to_jwk(private_key.public_key())
+    )
+    public_jwk.update({
+        "kid": "offline-adapter-test-key",
+        "use": "sig",
+        "alg": "RS256",
+    })
+    resolver = build_jwks_resolver({"keys": [public_jwk]})
+
+    def issue_token(roles=None, **overrides):
+        now = int(time.time())
+        claims = {
+            "iss": ISSUER,
+            "aud": AUDIENCE,
+            "sub": "synthetic-adapter-user",
+            "tid": TENANT,
+            "iat": now,
+            "nbf": now,
+            "exp": now + 300,
+            "roles": roles if roles is not None else ["CIRT.DFIR.Analyst"],
+        }
+        claims.update(overrides)
+        return jwt.encode(
+            claims,
+            private_key,
+            algorithm="RS256",
+            headers={"kid": "offline-adapter-test-key"},
+        )
+
+    return resolver, issue_token
+
+
+def authenticate(header, resolver):
+    return principal_from_authorization_header(
+        header,
+        trusted_key_resolver=resolver,
+        expected_issuer=ISSUER,
+        expected_audience=AUDIENCE,
+        expected_tenant_id=TENANT,
+        approved_role_map=ROLE_MAP,
+    )
+
+
+def test_valid_analyst_bearer_produces_principal(identity):
+    resolver, issue = identity
+    principal = authenticate("Bearer " + issue(), resolver)
+    assert principal.subject == "synthetic-adapter-user"
+    assert principal.roles == frozenset({ROLE_ANALYST})
+    assert authorize(principal, "cases:read")
+    assert authorize(principal, "cases:update")
+
+
+def test_viewer_cannot_update(identity):
+    resolver, issue = identity
+    principal = authenticate(
+        "Bearer " + issue(roles=["CIRT.DFIR.Viewer"]),
+        resolver,
+    )
+    with pytest.raises(AuthorizationDenied):
+        authorize(principal, "cases:update")
+
+
+def test_administrator_can_pass_admin_permission(identity):
+    resolver, issue = identity
+    principal = authenticate(
+        "Bearer " + issue(roles=["CIRT.DFIR.Administrator"]),
+        resolver,
+    )
+    assert authorize(principal, "users:manage")
+    assert authorize(principal, "audit:read")
+
+
+@pytest.mark.parametrize(
+    "header",
+    [
+        None,
+        "",
+        "Basic abc",
+        "Bearer",
+        "Bearer ",
+        "Bearer first second",
+    ],
+)
+def test_missing_or_malformed_header_is_rejected(identity, header):
+    resolver, _ = identity
+    with pytest.raises(BearerAuthenticationError):
+        authenticate(header, resolver)
+
+
+def test_tampered_token_is_rejected(identity):
+    resolver, issue = identity
+    token = issue()
+    header, payload, signature = token.split(".")
+    altered = ("A" if signature[0] != "A" else "B") + signature[1:]
+    with pytest.raises(BearerAuthenticationError):
+        authenticate(f"Bearer {header}.{payload}.{altered}", resolver)
+
+
+def test_wrong_tenant_is_rejected(identity):
+    resolver, issue = identity
+    with pytest.raises(BearerAuthenticationError):
+        authenticate(
+            "Bearer " + issue(tid="aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"),
+            resolver,
+        )
+
+
+def test_unapproved_role_is_rejected(identity):
+    resolver, issue = identity
+    with pytest.raises(BearerAuthenticationError):
+        authenticate(
+            "Bearer " + issue(roles=["CIRT.DFIR.Unapproved"]),
+            resolver,
+        )
+
+
+def test_empty_roles_are_rejected(identity):
+    resolver, issue = identity
+    with pytest.raises(BearerAuthenticationError):
+        authenticate("Bearer " + issue(roles=[]), resolver)
+
+def test_wrong_audience_is_rejected(identity):
+    resolver, issue = identity
+    with pytest.raises(BearerAuthenticationError):
+        authenticate("Bearer " + issue(aud="api://wrong-synthetic-audience"), resolver)
+
+
+def test_wrong_issuer_is_rejected(identity):
+    resolver, issue = identity
+    with pytest.raises(BearerAuthenticationError):
+        authenticate("Bearer " + issue(iss="https://invalid.example/tenant/v2.0"), resolver)
+
+
+def test_expired_token_is_rejected(identity):
+    resolver, issue = identity
+    with pytest.raises(BearerAuthenticationError):
+        authenticate("Bearer " + issue(exp=int(time.time()) - 60), resolver)
+
+
+def test_future_issued_token_is_rejected(identity):
+    resolver, issue = identity
+    with pytest.raises(BearerAuthenticationError):
+        authenticate("Bearer " + issue(iat=int(time.time()) + 120), resolver)
+
+
+--------------------------------------------------------------------------------
+TEST FILE: tests\test_entra_end_to_end_offline.py
+--------------------------------------------------------------------------------
+import json
+import time
+
+import jwt
+import pytest
+from cryptography.hazmat.primitives.asymmetric import rsa
+from jwt import InvalidTokenError
+
+from app.entra_jwks import build_jwks_resolver
+from app.entra_principal import (
+    PrincipalMappingError,
+    principal_from_verified_claims,
+)
+from app.entra_token_verifier import verify_entra_access_token
+from app.security import (
+    AuthorizationDenied,
+    ROLE_ADMINISTRATOR,
+    ROLE_ANALYST,
+    ROLE_VIEWER,
+    authorize,
+)
+
+TENANT_ID = "11111111-2222-4333-8444-555555555555"
+ISSUER = f"https://login.microsoftonline.com/{TENANT_ID}/v2.0"
+AUDIENCE = "api://synthetic-cirt-dfir-api"
+ROLE_MAP = {
+    "CIRT.DFIR.Viewer": ROLE_VIEWER,
+    "CIRT.DFIR.Analyst": ROLE_ANALYST,
+    "CIRT.DFIR.Administrator": ROLE_ADMINISTRATOR,
+}
+
+
+@pytest.fixture
+def identity_material():
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048,
+    )
+    public_jwk = json.loads(
+        jwt.algorithms.RSAAlgorithm.to_jwk(private_key.public_key())
+    )
+    public_jwk.update({
+        "kid": "synthetic-test-key",
+        "use": "sig",
+        "alg": "RS256",
+    })
+    jwks = {"keys": [public_jwk]}
+    resolver = build_jwks_resolver(jwks)
+    now = int(time.time())
+
+    def issue_token(roles=None, **overrides):
+        claims = {
+            "iss": ISSUER,
+            "aud": AUDIENCE,
+            "sub": "synthetic-user-001",
+            "tid": TENANT_ID,
+            "iat": now,
+            "nbf": now,
+            "exp": now + 300,
+            "roles": roles if roles is not None else ["CIRT.DFIR.Analyst"],
+        }
+        claims.update(overrides)
+        return jwt.encode(
+            claims,
+            private_key,
+            algorithm="RS256",
+            headers={"kid": "synthetic-test-key"},
+        )
+
+    return resolver, issue_token
+
+
+def verify(token, resolver):
+    return verify_entra_access_token(
+        token,
+        trusted_key_resolver=resolver,
+        expected_issuer=ISSUER,
+        expected_audience=AUDIENCE,
+        expected_tenant_id=TENANT_ID,
+    )
+
+
+def test_synthetic_token_verifies_maps_and_authorizes(identity_material):
+    resolver, issue_token = identity_material
+    claims = verify(issue_token(), resolver)
+    principal = principal_from_verified_claims(
+        claims,
+        approved_role_map=ROLE_MAP,
+    )
+
+    assert principal.subject == "synthetic-user-001"
+    assert principal.roles == frozenset({ROLE_ANALYST})
+    assert authorize(principal, "cases:read")
+    assert authorize(principal, "cases:update")
+
+    with pytest.raises(AuthorizationDenied):
+        authorize(principal, "users:manage")
+
+
+def test_viewer_can_read_but_cannot_update(identity_material):
+    resolver, issue_token = identity_material
+    claims = verify(
+        issue_token(roles=["CIRT.DFIR.Viewer"]),
+        resolver,
+    )
+    principal = principal_from_verified_claims(
+        claims,
+        approved_role_map=ROLE_MAP,
+    )
+
+    assert authorize(principal, "cases:read")
+    with pytest.raises(AuthorizationDenied):
+        authorize(principal, "cases:update")
+
+
+def test_invalid_signature_is_rejected_before_role_mapping(identity_material):
+    resolver, issue_token = identity_material
+    token = issue_token()
+    header, payload, signature = token.split(".")
+    altered_signature = ("A" if signature[0] != "A" else "B") + signature[1:]
+    tampered_token = f"{header}.{payload}.{altered_signature}"
+
+    with pytest.raises(InvalidTokenError):
+        verify(tampered_token, resolver)
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"iss": "https://attacker.invalid/"},
+        {"aud": "api://wrong-audience"},
+        {"tid": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"},
+        {"exp": int(time.time()) - 60},
+        {"nbf": int(time.time()) + 600},
+    ],
+)
+def test_invalid_claims_are_rejected(identity_material, overrides):
+    resolver, issue_token = identity_material
+    with pytest.raises(InvalidTokenError):
+        verify(issue_token(**overrides), resolver)
+
+
+def test_unapproved_role_is_rejected(identity_material):
+    resolver, issue_token = identity_material
+    claims = verify(
+        issue_token(roles=["CIRT.DFIR.Unapproved"]),
+        resolver,
+    )
+
+    with pytest.raises(PrincipalMappingError):
+        principal_from_verified_claims(
+            claims,
+            approved_role_map=ROLE_MAP,
+        )
+
+
+def test_missing_roles_are_rejected(identity_material):
+    resolver, issue_token = identity_material
+    claims = verify(issue_token(roles=[]), resolver)
+
+    with pytest.raises(PrincipalMappingError):
+        principal_from_verified_claims(
+            claims,
+            approved_role_map=ROLE_MAP,
+        )
+
+
+--------------------------------------------------------------------------------
+TEST FILE: tests\test_entra_http_transport.py
+--------------------------------------------------------------------------------
+import json
+from functools import partial
+
+import httpx
+import pytest
+
+from app.entra_http_transport import fetch_json_document
+from app.entra_metadata_client import MetadataTrustError
+
+
+URL = "https://login.microsoftonline.com/discovery/v2.0/keys"
+HOSTS = {"login.microsoftonline.com"}
+
+
+def make_client_factory(handler):
+    return partial(httpx.Client, transport=httpx.MockTransport(handler))
+
+
+def json_response(document, status_code=200, headers=None):
+    response_headers = {"content-type": "application/json"}
+    if headers:
+        response_headers.update(headers)
+    return httpx.Response(
+        status_code,
+        headers=response_headers,
+        content=json.dumps(document).encode("utf-8"),
+    )
+
+
+def test_accepts_trusted_json_object_without_network():
+    calls = []
+
+    def handler(request):
+        calls.append(request)
+        return json_response({"keys": []})
+
+    result = fetch_json_document(
+        URL,
+        trusted_hosts=HOSTS,
+        client_factory=make_client_factory(handler),
+    )
+
+    assert result == {"keys": []}
+    assert len(calls) == 1
+    assert calls[0].url.scheme == "https"
+    assert calls[0].headers["accept"] == "application/json"
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://login.microsoftonline.com/keys",
+        "https://attacker.example/keys",
+        "https://user:pass@login.microsoftonline.com/keys",
+        "https://login.microsoftonline.com/keys#fragment",
+    ],
+)
+def test_rejects_untrusted_or_unsafe_url_before_request(url):
+    calls = []
+
+    def handler(request):
+        calls.append(request)
+        return json_response({})
+
+    with pytest.raises(MetadataTrustError):
+        fetch_json_document(
+            url,
+            trusted_hosts=HOSTS,
+            client_factory=make_client_factory(handler),
+        )
+
+    assert calls == []
+
+
+def test_rejects_redirect_without_following_it():
+    calls = []
+
+    def handler(request):
+        calls.append(request)
+        return httpx.Response(
+            302,
+            headers={"location": "https://attacker.example/"},
+        )
+
+    with pytest.raises(MetadataTrustError, match="status"):
+        fetch_json_document(
+            URL,
+            trusted_hosts=HOSTS,
+            client_factory=make_client_factory(handler),
+        )
+
+    assert len(calls) == 1
+
+
+def test_rejects_non_success_status():
+    def handler(request):
+        return httpx.Response(503)
+
+    with pytest.raises(MetadataTrustError, match="status"):
+        fetch_json_document(
+            URL,
+            trusted_hosts=HOSTS,
+            client_factory=make_client_factory(handler),
+        )
+
+
+def test_rejects_non_json_content_type():
+    def handler(request):
+        return httpx.Response(200, headers={"content-type": "text/plain"}, content=b"{}")
+
+    with pytest.raises(MetadataTrustError, match="JSON content"):
+        fetch_json_document(
+            URL,
+            trusted_hosts=HOSTS,
+            client_factory=make_client_factory(handler),
+        )
+
+
+def test_rejects_declared_oversized_body():
+    def handler(request):
+        return httpx.Response(
+            200,
+            headers={
+                "content-type": "application/json",
+                "content-length": "1000",
+            },
+            content=b"{}",
+        )
+
+    with pytest.raises(MetadataTrustError, match="size limit"):
+        fetch_json_document(
+            URL,
+            trusted_hosts=HOSTS,
+            max_response_bytes=100,
+            client_factory=make_client_factory(handler),
+        )
+
+
+def test_rejects_streamed_oversized_body():
+    def handler(request):
+        return httpx.Response(
+            200,
+            headers={"content-type": "application/json"},
+            content=b'{"data":"' + (b"x" * 200) + b'"}',
+        )
+
+    with pytest.raises(MetadataTrustError, match="size limit"):
+        fetch_json_document(
+            URL,
+            trusted_hosts=HOSTS,
+            max_response_bytes=100,
+            client_factory=make_client_factory(handler),
+        )
+
+
+@pytest.mark.parametrize("body", [b"{", b"[]", b"null", b'"text"'])
+def test_rejects_invalid_json_or_non_object(body):
+    def handler(request):
+        return httpx.Response(
+            200,
+            headers={"content-type": "application/json"},
+            content=body,
+        )
+
+    with pytest.raises(MetadataTrustError):
+        fetch_json_document(
+            URL,
+            trusted_hosts=HOSTS,
+            client_factory=make_client_factory(handler),
+        )
+
+
+@pytest.mark.parametrize("timeout", [0, -1, 11, True, "3"])
+def test_rejects_invalid_timeout(timeout):
+    with pytest.raises(MetadataTrustError):
+        fetch_json_document(URL, trusted_hosts=HOSTS, timeout_seconds=timeout)
+
+
+@pytest.mark.parametrize("limit", [0, -1, 4 * 1024 * 1024 + 1, True, "100"])
+def test_rejects_invalid_response_size_limit(limit):
+    with pytest.raises(MetadataTrustError):
+        fetch_json_document(URL, trusted_hosts=HOSTS, max_response_bytes=limit)
+
+
+def test_rejects_empty_allowlist_before_request():
+    calls = []
+
+    def handler(request):
+        calls.append(request)
+        return json_response({})
+
+    with pytest.raises(MetadataTrustError, match="allowlist"):
+        fetch_json_document(
+            URL,
+            trusted_hosts=set(),
+            client_factory=make_client_factory(handler),
+        )
+
+    assert calls == []
+
+
+def test_accepts_json_with_parameters_in_content_type():
+    def handler(request):
+        return httpx.Response(
+            200,
+            headers={"content-type": "application/json; charset=utf-8"},
+            content=b'{"issuer":"synthetic"}',
+        )
+
+    assert fetch_json_document(
+        URL,
+        trusted_hosts=HOSTS,
+        client_factory=make_client_factory(handler),
+    ) == {"issuer": "synthetic"}
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://login.microsoftonline.com:8443/discovery",
+        "https://login.microsoftonline.com:80/discovery",
+    ],
+)
+def test_rejects_nonstandard_https_ports_before_request(url):
+    calls = []
+
+    def handler(request):
+        calls.append(request)
+        return json_response({})
+
+    with pytest.raises(MetadataTrustError, match="port 443"):
+        fetch_json_document(
+            url,
+            trusted_hosts=HOSTS,
+            client_factory=make_client_factory(handler),
+        )
+
+    assert calls == []
+
+
+def test_accepts_explicit_standard_https_port():
+    def handler(request):
+        assert request.url.port in (None, 443)
+        return json_response({"issuer": "synthetic"})
+
+    result = fetch_json_document(
+        "https://login.microsoftonline.com:443/discovery",
+        trusted_hosts=HOSTS,
+        client_factory=make_client_factory(handler),
+    )
+
+    assert result == {"issuer": "synthetic"}
+
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://[::1/discovery",
+        "https://login.microsoftonline.com:abc/discovery",
+    ],
+)
+def test_malformed_url_is_rejected_as_metadata_trust_error(url):
+    calls = []
+
+    def handler(request):
+        calls.append(request)
+        return json_response({})
+
+    with pytest.raises(MetadataTrustError, match="malformed"):
+        fetch_json_document(
+            url,
+            trusted_hosts=HOSTS,
+            client_factory=make_client_factory(handler),
+        )
+
+    assert calls == []
+
+
+--------------------------------------------------------------------------------
+TEST FILE: tests\test_entra_jwks.py
+--------------------------------------------------------------------------------
+import json
+
+import jwt
+import pytest
+from cryptography.hazmat.primitives.asymmetric import rsa
+from jwt import InvalidTokenError
+
+from app.entra_jwks import build_jwks_resolver
+
+
+def make_pair(kid):
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    public_jwk = json.loads(jwt.algorithms.RSAAlgorithm.to_jwk(private_key.public_key()))
+    public_jwk.update({"kid": kid, "use": "sig", "alg": "RS256"})
+    return private_key, public_jwk
+
+
+def make_token(private_key, kid="key-a", algorithm="RS256"):
+    return jwt.encode(
+        {"sub": "synthetic-user", "iat": 1800000000, "nbf": 1800000000, "exp": 4102444800},
+        private_key,
+        algorithm=algorithm,
+        headers={"kid": kid},
+    )
+
+
+def test_selects_matching_key_from_jwks():
+    private_key, public_jwk = make_pair("key-a")
+    resolver = build_jwks_resolver({"keys": [public_jwk]})
+    token = make_token(private_key, "key-a")
+    selected = resolver(token)
+    decoded = jwt.decode(
+        token,
+        selected,
+        algorithms=["RS256"],
+        options={"verify_exp": False, "verify_iat": False, "verify_nbf": False},
+    )
+    assert decoded["sub"] == "synthetic-user"
+
+
+def test_selects_correct_key_when_multiple_keys_exist():
+    private_a, jwk_a = make_pair("key-a")
+    _, jwk_b = make_pair("key-b")
+    resolver = build_jwks_resolver({"keys": [jwk_a, jwk_b]})
+    assert resolver(make_token(private_a, "key-a")) is not None
+
+
+def test_rejects_unknown_kid():
+    _, jwk = make_pair("known-key")
+    resolver = build_jwks_resolver({"keys": [jwk]})
+    unrelated_private, _ = make_pair("unknown-key")
+    with pytest.raises(InvalidTokenError, match="kid"):
+        resolver(make_token(unrelated_private, "unknown-key"))
+
+
+def test_supports_rotation_overlap_with_old_and_new_keys():
+    old_private, old_jwk = make_pair("old-key")
+    new_private, new_jwk = make_pair("new-key")
+    resolver = build_jwks_resolver({"keys": [old_jwk, new_jwk]})
+    assert resolver(make_token(old_private, "old-key")) is not None
+    assert resolver(make_token(new_private, "new-key")) is not None
+
+
+def test_removed_key_is_rejected_after_rotation():
+    old_private, old_jwk = make_pair("old-key")
+    _, new_jwk = make_pair("new-key")
+    resolver_after_rotation = build_jwks_resolver({"keys": [new_jwk]})
+    with pytest.raises(InvalidTokenError, match="kid"):
+        resolver_after_rotation(make_token(old_private, "old-key"))
+
+
+@pytest.mark.parametrize("document", [
+    None,
+    {},
+    {"keys": []},
+    {"keys": "not-a-list"},
+])
+def test_rejects_malformed_jwks_documents(document):
+    with pytest.raises(ValueError):
+        build_jwks_resolver(document)
+
+
+def test_rejects_duplicate_kids():
+    _, jwk_a = make_pair("duplicate")
+    _, jwk_b = make_pair("duplicate")
+    with pytest.raises(ValueError, match="Duplicate"):
+        build_jwks_resolver({"keys": [jwk_a, jwk_b]})
+
+
+def test_rejects_non_rsa_key():
+    with pytest.raises(ValueError, match="RSA"):
+        build_jwks_resolver({"keys": [{"kid": "ec-key", "kty": "EC"}]})
+
+
+def test_rejects_encryption_only_key():
+    _, jwk = make_pair("enc-key")
+    jwk["use"] = "enc"
+    with pytest.raises(ValueError, match="sig"):
+        build_jwks_resolver({"keys": [jwk]})
+
+
+def test_rejects_non_rs256_jwk():
+    _, jwk = make_pair("other-alg")
+    jwk["alg"] = "RS384"
+    with pytest.raises(ValueError, match="RS256"):
+        build_jwks_resolver({"keys": [jwk]})
+
+
+def test_rejects_private_key_material_in_jwks():
+    _, jwk = make_pair("private-key")
+    jwk["d"] = "not-accepted"
+    with pytest.raises(ValueError, match="Private"):
+        build_jwks_resolver({"keys": [jwk]})
+
+
+def test_rejects_token_without_kid():
+    private_key, jwk = make_pair("key-a")
+    resolver = build_jwks_resolver({"keys": [jwk]})
+    token = jwt.encode(
+        {"sub": "synthetic-user"},
+        private_key,
+        algorithm="RS256",
+    )
+    with pytest.raises(InvalidTokenError, match="kid"):
+        resolver(token)
+
+
+def test_rejects_non_rs256_token_header():
+    private_key = "synthetic-test-secret-at-least-32-bytes-long"
+    jwk_private, jwk = make_pair("key-a")
+    resolver = build_jwks_resolver({"keys": [jwk]})
+    token = jwt.encode(
+        {"sub": "synthetic-user"},
+        private_key,
+        algorithm="HS256",
+        headers={"kid": "key-a"},
+    )
+    with pytest.raises(InvalidTokenError, match="RS256"):
+        resolver(token)
+
+
+def test_rejects_malformed_token():
+    _, jwk = make_pair("key-a")
+    resolver = build_jwks_resolver({"keys": [jwk]})
+    with pytest.raises(InvalidTokenError, match="Malformed"):
+        resolver("not.a.valid.jwt")
+
+
+--------------------------------------------------------------------------------
+TEST FILE: tests\test_entra_jwks_cache.py
+--------------------------------------------------------------------------------
+import pytest
+
+from app.entra_jwks_cache import JWKSCache, JWKSCacheError
+
+
+def make_jwks(kid="synthetic-key-1"):
+    return {
+        "keys": [
+            {
+                "kid": kid,
+                "kty": "RSA",
+                "use": "sig",
+                "alg": "RS256",
+                "n": "synthetic-modulus-" + kid,
+                "e": "AQAB",
+            }
+        ]
+    }
+
+
+class FakeClock:
+    def __init__(self, start=100.0):
+        self.now = start
+
+    def __call__(self):
+        return self.now
+
+    def advance(self, seconds):
+        self.now += seconds
+
+
+def test_first_get_loads_and_caches_document():
+    calls = []
+    source = make_jwks()
+
+    def loader():
+        calls.append(1)
+        return source
+
+    cache = JWKSCache(loader, ttl_seconds=30)
+    assert cache.get() == source
+    assert cache.get() == source
+    assert len(calls) == 1
+    assert cache.is_valid
+
+
+def test_cache_expires_at_ttl_boundary():
+    clock = FakeClock()
+    calls = []
+
+    def loader():
+        calls.append(1)
+        return make_jwks()
+
+    cache = JWKSCache(loader, ttl_seconds=10, clock=clock)
+    cache.get()
+    clock.advance(9.99)
+    cache.get()
+    assert len(calls) == 1
+
+    clock.advance(0.01)
+    cache.get()
+    assert len(calls) == 2
+
+
+def test_expired_entry_is_reloaded():
+    clock = FakeClock()
+    calls = []
+
+    def loader():
+        calls.append(1)
+        return make_jwks(f"synthetic-key-{len(calls)}")
+
+    cache = JWKSCache(loader, ttl_seconds=5, clock=clock)
+    assert cache.get()["keys"][0]["kid"] == "synthetic-key-1"
+
+    clock.advance(6)
+    assert cache.get()["keys"][0]["kid"] == "synthetic-key-2"
+
+
+def test_refresh_replaces_keys_after_rotation():
+    current = {"value": make_jwks("synthetic-old-key")}
+
+    cache = JWKSCache(lambda: current["value"])
+    assert cache.get()["keys"][0]["kid"] == "synthetic-old-key"
+
+    current["value"] = make_jwks("synthetic-new-key")
+    refreshed = cache.refresh()
+
+    assert refreshed["keys"][0]["kid"] == "synthetic-new-key"
+    assert cache.get()["keys"][0]["kid"] == "synthetic-new-key"
+
+
+def test_invalidate_forces_next_load():
+    calls = []
+
+    def loader():
+        calls.append(1)
+        return make_jwks()
+
+    cache = JWKSCache(loader)
+    cache.get()
+    cache.invalidate()
+
+    assert not cache.is_valid
+    cache.get()
+    assert len(calls) == 2
+
+
+def test_mutating_returned_document_does_not_mutate_cache():
+    cache = JWKSCache(lambda: make_jwks())
+    first = cache.get()
+    first["keys"][0]["kid"] = "tampered"
+
+    second = cache.get()
+    assert second["keys"][0]["kid"] == "synthetic-key-1"
+
+
+def test_mutating_loader_source_does_not_mutate_cache():
+    source = make_jwks()
+    cache = JWKSCache(lambda: source)
+    cache.get()
+
+    source["keys"][0]["kid"] = "tampered"
+    assert cache.get()["keys"][0]["kid"] == "synthetic-key-1"
+
+
+def test_expired_keys_not_returned_if_loader_fails():
+    clock = FakeClock()
+    state = {"fail": False}
+
+    def loader():
+        if state["fail"]:
+            raise OSError("synthetic loader failure")
+        return make_jwks()
+
+    cache = JWKSCache(loader, ttl_seconds=2, clock=clock)
+    cache.get()
+
+    clock.advance(3)
+    state["fail"] = True
+
+    with pytest.raises(JWKSCacheError):
+        cache.get()
+
+    assert not cache.is_valid
+
+
+def test_invalid_refresh_does_not_replace_valid_unexpired_cache():
+    state = {"document": make_jwks("synthetic-original")}
+
+    def loader():
+        return state["document"]
+
+    cache = JWKSCache(loader, ttl_seconds=30)
+    cache.get()
+
+    state["document"] = {"keys": []}
+    with pytest.raises(JWKSCacheError):
+        cache.refresh()
+
+    # The previous entry is still unexpired, but refresh reported failure.
+    # It must not be extended by the failed refresh.
+    assert cache.get()["keys"][0]["kid"] == "synthetic-original"
+
+
+@pytest.mark.parametrize("ttl", [0, -1, 3601, True, "5"])
+def test_rejects_invalid_ttl(ttl):
+    with pytest.raises(ValueError):
+        JWKSCache(lambda: make_jwks(), ttl_seconds=ttl)
+
+
+def test_rejects_non_callable_loader():
+    with pytest.raises(ValueError):
+        JWKSCache(None)
+
+
+def test_rejects_non_callable_clock():
+    with pytest.raises(ValueError):
+        JWKSCache(lambda: make_jwks(), clock=None)
+
+
+def test_invalid_loaded_jwks_is_rejected():
+    cache = JWKSCache(lambda: {"keys": []})
+    with pytest.raises(JWKSCacheError):
+        cache.get()
+
+
+def test_loader_exception_is_wrapped():
+    def loader():
+        raise OSError("synthetic transport failure")
+
+    cache = JWKSCache(loader)
+    with pytest.raises(JWKSCacheError):
+        cache.get()
+
+
+def test_refresh_loads_even_when_cache_is_valid():
+    calls = []
+
+    def loader():
+        calls.append(1)
+        return make_jwks(f"synthetic-key-{len(calls)}")
+
+    cache = JWKSCache(loader)
+    assert cache.get()["keys"][0]["kid"] == "synthetic-key-1"
+    assert cache.refresh()["keys"][0]["kid"] == "synthetic-key-2"
+    assert len(calls) == 2
+
+
+def test_cache_ttl_is_bounded_to_one_hour():
+    with pytest.raises(ValueError):
+        JWKSCache(lambda: make_jwks(), ttl_seconds=3600.01)
+
+
+def test_cache_is_initially_invalid():
+    cache = JWKSCache(lambda: make_jwks())
+    assert not cache.is_valid
+
+
+def test_get_returns_a_dict_copy():
+    cache = JWKSCache(lambda: make_jwks())
+    result = cache.get()
+    assert isinstance(result, dict)
+    assert result is not cache._document
+
+--------------------------------------------------------------------------------
+TEST FILE: tests\test_entra_jwks_cache_hardening.py
+--------------------------------------------------------------------------------
+from concurrent.futures import ThreadPoolExecutor
+from threading import Lock
+from time import sleep
+
+import pytest
+
+from app.entra_jwks_cache import JWKSCache, JWKSCacheError
+
+
+def make_jwks(kid="synthetic-key-1"):
+    return {
+        "keys": [
+            {
+                "kid": kid,
+                "kty": "RSA",
+                "use": "sig",
+                "alg": "RS256",
+                "n": "synthetic-modulus-" + kid,
+                "e": "AQAB",
+            }
+        ]
+    }
+
+
+class FakeClock:
+    def __init__(self, start=100.0):
+        self.now = start
+
+    def __call__(self):
+        return self.now
+
+    def advance(self, seconds):
+        self.now += seconds
+
+
+def test_concurrent_gets_share_one_initial_load():
+    counter_lock = Lock()
+    calls = []
+
+    def loader():
+        with counter_lock:
+            calls.append(1)
+        sleep(0.05)
+        return make_jwks()
+
+    cache = JWKSCache(loader, ttl_seconds=30)
+
+    with ThreadPoolExecutor(max_workers=12) as pool:
+        results = list(pool.map(lambda _: cache.get(), range(24)))
+
+    assert len(calls) == 1
+    assert all(item == make_jwks() for item in results)
+
+
+def test_concurrent_refreshes_leave_a_valid_document():
+    counter_lock = Lock()
+    calls = []
+
+    def loader():
+        with counter_lock:
+            calls.append(1)
+            number = len(calls)
+        sleep(0.01)
+        return make_jwks(f"synthetic-key-{number}")
+
+    cache = JWKSCache(loader, ttl_seconds=30)
+    cache.get()
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        results = list(pool.map(lambda _: cache.refresh(), range(8)))
+
+    assert len(calls) == 9
+    assert len(results) == 8
+    assert all(isinstance(result.get("keys"), list) for result in results)
+    assert cache.is_valid
+    assert cache.get()["keys"][0]["kid"].startswith("synthetic-key-")
+
+
+def test_failed_refresh_does_not_extend_expiry():
+    clock = FakeClock()
+    state = {"fail": False}
+    calls = []
+
+    def loader():
+        calls.append(1)
+        if state["fail"]:
+            raise OSError("synthetic refresh failure")
+        return make_jwks()
+
+    cache = JWKSCache(loader, ttl_seconds=5, clock=clock)
+    cache.get()
+    clock.advance(4)
+
+    state["fail"] = True
+    with pytest.raises(JWKSCacheError):
+        cache.refresh()
+
+    assert cache.is_valid
+
+    # The failed refresh must not restart the five-second TTL.
+    clock.advance(1.1)
+    assert not cache.is_valid
+
+    with pytest.raises(JWKSCacheError):
+        cache.get()
+
+
+def test_invalid_refresh_does_not_replace_existing_entry():
+    state = {"document": make_jwks("synthetic-original")}
+    cache = JWKSCache(lambda: state["document"], ttl_seconds=30)
+
+    cache.get()
+    state["document"] = {"keys": []}
+
+    with pytest.raises(JWKSCacheError):
+        cache.refresh()
+
+    # The old entry remains available only until its original expiry.
+    assert cache.get()["keys"][0]["kid"] == "synthetic-original"
+
+
+def test_expired_cache_is_not_marked_valid_after_failed_reload():
+    clock = FakeClock()
+    state = {"fail": False}
+
+    def loader():
+        if state["fail"]:
+            raise OSError("synthetic reload failure")
+        return make_jwks()
+
+    cache = JWKSCache(loader, ttl_seconds=2, clock=clock)
+    cache.get()
+    clock.advance(3)
+    state["fail"] = True
+
+    with pytest.raises(JWKSCacheError):
+        cache.get()
+
+    assert not cache.is_valid
+
+
+def test_invalidation_and_concurrent_gets_reload_once():
+    counter_lock = Lock()
+    calls = []
+
+    def loader():
+        with counter_lock:
+            calls.append(1)
+        sleep(0.05)
+        return make_jwks()
+
+    cache = JWKSCache(loader)
+    cache.get()
+    cache.invalidate()
+
+    with ThreadPoolExecutor(max_workers=10) as pool:
+        results = list(pool.map(lambda _: cache.get(), range(20)))
+
+    assert len(calls) == 2
+    assert all(item == make_jwks() for item in results)
+
+
+def test_returned_documents_are_independent_across_threads():
+    cache = JWKSCache(lambda: make_jwks())
+    cache.get()
+
+    def mutate_copy(_):
+        document = cache.get()
+        document["keys"][0]["kid"] = "tampered"
+        return document
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        list(pool.map(mutate_copy, range(16)))
+
+    assert cache.get()["keys"][0]["kid"] == "synthetic-key-1"
+
+
+def test_clock_boundary_marks_entry_expired():
+    clock = FakeClock()
+    cache = JWKSCache(lambda: make_jwks(), ttl_seconds=10, clock=clock)
+
+    cache.get()
+    clock.advance(10)
+
+    assert not cache.is_valid
+
+
+def test_failed_loader_does_not_create_valid_cache():
+    def loader():
+        raise OSError("synthetic initial failure")
+
+    cache = JWKSCache(loader)
+
+    with pytest.raises(JWKSCacheError):
+        cache.get()
+
+    assert not cache.is_valid
+
+
+def test_refresh_with_valid_data_restarts_ttl():
+    clock = FakeClock()
+    calls = []
+
+    def loader():
+        calls.append(1)
+        return make_jwks()
+
+    cache = JWKSCache(loader, ttl_seconds=10, clock=clock)
+    cache.get()
+    clock.advance(8)
+    cache.refresh()
+
+    clock.advance(3)
+    assert cache.is_valid
+    assert len(calls) == 2
+
+--------------------------------------------------------------------------------
+TEST FILE: tests\test_entra_metadata_client.py
+--------------------------------------------------------------------------------
+import pytest
+
+from app.entra_metadata_client import (
+    MetadataTrustError,
+    fetch_trusted_document,
+    validate_discovery_document,
+    validate_jwks_document,
+)
+
+
+ISSUER = "https://login.microsoftonline.com/tenant-test/v2.0"
+JWKS_URI = "https://login.microsoftonline.com/tenant-test/discovery/v2.0/keys"
+HOSTS = {"login.microsoftonline.com"}
+
+
+def valid_discovery():
+    return {"issuer": ISSUER, "jwks_uri": JWKS_URI}
+
+
+def valid_jwks():
+    return {
+        "keys": [
+            {
+                "kid": "synthetic-key-1",
+                "kty": "RSA",
+                "use": "sig",
+                "alg": "RS256",
+                "n": "synthetic-modulus",
+                "e": "AQAB",
+            }
+        ]
+    }
+
+
+def test_accepts_expected_discovery_document():
+    metadata = validate_discovery_document(
+        valid_discovery(),
+        expected_issuer=ISSUER,
+        allowed_jwks_hosts=HOSTS,
+    )
+    assert metadata.issuer == ISSUER
+    assert metadata.jwks_uri == JWKS_URI
+
+
+def test_rejects_wrong_issuer():
+    document = valid_discovery()
+    document["issuer"] = "https://attacker.example/issuer"
+    with pytest.raises(MetadataTrustError):
+        validate_discovery_document(
+            document,
+            expected_issuer=ISSUER,
+            allowed_jwks_hosts=HOSTS,
+        )
+
+
+def test_rejects_http_jwks_url():
+    document = valid_discovery()
+    document["jwks_uri"] = "http://login.microsoftonline.com/keys"
+    with pytest.raises(MetadataTrustError):
+        validate_discovery_document(
+            document,
+            expected_issuer=ISSUER,
+            allowed_jwks_hosts=HOSTS,
+        )
+
+
+def test_rejects_unapproved_jwks_host():
+    document = valid_discovery()
+    document["jwks_uri"] = "https://attacker.example/keys"
+    with pytest.raises(MetadataTrustError):
+        validate_discovery_document(
+            document,
+            expected_issuer=ISSUER,
+            allowed_jwks_hosts=HOSTS,
+        )
+
+
+def test_rejects_missing_expected_issuer():
+    with pytest.raises(MetadataTrustError):
+        validate_discovery_document(
+            valid_discovery(),
+            expected_issuer="",
+            allowed_jwks_hosts=HOSTS,
+        )
+
+
+def test_transport_is_injected_and_receives_timeout():
+    calls = []
+
+    def fake_transport(url, timeout):
+        calls.append((url, timeout))
+        return valid_discovery()
+
+    result = fetch_trusted_document(
+        "https://login.microsoftonline.com/discovery",
+        trusted_hosts=HOSTS,
+        transport=fake_transport,
+        timeout_seconds=2.0,
+    )
+
+    assert result["issuer"] == ISSUER
+    assert calls == [
+        ("https://login.microsoftonline.com/discovery", 2.0)
+    ]
+
+
+def test_rejects_unapproved_fetch_host_before_transport():
+    calls = []
+
+    def fake_transport(url, timeout):
+        calls.append(url)
+        return {}
+
+    with pytest.raises(MetadataTrustError):
+        fetch_trusted_document(
+            "https://attacker.example/discovery",
+            trusted_hosts=HOSTS,
+            transport=fake_transport,
+        )
+
+    assert calls == []
+
+
+def test_rejects_non_https_fetch_url():
+    with pytest.raises(MetadataTrustError):
+        fetch_trusted_document(
+            "http://login.microsoftonline.com/discovery",
+            trusted_hosts=HOSTS,
+            transport=lambda url, timeout: {},
+        )
+
+
+def test_rejects_timeout_outside_bound():
+    with pytest.raises(MetadataTrustError):
+        fetch_trusted_document(
+            "https://login.microsoftonline.com/discovery",
+            trusted_hosts=HOSTS,
+            transport=lambda url, timeout: {},
+            timeout_seconds=30,
+        )
+
+
+def test_rejects_non_object_transport_response():
+    with pytest.raises(MetadataTrustError):
+        fetch_trusted_document(
+            "https://login.microsoftonline.com/discovery",
+            trusted_hosts=HOSTS,
+            transport=lambda url, timeout: [],
+        )
+
+
+def test_accepts_structurally_valid_jwks():
+    result = validate_jwks_document(valid_jwks())
+    assert result["keys"][0]["kid"] == "synthetic-key-1"
+
+
+@pytest.mark.parametrize("document", [None, [], {}, {"keys": []}])
+def test_rejects_invalid_jwks_container(document):
+    with pytest.raises(MetadataTrustError):
+        validate_jwks_document(document)
+
+
+def test_rejects_duplicate_key_ids():
+    document = valid_jwks()
+    document["keys"].append(dict(document["keys"][0]))
+    with pytest.raises(MetadataTrustError):
+        validate_jwks_document(document)
+
+
+def test_rejects_non_rsa_key():
+    document = valid_jwks()
+    document["keys"][0]["kty"] = "EC"
+    with pytest.raises(MetadataTrustError):
+        validate_jwks_document(document)
+
+
+def test_rejects_private_key_material():
+    document = valid_jwks()
+    document["keys"][0]["d"] = "synthetic-private-value"
+    with pytest.raises(MetadataTrustError):
+        validate_jwks_document(document)
+
+
+def test_rejects_wrong_algorithm():
+    document = valid_jwks()
+    document["keys"][0]["alg"] = "HS256"
+    with pytest.raises(MetadataTrustError):
+        validate_jwks_document(document)
+
+
+def test_rejects_encryption_key():
+    document = valid_jwks()
+    document["keys"][0]["use"] = "enc"
+    with pytest.raises(MetadataTrustError):
+        validate_jwks_document(document)
+
+
+def test_rejects_missing_key_id():
+    document = valid_jwks()
+    document["keys"][0].pop("kid")
+    with pytest.raises(MetadataTrustError):
+        validate_jwks_document(document)
+
+--------------------------------------------------------------------------------
+TEST FILE: tests\test_entra_principal.py
+--------------------------------------------------------------------------------
+import pytest
+
+from app.security import KNOWN_ROLES
+from app.entra_principal import (
+    PrincipalMappingError,
+    principal_from_verified_claims,
+)
+
+
+TEST_ROLE_MAP = {
+    "CIRT.DFIR.Viewer": "Viewer",
+    "CIRT.DFIR.Analyst": "DFIR Analyst",
+    "CIRT.DFIR.Administrator": "Administrator",
+}
+
+
+def test_maps_verified_analyst_role():
+    principal = principal_from_verified_claims(
+        {"sub": "synthetic-user-01", "roles": ["CIRT.DFIR.Analyst"]},
+        approved_role_map=TEST_ROLE_MAP,
+    )
+    assert principal.subject == "synthetic-user-01"
+    assert principal.roles == frozenset({"DFIR Analyst"})
+
+
+def test_maps_multiple_approved_roles():
+    principal = principal_from_verified_claims(
+        {
+            "sub": "synthetic-user-02",
+            "roles": ["CIRT.DFIR.Viewer", "CIRT.DFIR.Analyst"],
+        },
+        approved_role_map=TEST_ROLE_MAP,
+    )
+    assert principal.roles == frozenset({"Viewer", "DFIR Analyst"})
+
+
+def test_subject_is_trimmed():
+    principal = principal_from_verified_claims(
+        {"sub": "  synthetic-user-03  ", "roles": ["CIRT.DFIR.Viewer"]},
+        approved_role_map=TEST_ROLE_MAP,
+    )
+    assert principal.subject == "synthetic-user-03"
+
+
+@pytest.mark.parametrize("claims", [
+    None,
+    [],
+    "not-a-claims-object",
+])
+def test_rejects_non_mapping_claims(claims):
+    with pytest.raises(PrincipalMappingError):
+        principal_from_verified_claims(
+            claims,
+            approved_role_map=TEST_ROLE_MAP,
+        )
+
+
+@pytest.mark.parametrize("claims", [
+    {"roles": ["CIRT.DFIR.Analyst"]},
+    {"sub": "", "roles": ["CIRT.DFIR.Analyst"]},
+    {"sub": "   ", "roles": ["CIRT.DFIR.Analyst"]},
+    {"sub": 123, "roles": ["CIRT.DFIR.Analyst"]},
+])
+def test_rejects_missing_or_invalid_subject(claims):
+    with pytest.raises(PrincipalMappingError):
+        principal_from_verified_claims(
+            claims,
+            approved_role_map=TEST_ROLE_MAP,
+        )
+
+
+@pytest.mark.parametrize("claims", [
+    {"sub": "synthetic-user", "roles": "CIRT.DFIR.Analyst"},
+    {"sub": "synthetic-user", "roles": []},
+    {"sub": "synthetic-user"},
+    {"sub": "synthetic-user", "roles": [None]},
+    {"sub": "synthetic-user", "roles": [""]},
+    {
+        "sub": "synthetic-user",
+        "roles": ["CIRT.DFIR.Analyst", "CIRT.DFIR.Analyst"],
+    },
+])
+def test_rejects_missing_malformed_or_duplicate_roles(claims):
+    with pytest.raises(PrincipalMappingError):
+        principal_from_verified_claims(
+            claims,
+            approved_role_map=TEST_ROLE_MAP,
+        )
+
+
+def test_rejects_unapproved_application_role():
+    with pytest.raises(PrincipalMappingError):
+        principal_from_verified_claims(
+            {"sub": "synthetic-user", "roles": ["CIRT.DFIR.SuperUser"]},
+            approved_role_map=TEST_ROLE_MAP,
+        )
+
+
+@pytest.mark.parametrize("role_map", [
+    {},
+    None,
+    {"CIRT.DFIR.Analyst": "SuperUser"},
+    {"": "Viewer"},
+    {"CIRT.DFIR.Analyst": ""},
+])
+def test_rejects_missing_or_invalid_server_role_map(role_map):
+    with pytest.raises(PrincipalMappingError):
+        principal_from_verified_claims(
+            {"sub": "synthetic-user", "roles": ["CIRT.DFIR.Analyst"]},
+            approved_role_map=role_map,
+        )
+
+
+def test_internal_role_values_are_known():
+    assert set(TEST_ROLE_MAP.values()).issubset(KNOWN_ROLES)
+
+
+def test_ignores_unrelated_claims_and_does_not_grant_from_groups():
+    principal = principal_from_verified_claims(
+        {
+            "sub": "synthetic-user",
+            "groups": ["CIRT.DFIR.Administrator"],
+            "scp": "cases:update",
+            "roles": ["CIRT.DFIR.Viewer"],
+        },
+        approved_role_map=TEST_ROLE_MAP,
+    )
+    assert principal.roles == frozenset({"Viewer"})
+
+
+--------------------------------------------------------------------------------
+TEST FILE: tests\test_entra_principal_authorization.py
+--------------------------------------------------------------------------------
+import pytest
+
+from app.security import authorize, AuthorizationDenied
+from app.entra_principal import principal_from_verified_claims
+
+
+TEST_ROLE_MAP = {
+    "CIRT.DFIR.Viewer": "Viewer",
+    "CIRT.DFIR.Analyst": "DFIR Analyst",
+    "CIRT.DFIR.Administrator": "Administrator",
+}
+
+
+def make_principal(app_role):
+    return principal_from_verified_claims(
+        {
+            "sub": "synthetic-authorization-test-user",
+            "roles": [app_role],
+        },
+        approved_role_map=TEST_ROLE_MAP,
+    )
+
+
+def test_viewer_can_read_cases():
+    principal = make_principal("CIRT.DFIR.Viewer")
+    authorize(principal, "cases:read")
+
+
+def test_viewer_cannot_update_cases():
+    principal = make_principal("CIRT.DFIR.Viewer")
+    with pytest.raises(AuthorizationDenied):
+        authorize(principal, "cases:update")
+
+
+def test_analyst_can_read_cases():
+    principal = make_principal("CIRT.DFIR.Analyst")
+    authorize(principal, "cases:read")
+
+
+def test_analyst_can_update_cases():
+    principal = make_principal("CIRT.DFIR.Analyst")
+    authorize(principal, "cases:update")
+
+
+def test_analyst_cannot_manage_users():
+    principal = make_principal("CIRT.DFIR.Analyst")
+    with pytest.raises(AuthorizationDenied):
+        authorize(principal, "users:manage")
+
+
+def test_administrator_can_read_cases():
+    principal = make_principal("CIRT.DFIR.Administrator")
+    authorize(principal, "cases:read")
+
+
+def test_administrator_can_update_cases():
+    principal = make_principal("CIRT.DFIR.Administrator")
+    authorize(principal, "cases:update")
+
+
+def test_administrator_can_manage_users():
+    principal = make_principal("CIRT.DFIR.Administrator")
+    authorize(principal, "users:manage")
+
+
+def test_administrator_can_read_audit():
+    principal = make_principal("CIRT.DFIR.Administrator")
+    authorize(principal, "audit:read")
+
+
+def test_unknown_permission_is_denied():
+    principal = make_principal("CIRT.DFIR.Administrator")
+    with pytest.raises(AuthorizationDenied):
+        authorize(principal, "system:unapproved")
+
+
+--------------------------------------------------------------------------------
+TEST FILE: tests\test_entra_token_verifier.py
+--------------------------------------------------------------------------------
+from datetime import datetime, timedelta, timezone
+
+import jwt
+import pytest
+from cryptography.hazmat.primitives.asymmetric import rsa
+from jwt import InvalidTokenError
+
+from app.entra_token_verifier import verify_entra_access_token
+
+
+ISSUER = "https://login.microsoftonline.com/synthetic-tenant/v2.0"
+AUDIENCE = "api://synthetic-cirt-dfir"
+TENANT = "synthetic-tenant"
+OTHER_TENANT = "another-synthetic-tenant"
+
+
+@pytest.fixture
+def signing_material():
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    return private_key, private_key.public_key()
+
+
+def make_token(private_key, **overrides):
+    now = datetime.now(timezone.utc)
+    claims = {
+        "iss": ISSUER,
+        "aud": AUDIENCE,
+        "sub": "synthetic-user-001",
+        "tid": TENANT,
+        "iat": now,
+        "nbf": now - timedelta(seconds=5),
+        "exp": now + timedelta(minutes=5),
+        "roles": ["DFIR Analyst"],
+    }
+    claims.update(overrides)
+    return jwt.encode(claims, private_key, algorithm="RS256", headers={"kid": "synthetic-key-1"})
+
+
+def verify(token, public_key):
+    return verify_entra_access_token(
+        token,
+        trusted_key_resolver=lambda _token: public_key,
+        expected_issuer=ISSUER,
+        expected_audience=AUDIENCE,
+        expected_tenant_id=TENANT,
+    )
+
+
+def test_accepts_valid_synthetic_rs256_token(signing_material):
+    private_key, public_key = signing_material
+    claims = verify(make_token(private_key), public_key)
+    assert claims["sub"] == "synthetic-user-001"
+
+
+def test_rejects_tampered_signature(signing_material):
+    private_key, public_key = signing_material
+    token = make_token(private_key)
+    parts = token.split(".")
+    parts[2] = ("A" if parts[2][0] != "A" else "B") + parts[2][1:]
+    with pytest.raises(InvalidTokenError):
+        verify(".".join(parts), public_key)
+
+
+def test_rejects_expired_token(signing_material):
+    private_key, public_key = signing_material
+    old = datetime.now(timezone.utc) - timedelta(minutes=10)
+    token = make_token(private_key, exp=old, iat=old - timedelta(minutes=5), nbf=old - timedelta(minutes=5))
+    with pytest.raises(InvalidTokenError):
+        verify(token, public_key)
+
+
+def test_rejects_wrong_issuer(signing_material):
+    private_key, public_key = signing_material
+    with pytest.raises(InvalidTokenError):
+        verify(make_token(private_key, iss="https://untrusted.invalid/"), public_key)
+
+
+def test_rejects_wrong_audience(signing_material):
+    private_key, public_key = signing_material
+    with pytest.raises(InvalidTokenError):
+        verify(make_token(private_key, aud="api://wrong-audience"), public_key)
+
+
+def test_rejects_wrong_tenant(signing_material):
+    private_key, public_key = signing_material
+    with pytest.raises(InvalidTokenError):
+        verify(make_token(private_key, tid=OTHER_TENANT), public_key)
+
+
+def test_rejects_token_signed_by_another_key(signing_material):
+    private_key, _ = signing_material
+    other_private = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    with pytest.raises(InvalidTokenError):
+        verify(make_token(private_key), other_private.public_key())
+
+
+def test_rejects_hs256_token(signing_material):
+    private_key, public_key = signing_material
+    token = jwt.encode(
+        {"iss": ISSUER, "aud": AUDIENCE, "sub": "synthetic-user",
+         "tid": TENANT, "iat": 1, "nbf": 1, "exp": 4102444800},
+        "synthetic-test-secret-at-least-32-bytes-long",
+        algorithm="HS256",
+    )
+    with pytest.raises(InvalidTokenError):
+        verify(token, public_key)
+
+
+def test_rejects_missing_subject(signing_material):
+    private_key, public_key = signing_material
+    now = datetime.now(timezone.utc)
+    claims = {
+        "iss": ISSUER,
+        "aud": AUDIENCE,
+        "tid": TENANT,
+        "iat": now,
+        "nbf": now - timedelta(seconds=1),
+        "exp": now + timedelta(minutes=5),
+    }
+    token = jwt.encode(claims, private_key, algorithm="RS256")
+    with pytest.raises(InvalidTokenError):
+        verify(token, public_key)
+
+def test_rejects_missing_required_exp_claim(signing_material):
+    private_key, public_key = signing_material
+    now = datetime.now(timezone.utc)
+    claims = {
+        "iss": ISSUER, "aud": AUDIENCE, "sub": "synthetic-user-001",
+        "tid": TENANT, "iat": now, "nbf": now - timedelta(seconds=1),
+    }
+    token = jwt.encode(claims, private_key, algorithm="RS256")
+    with pytest.raises(InvalidTokenError):
+        verify(token, public_key)
+
+
+def test_requires_configured_tenant(signing_material):
+    private_key, public_key = signing_material
+    token = make_token(private_key)
+    with pytest.raises(ValueError):
+        verify_entra_access_token(
+            token,
+            trusted_key_resolver=lambda _token: public_key,
+            expected_issuer=ISSUER,
+            expected_audience=AUDIENCE,
+            expected_tenant_id="",
+        )
+
+
+def test_rejects_empty_token(signing_material):
+    _, public_key = signing_material
+    with pytest.raises(InvalidTokenError):
+        verify("", public_key)
+
+
+
+--------------------------------------------------------------------------------
+TEST FILE: tests\test_entra_verifier_jwks_integration.py
+--------------------------------------------------------------------------------
+import json
+from datetime import datetime, timedelta, timezone
+
+import jwt
+import pytest
+from cryptography.hazmat.primitives.asymmetric import rsa
+from jwt import InvalidTokenError
+
+from app.entra_jwks import build_jwks_resolver
+from app.entra_token_verifier import verify_entra_access_token
+
+
+ISSUER = "https://login.microsoftonline.com/synthetic-tenant/v2.0"
+AUDIENCE = "api://synthetic-cirt-dfir"
+TENANT = "synthetic-tenant"
+
+
+@pytest.fixture
+def test_material():
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    public_jwk = json.loads(
+        jwt.algorithms.RSAAlgorithm.to_jwk(private_key.public_key())
+    )
+    public_jwk.update({
+        "kid": "integration-key-1",
+        "use": "sig",
+        "alg": "RS256",
+    })
+    return private_key, public_jwk
+
+
+def make_token(private_key, kid="integration-key-1", **overrides):
+    now = datetime.now(timezone.utc)
+    claims = {
+        "iss": ISSUER,
+        "aud": AUDIENCE,
+        "sub": "synthetic-integration-user",
+        "tid": TENANT,
+        "iat": now,
+        "nbf": now - timedelta(seconds=2),
+        "exp": now + timedelta(minutes=5),
+        "roles": ["DFIR Analyst"],
+    }
+    claims.update(overrides)
+    return jwt.encode(
+        claims,
+        private_key,
+        algorithm="RS256",
+        headers={"kid": kid},
+    )
+
+
+def verify_with_jwks(token, jwks):
+    resolver = build_jwks_resolver(jwks)
+    return verify_entra_access_token(
+        token,
+        trusted_key_resolver=resolver,
+        expected_issuer=ISSUER,
+        expected_audience=AUDIENCE,
+        expected_tenant_id=TENANT,
+    )
+
+
+def test_valid_token_verifies_through_jwks_and_verifier(test_material):
+    private_key, jwk = test_material
+    token = make_token(private_key)
+
+    claims = verify_with_jwks(token, {"keys": [jwk]})
+
+    assert claims["sub"] == "synthetic-integration-user"
+    assert claims["tid"] == TENANT
+    assert claims["roles"] == ["DFIR Analyst"]
+
+
+def test_invalid_signature_is_rejected(test_material):
+    _, trusted_jwk = test_material
+    attacker_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    token = make_token(attacker_key)
+
+    with pytest.raises(InvalidTokenError):
+        verify_with_jwks(token, {"keys": [trusted_jwk]})
+
+
+def test_unknown_kid_is_rejected(test_material):
+    private_key, jwk = test_material
+    token = make_token(private_key, kid="unknown-key-id")
+
+    with pytest.raises(InvalidTokenError, match="kid"):
+        verify_with_jwks(token, {"keys": [jwk]})
+
+
+def test_expired_token_is_rejected(test_material):
+    private_key, jwk = test_material
+    old = datetime.now(timezone.utc) - timedelta(minutes=10)
+    token = make_token(
+        private_key,
+        exp=old,
+        iat=old - timedelta(minutes=5),
+        nbf=old - timedelta(minutes=5),
+    )
+
+    with pytest.raises(InvalidTokenError):
+        verify_with_jwks(token, {"keys": [jwk]})
+
+
+def test_wrong_issuer_is_rejected(test_material):
+    private_key, jwk = test_material
+    token = make_token(private_key, iss="https://untrusted.invalid/")
+
+    with pytest.raises(InvalidTokenError):
+        verify_with_jwks(token, {"keys": [jwk]})
+
+
+def test_wrong_audience_is_rejected(test_material):
+    private_key, jwk = test_material
+    token = make_token(private_key, aud="api://wrong-audience")
+
+    with pytest.raises(InvalidTokenError):
+        verify_with_jwks(token, {"keys": [jwk]})
+
+
+def test_wrong_tenant_is_rejected(test_material):
+    private_key, jwk = test_material
+    token = make_token(private_key, tid="another-synthetic-tenant")
+
+    with pytest.raises(InvalidTokenError):
+        verify_with_jwks(token, {"keys": [jwk]})
+
+
+def test_not_before_in_future_is_rejected(test_material):
+    private_key, jwk = test_material
+    future = datetime.now(timezone.utc) + timedelta(minutes=10)
+    token = make_token(
+        private_key,
+        nbf=future,
+        exp=future + timedelta(minutes=5),
+    )
+
+    with pytest.raises(InvalidTokenError):
+        verify_with_jwks(token, {"keys": [jwk]})
+
+
+def test_rotation_overlap_accepts_old_and_new_keys():
+    old_private = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    new_private = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+
+    old_jwk = json.loads(
+        jwt.algorithms.RSAAlgorithm.to_jwk(old_private.public_key())
+    )
+    old_jwk.update({"kid": "old-key", "use": "sig", "alg": "RS256"})
+
+    new_jwk = json.loads(
+        jwt.algorithms.RSAAlgorithm.to_jwk(new_private.public_key())
+    )
+    new_jwk.update({"kid": "new-key", "use": "sig", "alg": "RS256"})
+
+    jwks = {"keys": [old_jwk, new_jwk]}
+
+    old_claims = verify_with_jwks(
+        make_token(old_private, kid="old-key"), jwks
+    )
+    new_claims = verify_with_jwks(
+        make_token(new_private, kid="new-key"), jwks
+    )
+
+    assert old_claims["sub"] == "synthetic-integration-user"
+    assert new_claims["sub"] == "synthetic-integration-user"
+
+
+def test_removed_key_is_rejected_after_rotation():
+    old_private = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    new_private = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+
+    new_jwk = json.loads(
+        jwt.algorithms.RSAAlgorithm.to_jwk(new_private.public_key())
+    )
+    new_jwk.update({"kid": "new-key", "use": "sig", "alg": "RS256"})
+
+    token = make_token(old_private, kid="old-key")
+
+    with pytest.raises(InvalidTokenError, match="kid"):
+        verify_with_jwks(token, {"keys": [new_jwk]})
+
+
+def test_private_key_material_in_jwks_is_rejected(test_material):
+    _, jwk = test_material
+    malicious_document = dict(jwk)
+    malicious_document["d"] = "not-accepted"
+
+    with pytest.raises(ValueError, match="Private"):
+        build_jwks_resolver({"keys": [malicious_document]})
+
+
+def test_missing_tenant_configuration_fails_closed(test_material):
+    private_key, jwk = test_material
+    token = make_token(private_key)
+    resolver = build_jwks_resolver({"keys": [jwk]})
+
+    with pytest.raises(ValueError, match="expected_tenant_id"):
+        verify_entra_access_token(
+            token,
+            trusted_key_resolver=resolver,
+            expected_issuer=ISSUER,
+            expected_audience=AUDIENCE,
+            expected_tenant_id="",
+        )
+
+
+--------------------------------------------------------------------------------
+TEST FILE: tests\test_security.py
+--------------------------------------------------------------------------------
+import unittest
+
+from app.security import (
+    AuthenticationRequired,
+    AuthorizationDenied,
+    Principal,
+    ROLE_ADMINISTRATOR,
+    ROLE_ANALYST,
+    ROLE_VIEWER,
+    authorize,
+)
+
+
+class TestRBACPolicy(unittest.TestCase):
+    def setUp(self):
+        self.admin = Principal("synthetic-admin", frozenset({ROLE_ADMINISTRATOR}))
+        self.analyst = Principal("synthetic-analyst", frozenset({ROLE_ANALYST}))
+        self.viewer = Principal("synthetic-viewer", frozenset({ROLE_VIEWER}))
+
+    def test_admin_can_read_update_manage_users_and_read_audit(self):
+        for permission in ("cases:read", "cases:update", "users:manage", "audit:read"):
+            with self.subTest(permission=permission):
+                self.assertTrue(authorize(self.admin, permission))
+
+    def test_analyst_can_read_and_update_cases(self):
+        self.assertTrue(authorize(self.analyst, "cases:read"))
+        self.assertTrue(authorize(self.analyst, "cases:update"))
+
+    def test_analyst_cannot_manage_users_or_read_audit(self):
+        for permission in ("users:manage", "audit:read"):
+            with self.subTest(permission=permission):
+                with self.assertRaises(AuthorizationDenied):
+                    authorize(self.analyst, permission)
+
+    def test_viewer_can_read_cases(self):
+        self.assertTrue(authorize(self.viewer, "cases:read"))
+
+    def test_viewer_cannot_update_cases(self):
+        with self.assertRaises(AuthorizationDenied):
+            authorize(self.viewer, "cases:update")
+
+    def test_missing_principal_is_rejected(self):
+        with self.assertRaises(AuthenticationRequired):
+            authorize(None, "cases:read")
+
+    def test_unknown_role_is_rejected(self):
+        principal = Principal("synthetic-user", frozenset({"SuperUser"}))
+        with self.assertRaises(AuthorizationDenied):
+            authorize(principal, "cases:read")
+
+    def test_unknown_permission_is_rejected(self):
+        with self.assertRaises(AuthorizationDenied):
+            authorize(self.admin, "database:destroy")
+
+    def test_empty_subject_is_rejected(self):
+        principal = Principal(" ", frozenset({ROLE_ADMINISTRATOR}))
+        with self.assertRaises(AuthenticationRequired):
+            authorize(principal, "cases:read")
+
+    def test_no_roles_is_rejected(self):
+        principal = Principal("synthetic-user", frozenset())
+        with self.assertRaises(AuthorizationDenied):
+            authorize(principal, "cases:read")
+
+
+if __name__ == "__main__":
+    unittest.main()
+
+
+READ-ONLY INSPECTION COMPLETE

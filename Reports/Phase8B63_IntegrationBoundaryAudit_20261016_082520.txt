@@ -1,0 +1,66 @@
+﻿CIRT DFIR PROFESSIONAL - PHASE 8B.63
+Read-only authentication integration-boundary audit
+Timestamp: 2026-10-16T08:25:20.6795447+08:00
+Source modifications: NONE
+Package installation: NONE
+External network requests: NONE
+
+=== STATIC SOURCE CHECKS ===
+PASS - Authentication gate contains HTTP 401 fail-closed response
+PASS - Authentication gate rejects unconfigured authentication
+PASS - Authentication gate does not import the HTTP metadata transport
+PASS - Authentication gate does not directly import the JWKS cache
+PASS - Transport requires HTTPS
+PASS - Transport disables automatic redirects
+PASS - Transport keeps TLS verification enabled
+PASS - Transport disables environment-derived client configuration
+PASS - Transport enforces a bounded response size
+PASS - Metadata validator exposes trusted-document validation
+PASS - JWKS cache has a bounded TTL
+Static checks passed: 11/11
+Static checks failed: 0
+
+=== FOCUSED SECURITY TESTS ===
+........................................................................ [ 97%]
+..                                                                       [100%]
+============================== warnings summary ===============================
+.venv\Lib\site-packages\fastapi\testclient.py:1
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+74 passed, 1 warning in 0.08s
+Focused security test exit code: 0
+
+=== FULL BACKEND REGRESSION ===
+........................................................................ [ 37%]
+........................................................................ [ 74%]
+..................................................                       [100%]
+============================== warnings summary ===============================
+.venv\Lib\site-packages\fastapi\testclient.py:1
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+194 passed, 1 warning in 2.19s
+Full backend exit code: 0
+
+=== FRONTEND PRODUCTION BUILD ===
+
+> cirt-dfir-platform-frontend@0.1.0 build
+> tsc -b && vite build
+
+[36mvite v7.3.7 [32mbuilding client environment for production...[36m[39m
+transforming...
+[32mΓ£ô[39m 29 modules transformed.
+rendering chunks...
+computing gzip size...
+[2mdist/[22m[32mindex.html                 [39m[1m[2m  0.45 kB[22m[1m[22m[2m Γöé gzip:  0.30 kB[22m
+[2mdist/[22m[35massets/index-BPJY-tX1.css  [39m[1m[2m  4.87 kB[22m[1m[22m[2m Γöé gzip:  1.64 kB[22m
+[2mdist/[22m[36massets/index-CfTLV-Tt.js   [39m[1m[2m231.03 kB[22m[1m[22m[2m Γöé gzip: 72.02 kB[22m
+[32mΓ£ô built in 713ms[39m
+Frontend build exit code: 0
+
+Production authentication must remain fail-closed.
+Static checks are not a substitute for a full security review.
+Overall result: PASS - review checks and builds passed

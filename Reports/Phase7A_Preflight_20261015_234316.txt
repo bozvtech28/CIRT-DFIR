@@ -1,0 +1,1181 @@
+﻿CIRT DFIR Professional - Phase 7A Preflight
+Timestamp: 2026-10-15 23:43:17
+Project root: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional
+Backup directory: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\Phase7A_Preflight_20261015_234316
+Purpose: Inspect case lifecycle implementation points before changing source.
+Application source changes: None
+Server started: No
+Production collector executed: No
+Real evidence accessed: No
+
+==============================================================================
+FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\main.py
+Exists: Yes
+SHA256 original: B7C30C10FD9D4137630B21AA45AB45D8A09AB9FC3AB04A2AF79BC1DC0C7544C6
+SHA256 backup:   B7C30C10FD9D4137630B21AA45AB45D8A09AB9FC3AB04A2AF79BC1DC0C7544C6
+Backup verified: True
+
+--- Source content ---
+from fastapi import FastAPI
+from pydantic import BaseModel
+from app.case_store import list_demo_cases
+
+app = FastAPI(
+    title="CIRT DFIR Platform API",
+    version="0.1.0",
+    description="Development scaffold only. Synthetic data; no evidence intake.",
+)
+
+
+class HealthResponse(BaseModel):
+    status: str
+    mode: str
+
+
+class DemoCase(BaseModel):
+    case_id: str
+    title: str
+    severity: str
+    status: str
+
+
+DEMO_CASES = [
+    DemoCase(
+        case_id="DEMO-2026-001",
+        title="Endpoint Alert Review",
+        severity="High",
+        status="Investigating",
+    ),
+    DemoCase(
+        case_id="DEMO-2026-002",
+        title="Suspicious Login Review",
+        severity="Medium",
+        status="Triage",
+    ),
+    DemoCase(
+        case_id="DEMO-2026-003",
+        title="Mailbox Rule Assessment",
+        severity="Medium",
+        status="Evidence review",
+    ),
+]
+
+
+@app.get("/api/v1/health", response_model=HealthResponse)
+def health() -> HealthResponse:
+    return HealthResponse(status="ok", mode="development-scaffold")
+
+
+@app.get("/api/v1/demo/cases", response_model=list[DemoCase])
+def get_demo_cases() -> list[DemoCase]:
+    return [DemoCase(**item) for item in list_demo_cases()]
+
+==============================================================================
+FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_store.py
+Exists: Yes
+SHA256 original: 775FF3334CCD2D401B2392D0E96BCB87E7A2BBD90B76379F104E2E01651EEBE8
+SHA256 backup:   775FF3334CCD2D401B2392D0E96BCB87E7A2BBD90B76379F104E2E01651EEBE8
+Backup verified: True
+
+--- Source content ---
+import os
+from pathlib import Path
+from typing import Any
+
+from app.case_repository import connect, create_case, initialize, list_cases
+
+APP_DIR = Path(__file__).resolve().parent
+SCHEMA_PATH = APP_DIR / "case_schema.sql"
+DEFAULT_DB = APP_DIR.parent / "data" / "cirt_cases.sqlite"
+DB_PATH = Path(os.environ.get("CIRT_DFIR_DB_PATH", str(DEFAULT_DB)))
+
+
+def ensure_database() -> None:
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+    # Initialize only a new/empty database; never reapply CREATE statements
+    # to an existing database.
+    needs_init = not DB_PATH.exists() or DB_PATH.stat().st_size == 0
+    if needs_init:
+        initialize(DB_PATH, SCHEMA_PATH)
+
+    db = connect(DB_PATH)
+    try:
+        row = db.execute("SELECT COUNT(*) AS total FROM cases").fetchone()
+        total = int(row["total"])
+    finally:
+        db.close()
+
+    # Seed only empty databases, using synthetic demo records.
+    if total == 0:
+        timestamp = "2026-10-15T00:00:00Z"
+        demo_records = [
+            ("DEMO-2026-001", "Endpoint Alert Review", "High", "Investigating"),
+            ("DEMO-2026-002", "Suspicious Login Review", "Medium", "Triage"),
+            ("DEMO-2026-003", "Mailbox Rule Assessment", "Medium", "Evidence review"),
+        ]
+
+        db = connect(DB_PATH)
+        try:
+            for case_id, title, severity, status in demo_records:
+                create_case(
+                    db,
+                    case_id=case_id,
+                    title=title,
+                    severity=severity,
+                    status=status,
+                    actor_id="DEMO-SYSTEM",
+                    timestamp=timestamp,
+                )
+        finally:
+            db.close()
+
+
+def list_demo_cases() -> list[dict[str, Any]]:
+    ensure_database()
+    db = connect(DB_PATH)
+    try:
+        return list_cases(db)
+    finally:
+        db.close()
+
+==============================================================================
+FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_repository.py
+Exists: Yes
+SHA256 original: A30B3039420A01B3567D29357C388BF329AD78A679918F63B45C1C62984F374A
+SHA256 backup:   A30B3039420A01B3567D29357C388BF329AD78A679918F63B45C1C62984F374A
+Backup verified: True
+
+--- Source content ---
+import json
+import sqlite3
+from pathlib import Path
+from typing import Any
+
+
+def connect(database_path: str | Path) -> sqlite3.Connection:
+    connection = sqlite3.connect(str(database_path))
+    connection.row_factory = sqlite3.Row
+    connection.execute("PRAGMA foreign_keys = ON")
+    return connection
+
+
+def initialize(database_path: str | Path, schema_path: str | Path) -> None:
+    schema = Path(schema_path).read_text(encoding="utf-8")
+    db = connect(database_path)
+    try:
+        db.executescript(schema)
+        db.commit()
+    finally:
+        db.close()
+
+
+def create_case(
+    db: sqlite3.Connection,
+    *,
+    case_id: str,
+    title: str,
+    severity: str,
+    status: str,
+    actor_id: str,
+    timestamp: str,
+) -> dict[str, Any]:
+    if not all(isinstance(value, str) and value.strip() for value in (
+        case_id, title, severity, status, actor_id, timestamp
+    )):
+        raise ValueError("Case fields, actor, and timestamp must be non-empty strings.")
+
+    details = json.dumps(
+        {"synthetic": True, "action": "case_created"},
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+
+    with db:
+        db.execute(
+            """INSERT INTO cases
+               (case_id, title, severity, status, created_at, updated_at, created_by)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (case_id, title, severity, status, timestamp, timestamp, actor_id),
+        )
+        db.execute(
+            """INSERT INTO audit_events
+               (case_id, event_type, actor_id, event_time, details_json)
+               VALUES (?, ?, ?, ?, ?)""",
+            (case_id, "CASE_CREATED", actor_id, timestamp, details),
+        )
+
+    return get_case(db, case_id)
+
+
+def get_case(db: sqlite3.Connection, case_id: str) -> dict[str, Any] | None:
+    row = db.execute(
+        """SELECT case_id, title, severity, status, created_at,
+                  updated_at, created_by, version
+           FROM cases WHERE case_id = ?""",
+        (case_id,),
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def list_cases(db: sqlite3.Connection) -> list[dict[str, Any]]:
+    rows = db.execute(
+        """SELECT case_id, title, severity, status, created_at,
+                  updated_at, created_by, version
+           FROM cases ORDER BY created_at, case_id"""
+    ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def list_audit_events(
+    db: sqlite3.Connection, case_id: str
+) -> list[dict[str, Any]]:
+    rows = db.execute(
+        """SELECT event_id, case_id, event_type, actor_id,
+                  event_time, details_json, previous_hash, event_hash
+           FROM audit_events
+           WHERE case_id = ?
+           ORDER BY event_id""",
+        (case_id,),
+    ).fetchall()
+    return [dict(row) for row in rows]
+
+==============================================================================
+FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_schema.sql
+Exists: Yes
+SHA256 original: 69347622F6553ED288ED9DB39215C7B5BFED5C4323C90BC93E2E333E55F9E915
+SHA256 backup:   69347622F6553ED288ED9DB39215C7B5BFED5C4323C90BC93E2E333E55F9E915
+Backup verified: True
+
+--- Source content ---
+PRAGMA foreign_keys = ON;
+
+CREATE TABLE IF NOT EXISTS cases (
+    case_id TEXT PRIMARY KEY NOT NULL,
+    title TEXT NOT NULL CHECK (length(trim(title)) > 0),
+    severity TEXT NOT NULL CHECK (severity IN ('Low', 'Medium', 'High', 'Critical')),
+    status TEXT NOT NULL CHECK (
+        status IN ('Triage', 'Investigating', 'Evidence review', 'Contained', 'Closed')
+    ),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    created_by TEXT NOT NULL,
+    version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1)
+);
+
+CREATE TABLE IF NOT EXISTS audit_events (
+    event_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    case_id TEXT NOT NULL,
+    event_type TEXT NOT NULL CHECK (length(trim(event_type)) > 0),
+    actor_id TEXT NOT NULL CHECK (length(trim(actor_id)) > 0),
+    event_time TEXT NOT NULL,
+    details_json TEXT NOT NULL CHECK (json_valid(details_json)),
+    previous_hash TEXT,
+    event_hash TEXT,
+    FOREIGN KEY (case_id) REFERENCES cases(case_id) ON DELETE RESTRICT
+);
+
+CREATE INDEX IF NOT EXISTS idx_cases_status ON cases(status);
+CREATE INDEX IF NOT EXISTS idx_cases_severity ON cases(severity);
+CREATE INDEX IF NOT EXISTS idx_audit_case_time ON audit_events(case_id, event_time);
+
+-- Basic database-level protection against ordinary audit-event edits/deletes.
+-- This does not protect against a database administrator or direct file tampering.
+CREATE TRIGGER IF NOT EXISTS audit_events_no_update
+BEFORE UPDATE ON audit_events
+BEGIN
+    SELECT RAISE(ABORT, 'Audit events are append-only');
+END;
+
+CREATE TRIGGER IF NOT EXISTS audit_events_no_delete
+BEFORE DELETE ON audit_events
+BEGIN
+    SELECT RAISE(ABORT, 'Audit events are append-only');
+END;
+
+==============================================================================
+FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py
+Exists: Yes
+SHA256 original: A30B3039420A01B3567D29357C388BF329AD78A679918F63B45C1C62984F374A
+SHA256 backup:   A30B3039420A01B3567D29357C388BF329AD78A679918F63B45C1C62984F374A
+Backup verified: True
+
+--- Source content ---
+import json
+import sqlite3
+from pathlib import Path
+from typing import Any
+
+
+def connect(database_path: str | Path) -> sqlite3.Connection:
+    connection = sqlite3.connect(str(database_path))
+    connection.row_factory = sqlite3.Row
+    connection.execute("PRAGMA foreign_keys = ON")
+    return connection
+
+
+def initialize(database_path: str | Path, schema_path: str | Path) -> None:
+    schema = Path(schema_path).read_text(encoding="utf-8")
+    db = connect(database_path)
+    try:
+        db.executescript(schema)
+        db.commit()
+    finally:
+        db.close()
+
+
+def create_case(
+    db: sqlite3.Connection,
+    *,
+    case_id: str,
+    title: str,
+    severity: str,
+    status: str,
+    actor_id: str,
+    timestamp: str,
+) -> dict[str, Any]:
+    if not all(isinstance(value, str) and value.strip() for value in (
+        case_id, title, severity, status, actor_id, timestamp
+    )):
+        raise ValueError("Case fields, actor, and timestamp must be non-empty strings.")
+
+    details = json.dumps(
+        {"synthetic": True, "action": "case_created"},
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+
+    with db:
+        db.execute(
+            """INSERT INTO cases
+               (case_id, title, severity, status, created_at, updated_at, created_by)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (case_id, title, severity, status, timestamp, timestamp, actor_id),
+        )
+        db.execute(
+            """INSERT INTO audit_events
+               (case_id, event_type, actor_id, event_time, details_json)
+               VALUES (?, ?, ?, ?, ?)""",
+            (case_id, "CASE_CREATED", actor_id, timestamp, details),
+        )
+
+    return get_case(db, case_id)
+
+
+def get_case(db: sqlite3.Connection, case_id: str) -> dict[str, Any] | None:
+    row = db.execute(
+        """SELECT case_id, title, severity, status, created_at,
+                  updated_at, created_by, version
+           FROM cases WHERE case_id = ?""",
+        (case_id,),
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def list_cases(db: sqlite3.Connection) -> list[dict[str, Any]]:
+    rows = db.execute(
+        """SELECT case_id, title, severity, status, created_at,
+                  updated_at, created_by, version
+           FROM cases ORDER BY created_at, case_id"""
+    ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def list_audit_events(
+    db: sqlite3.Connection, case_id: str
+) -> list[dict[str, Any]]:
+    rows = db.execute(
+        """SELECT event_id, case_id, event_type, actor_id,
+                  event_time, details_json, previous_hash, event_hash
+           FROM audit_events
+           WHERE case_id = ?
+           ORDER BY event_id""",
+        (case_id,),
+    ).fetchall()
+    return [dict(row) for row in rows]
+
+==============================================================================
+FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\test_case_repository.py
+Exists: Yes
+SHA256 original: 2A39E6ADBCDB27667D5D200D293042B48891BC0F775EBB5AF62894127363DE84
+SHA256 backup:   2A39E6ADBCDB27667D5D200D293042B48891BC0F775EBB5AF62894127363DE84
+Backup verified: True
+
+--- Source content ---
+import json
+import sqlite3
+import tempfile
+import unittest
+from pathlib import Path
+
+from case_repository import (
+    connect, create_case, get_case, initialize, list_audit_events, list_cases
+)
+
+BASE = Path(__file__).resolve().parent
+SCHEMA = BASE / "phase6_schema.sql"
+
+
+class RepositoryTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.database = Path(self.temp.name) / "synthetic-test.sqlite"
+        initialize(self.database, SCHEMA)
+        self.db = connect(self.database)
+
+    def tearDown(self):
+        self.db.close()
+        self.temp.cleanup()
+
+    def make_case(self, case_id="DEMO-REPO-001"):
+        return create_case(
+            self.db,
+            case_id=case_id,
+            title="Synthetic repository test",
+            severity="High",
+            status="Investigating",
+            actor_id="synthetic-test",
+            timestamp="2026-01-01T00:00:00Z",
+        )
+
+    def test_create_and_retrieve_case(self):
+        case = self.make_case()
+        self.assertEqual(case["case_id"], "DEMO-REPO-001")
+        self.assertEqual(get_case(self.db, "DEMO-REPO-001")["severity"], "High")
+
+    def test_list_cases(self):
+        self.make_case("DEMO-REPO-002")
+        self.make_case("DEMO-REPO-001")
+        self.assertEqual(
+            [c["case_id"] for c in list_cases(self.db)],
+            ["DEMO-REPO-001", "DEMO-REPO-002"],
+        )
+
+    def test_missing_case_returns_none(self):
+        self.assertIsNone(get_case(self.db, "DEMO-MISSING"))
+
+    def test_creation_records_audit_event(self):
+        self.make_case()
+        events = list_audit_events(self.db, "DEMO-REPO-001")
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0]["event_type"], "CASE_CREATED")
+        self.assertEqual(events[0]["actor_id"], "synthetic-test")
+        self.assertTrue(json.loads(events[0]["details_json"])["synthetic"])
+
+    def test_invalid_severity_is_rejected(self):
+        with self.assertRaises(sqlite3.IntegrityError):
+            create_case(
+                self.db,
+                case_id="DEMO-INVALID",
+                title="Synthetic invalid test",
+                severity="Extreme",
+                status="Triage",
+                actor_id="synthetic-test",
+                timestamp="2026-01-01T00:00:00Z",
+            )
+
+    def test_empty_actor_is_rejected(self):
+        with self.assertRaises(ValueError):
+            create_case(
+                self.db,
+                case_id="DEMO-EMPTY-ACTOR",
+                title="Synthetic test",
+                severity="Low",
+                status="Triage",
+                actor_id="",
+                timestamp="2026-01-01T00:00:00Z",
+            )
+
+    def test_duplicate_case_id_is_rejected(self):
+        self.make_case()
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.make_case()
+
+    def test_audit_event_cannot_be_updated(self):
+        self.make_case()
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                "UPDATE audit_events SET event_type='ALTERED' WHERE event_id=1"
+            )
+
+    def test_audit_event_cannot_be_deleted(self):
+        self.make_case()
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute("DELETE FROM audit_events WHERE event_id=1")
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)
+
+==============================================================================
+FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\phase6_schema.sql
+Exists: Yes
+SHA256 original: 69347622F6553ED288ED9DB39215C7B5BFED5C4323C90BC93E2E333E55F9E915
+SHA256 backup:   69347622F6553ED288ED9DB39215C7B5BFED5C4323C90BC93E2E333E55F9E915
+Backup verified: True
+
+--- Source content ---
+PRAGMA foreign_keys = ON;
+
+CREATE TABLE IF NOT EXISTS cases (
+    case_id TEXT PRIMARY KEY NOT NULL,
+    title TEXT NOT NULL CHECK (length(trim(title)) > 0),
+    severity TEXT NOT NULL CHECK (severity IN ('Low', 'Medium', 'High', 'Critical')),
+    status TEXT NOT NULL CHECK (
+        status IN ('Triage', 'Investigating', 'Evidence review', 'Contained', 'Closed')
+    ),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    created_by TEXT NOT NULL,
+    version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1)
+);
+
+CREATE TABLE IF NOT EXISTS audit_events (
+    event_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    case_id TEXT NOT NULL,
+    event_type TEXT NOT NULL CHECK (length(trim(event_type)) > 0),
+    actor_id TEXT NOT NULL CHECK (length(trim(actor_id)) > 0),
+    event_time TEXT NOT NULL,
+    details_json TEXT NOT NULL CHECK (json_valid(details_json)),
+    previous_hash TEXT,
+    event_hash TEXT,
+    FOREIGN KEY (case_id) REFERENCES cases(case_id) ON DELETE RESTRICT
+);
+
+CREATE INDEX IF NOT EXISTS idx_cases_status ON cases(status);
+CREATE INDEX IF NOT EXISTS idx_cases_severity ON cases(severity);
+CREATE INDEX IF NOT EXISTS idx_audit_case_time ON audit_events(case_id, event_time);
+
+-- Basic database-level protection against ordinary audit-event edits/deletes.
+-- This does not protect against a database administrator or direct file tampering.
+CREATE TRIGGER IF NOT EXISTS audit_events_no_update
+BEFORE UPDATE ON audit_events
+BEGIN
+    SELECT RAISE(ABORT, 'Audit events are append-only');
+END;
+
+CREATE TRIGGER IF NOT EXISTS audit_events_no_delete
+BEFORE DELETE ON audit_events
+BEGIN
+    SELECT RAISE(ABORT, 'Audit events are append-only');
+END;
+
+==============================================================================
+FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\App.tsx
+Exists: Yes
+SHA256 original: DBEAED9BED6258804A1A37F13185426929E977D45C1F4005AE1E511A2E2538DC
+SHA256 backup:   DBEAED9BED6258804A1A37F13185426929E977D45C1F4005AE1E511A2E2538DC
+Backup verified: True
+
+--- Source content ---
+import { useEffect, useMemo, useState } from "react";
+
+type DemoCase = {
+  case_id: string;
+  title: string;
+  severity: string;
+  status: string;
+};
+
+const navigation = [
+  "Dashboard",
+  "Cases",
+  "Assets & Scans",
+  "Findings",
+  "Evidence Vault",
+  "Response Actions",
+  "Reports",
+  "Administration",
+];
+
+const fallbackCases: DemoCase[] = [
+  { case_id: "DEMO-2026-001", title: "Endpoint Alert Review", severity: "High", status: "Investigating" },
+  { case_id: "DEMO-2026-002", title: "Suspicious Login Review", severity: "Medium", status: "Triage" },
+  { case_id: "DEMO-2026-003", title: "Mailbox Rule Assessment", severity: "Medium", status: "Evidence review" },
+];
+
+const API_BASE = "";
+
+function App() {
+  const [page, setPage] = useState("Dashboard");
+  const [search, setSearch] = useState("");
+  const [cases, setCases] = useState<DemoCase[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [usingFallback, setUsingFallback] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [caseSeverityFilter, setCaseSeverityFilter] = useState("All");
+  const [caseStatusFilter, setCaseStatusFilter] = useState("All");
+  const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadCases() {
+      setLoading(true);
+      setError("");
+      setUsingFallback(false);
+
+      try {
+        const response = await fetch(`${API_BASE}/api/v1/demo/cases`, {
+          headers: { Accept: "application/json" },
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error(`API returned HTTP ${response.status}`);
+        }
+
+        const payload: unknown = await response.json();
+
+        if (
+          !Array.isArray(payload) ||
+          !payload.every(
+            (item) =>
+              item !== null &&
+              typeof item === "object" &&
+              typeof item.case_id === "string" &&
+              typeof item.title === "string" &&
+              typeof item.severity === "string" &&
+              typeof item.status === "string",
+          )
+        ) {
+          throw new Error("Unexpected API response format.");
+        }
+
+        if (!controller.signal.aborted) setCases(payload as DemoCase[]);
+      } catch (err) {
+        if (controller.signal.aborted) return;
+
+        const message = err instanceof Error ? err.message : "Unknown connection error";
+        setError(`Could not load cases from the localhost development API: ${message}`);
+        setCases(fallbackCases);
+        setUsingFallback(true);
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    }
+
+    void loadCases();
+    return () => controller.abort();
+  }, [refreshKey]);
+
+  const filteredCases = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return cases;
+
+    return cases.filter((item) =>
+      `${item.case_id} ${item.title} ${item.severity} ${item.status}`
+        .toLowerCase()
+        .includes(term),
+    );
+  }, [cases, search]);
+
+  const severityOptions = useMemo(
+    () => ["All", ...Array.from(new Set(cases.map((item) => item.severity))).sort()],
+    [cases],
+  );
+  const statusOptions = useMemo(
+    () => ["All", ...Array.from(new Set(cases.map((item) => item.status))).sort()],
+    [cases],
+  );
+  const visibleCases = useMemo(() => filteredCases.filter((item) =>
+    (caseSeverityFilter === "All" || item.severity === caseSeverityFilter) &&
+    (caseStatusFilter === "All" || item.status === caseStatusFilter)
+  ), [filteredCases, caseSeverityFilter, caseStatusFilter]);
+  const selectedCase = cases.find((item) => item.case_id === selectedCaseId) ?? null;
+
+  return (
+    <div className="shell">
+      <aside className="sidebar">
+        <div className="brand">
+          <div className="brand-mark">DFIR</div>
+          <div><strong>CIRT RESPONSE</strong><small>Investigation Platform</small></div>
+        </div>
+        <p className="nav-label">WORKSPACE</p>
+        <nav aria-label="Main navigation">
+          {navigation.map((item) => (
+            <button
+              className={`nav-item ${page === item ? "active" : ""}`}
+              key={item}
+              onClick={() => setPage(item)}
+              aria-current={page === item ? "page" : undefined}
+            >
+              <span aria-hidden="true">{item === "Dashboard" ? "â–¦" : "â—‡"}</span>
+              {item}
+            </button>
+          ))}
+        </nav>
+        <div className="side-note">
+          <span className="status-dot" /> Development mode
+          <small>Synthetic records only. No scanner or evidence repository connected.</small>
+        </div>
+      </aside>
+
+      <main className="main">
+        <header className="topbar">
+          <span>CIRT / DFIR <span className="muted"> / {page}</span></span>
+          <span className="demo-label">DEVELOPMENT SCAFFOLD</span>
+        </header>
+
+        <div className="content">
+          <div className="page-heading">
+            <div>
+              <span className="eyebrow">SECURITY OPERATIONS</span>
+              <h1>{page === "Dashboard" ? "Incident Response Overview" : page}</h1>
+              <p className="muted">Case management and forensic workflow development.</p>
+            </div>
+          </div>
+
+          <div className="notice" role="note">
+            DEVELOPMENT ONLY â€” records are synthetic. This is not an operational
+            incident-response or evidence-management system.
+          </div>
+
+          {page === "Dashboard" || page === "Cases" ? (
+            <>
+              <div className="metrics">
+                <article className="metric"><span>Cases returned</span><strong>{loading ? "â€¦" : cases.length}</strong><small>Current case-list response</small></article>
+                <article className="metric"><span>High severity</span><strong>{cases.filter((item) => item.severity.toLowerCase() === "high").length}</strong><small>Synthetic records only</small></article>
+                <article className="metric"><span>Investigating</span><strong>{cases.filter((item) => item.status.toLowerCase() === "investigating").length}</strong><small>Returned case data</small></article>
+                <article className="metric"><span>API state</span><strong>{loading ? "Loading" : usingFallback ? "Offline" : "Ready"}</strong><small>Local development endpoint</small></article>
+              </div>
+
+              {loading && <section className="panel" role="status">Loading synthetic cases from the development APIâ€¦</section>}
+
+              {error && (
+                <section className="panel" role="alert">
+                  <h2>API connection notice</h2>
+                  <p>{error}</p>
+                  <p>Showing clearly identified local synthetic fallback records.</p>
+                </section>
+              )}
+
+              <section className="panel">
+                <div className="panel-heading">
+                  <h2>Case Register</h2>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <input
+                      aria-label="Search synthetic cases"
+                      placeholder="Search cases..."
+                      value={search}
+                      onChange={(event) => setSearch(event.target.value)}
+                    />
+                    <select
+                      aria-label="Filter cases by severity"
+                      value={caseSeverityFilter}
+                      onChange={(event) => setCaseSeverityFilter(event.target.value)}
+                    >
+                      {severityOptions.map((value) => <option key={value} value={value}>{value === "All" ? "All severities" : value}</option>)}
+                    </select>
+                    <select
+                      aria-label="Filter cases by status"
+                      value={caseStatusFilter}
+                      onChange={(event) => setCaseStatusFilter(event.target.value)}
+                    >
+                      {statusOptions.map((value) => <option key={value} value={value}>{value === "All" ? "All statuses" : value}</option>)}
+                    </select>
+                    <button type="button" onClick={() => setRefreshKey((value) => value + 1)} disabled={loading}>
+                      {loading ? "Loadingâ€¦" : "Refresh"}
+                    </button>
+                  </div>
+                </div>
+                <div className="table-wrap">
+                  <table>
+                    <thead><tr><th>Case ID</th><th>Incident</th><th>Severity</th><th>Status</th></tr></thead>
+                    <tbody>
+                      {visibleCases.map((item) => (
+                        <tr key={item.case_id} className={selectedCaseId === item.case_id ? "selected-case-row" : ""}>
+                          <td>
+                            <button
+                              type="button"
+                              className="case-link"
+                              onClick={() => setSelectedCaseId((current) => current === item.case_id ? null : item.case_id)}
+                              aria-expanded={selectedCaseId === item.case_id}
+                            >
+                              {item.case_id}
+                            </button>
+                          </td>
+                          <td>{item.title}</td>
+                          <td><span className={`pill ${item.severity.toLowerCase()}`}>{item.severity}</span></td>
+                          <td>{item.status}</td>
+                        </tr>
+                      ))}
+                      {!loading && visibleCases.length === 0 && <tr><td colSpan={4}>No cases match the current search and filters.</td></tr>}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="muted">
+                  Showing {visibleCases.length} of {cases.length} synthetic cases.
+                  {" "}{usingFallback ? "Data source: local fallback; API unavailable." : "Data source: development API response."}
+                </p>
+              </section>
+
+              {selectedCase && (
+                <section className="panel case-detail-panel" aria-labelledby="case-detail-title">
+                  <div className="panel-heading">
+                    <h2 id="case-detail-title">Case details</h2>
+                    <button type="button" onClick={() => setSelectedCaseId(null)}>Close details</button>
+                  </div>
+                  <dl className="case-detail-grid">
+                    <div><dt>Case ID</dt><dd>{selectedCase.case_id}</dd></div>
+                    <div><dt>Incident</dt><dd>{selectedCase.title}</dd></div>
+                    <div><dt>Severity</dt><dd><span className={`pill ${selectedCase.severity.toLowerCase()}`}>{selectedCase.severity}</span></dd></div>
+                    <div><dt>Status</dt><dd>{selectedCase.status}</dd></div>
+                  </dl>
+                  <p className="muted">Read-only details from synthetic development data. Editing and persistence are not enabled.</p>
+                </section>
+              )}
+            </>
+          ) : (
+            <section className="panel placeholder">
+              <h2>{page}</h2>
+              <p>This module is a scaffold; its workflow has not been implemented.</p>
+              <p>Production access controls, audit logging, evidence safeguards, and security review are required before operational use.</p>
+            </section>
+          )}
+        </div>
+        <footer className="app-footer">
+          <div>CIRT DFIR Â· Development scaffold Â· Synthetic data Â· Not for operational use</div>
+          <div className="bozv-signature">
+            <span>Developed by: <strong>BozV</strong></span>
+            <span>Powered by: <strong>BozV</strong></span>
+          </div>
+        </footer>
+      </main>
+    </div>
+  );
+}
+
+export default App;
+
+==============================================================================
+FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\style.css
+Exists: Yes
+SHA256 original: 1422AB3D3E51C8F3D6539FD904F3BB950671366D3833C08912F2DA6DBA83E1B2
+SHA256 backup:   1422AB3D3E51C8F3D6539FD904F3BB950671366D3833C08912F2DA6DBA83E1B2
+Backup verified: True
+
+--- Source content ---
+:root{font-family:Inter,"Segoe UI",Arial,sans-serif;color:#e6edf7;background:#0b1120;font-synthesis:none;text-rendering:optimizeLegibility}
+*{box-sizing:border-box}
+body{margin:0;min-width:320px;min-height:100vh}
+button,input{font:inherit}
+.shell{min-height:100vh;display:grid;grid-template-columns:245px minmax(0,1fr)}
+.sidebar{background:#0d1627;border-right:1px solid #26354d;padding:22px 14px}
+.brand{display:flex;align-items:center;gap:11px;padding:0 7px 23px;border-bottom:1px solid #26354d}
+.brand-mark{background:#1b3c70;border:1px solid #3767a8;color:#a9ceff;padding:10px;border-radius:9px;font-weight:800}
+.brand strong,.brand small{display:block}
+.brand strong{font-size:13px;letter-spacing:.5px}
+.brand small{color:#8fa1ba;font-size:11px;margin-top:5px}
+.nav-label,.eyebrow{font-size:10px;letter-spacing:1.5px;font-weight:700;color:#7193c2}
+.nav-label{margin:25px 10px 10px}
+nav{display:grid;gap:4px}
+.nav-item{display:flex;align-items:center;gap:11px;text-align:left;border:0;border-radius:7px;padding:11px;background:transparent;color:#a9bad1;cursor:pointer}
+.nav-item:hover,.nav-item.active{background:#1b2b45;color:#fff}
+.nav-item.active{box-shadow:inset 3px 0 #5597ff}
+.side-note{margin:28px 5px;padding:12px;border:1px solid #26354d;border-radius:8px;color:#41d6a3;font-size:11px}
+.side-note small{display:block;color:#8fa1ba;line-height:1.6;margin-top:8px}
+.status-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#41d6a3;margin-right:6px}
+.main{min-width:0}
+.topbar{height:67px;display:flex;align-items:center;justify-content:space-between;padding:0 30px;border-bottom:1px solid #26354d;background:#0d1627;font-size:12px}
+.muted{color:#8fa1ba}
+.demo-label{font-size:10px;color:#8fa1ba;letter-spacing:1px}
+.content{max-width:1450px;margin:auto;padding:29px 30px}
+.page-heading{display:flex;justify-content:space-between;margin-bottom:22px}
+h1{font-size:27px;margin:8px 0}
+h2{font-size:15px;margin:0}
+.page-heading p{font-size:13px}
+.notice{background:#192a41;border:1px solid #304967;color:#b8cce5;padding:13px 15px;border-radius:8px;font-size:12px;line-height:1.6}
+.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin:20px 0}
+.metric,.panel{background:#111b2e;border:1px solid #26354d;border-radius:10px}
+.metric{padding:17px}
+.metric span,.metric small{display:block;color:#8fa1ba;font-size:12px}
+.metric strong{display:block;font-size:29px;margin:12px 0}
+.metric small{font-size:11px}
+.panel{padding:18px;margin-top:16px}
+.panel-heading{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-bottom:15px}
+input{background:#0b1424;border:1px solid #30405a;border-radius:7px;padding:10px 12px;color:#e6edf7;max-width:100%}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;white-space:nowrap}
+th,td{text-align:left;padding:13px 10px;border-bottom:1px solid #223047;font-size:12px}
+th{font-size:10px;letter-spacing:.8px;color:#8fa1ba;text-transform:uppercase}
+tbody tr:last-child td{border-bottom:0}
+.pill{display:inline-block;padding:5px 8px;border-radius:20px;font-size:10px;background:#24344a}
+.pill.high{background:#48252e;color:#ff9ba3}
+.pill.medium{background:#45361f;color:#f4cb78}
+.pill.low{background:#193d38;color:#75e5bd}
+.placeholder{line-height:1.7;color:#b8cce5}
+footer{text-align:center;padding:20px;color:#6f829b;font-size:10px}
+@media(max-width:950px){.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.shell{grid-template-columns:205px minmax(0,1fr)}.content{padding:22px 18px}}
+@media(max-width:650px){.shell{grid-template-columns:1fr}.sidebar{padding:12px}.brand{padding-bottom:12px}.nav-label,.side-note{display:none}nav{display:flex;flex-wrap:wrap;margin-top:12px}.nav-item{padding:9px;font-size:12px}.topbar{padding:0 14px}.content{padding:18px 12px}.metrics{gap:8px}.metric{padding:12px}.metric strong{font-size:23px}.panel-heading{align-items:flex-start;flex-direction:column}}
+
+/* BozV application signature */
+.app-footer {
+  text-align: center;
+  padding: 20px 16px;
+  color: #6f829b;
+  font-size: 10px;
+  line-height: 1.8;
+}
+
+.bozv-signature {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+  margin-top: 7px;
+  color: #9bb2d1;
+  letter-spacing: 0.2px;
+}
+
+.bozv-signature strong {
+  color: #8fc0ff;
+  font-weight: 700;
+}
+
+/* Phase 5C: synthetic case filters and read-only details */
+.panel-heading select {
+  min-width: 130px;
+  max-width: 100%;
+}
+.case-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #8fc0ff;
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+.case-link:hover,
+.case-link:focus-visible {
+  color: #c2ddff;
+  text-decoration: underline;
+}
+.selected-case-row {
+  background: rgba(82, 145, 219, 0.1);
+}
+.case-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin: 18px 0;
+}
+.case-detail-grid > div {
+  padding: 14px;
+  border: 1px solid #263c56;
+  border-radius: 8px;
+  background: rgba(9, 20, 35, 0.5);
+  min-width: 0;
+}
+.case-detail-grid dt {
+  color: #91a5bf;
+  font-size: 11px;
+  margin-bottom: 8px;
+}
+.case-detail-grid dd {
+  margin: 0;
+  color: #e4edf9;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 700px) {
+  .panel-heading select {
+    width: 100%;
+  }
+}
+
+==============================================================================
+LIFECYCLE IMPLEMENTATION MARKERS
+
+MARKER: API routes
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\main.py:46: @app.get("/api/v1/health", response_model=HealthResponse)
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\main.py:51: @app.get("/api/v1/demo/cases", response_model=list[DemoCase])
+
+MARKER: Repository functions
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\main.py:47: def health() -> HealthResponse:
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\main.py:52: def get_demo_cases() -> list[DemoCase]:
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_store.py:13: def ensure_database() -> None:
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_store.py:54: def list_demo_cases() -> list[dict[str, Any]]:
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_repository.py:7: def connect(database_path: str | Path) -> sqlite3.Connection:
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_repository.py:14: def initialize(database_path: str | Path, schema_path: str | Path) -> None:
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_repository.py:24: def create_case(
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_repository.py:62: def get_case(db: sqlite3.Connection, case_id: str) -> dict[str, Any] | None:
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_repository.py:72: def list_cases(db: sqlite3.Connection) -> list[dict[str, Any]]:
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_repository.py:81: def list_audit_events(
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py:7: def connect(database_path: str | Path) -> sqlite3.Connection:
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py:14: def initialize(database_path: str | Path, schema_path: str | Path) -> None:
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py:24: def create_case(
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py:62: def get_case(db: sqlite3.Connection, case_id: str) -> dict[str, Any] | None:
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py:72: def list_cases(db: sqlite3.Connection) -> list[dict[str, Any]]:
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py:81: def list_audit_events(
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\test_case_repository.py:16: def setUp(self):
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\test_case_repository.py:22: def tearDown(self):
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\test_case_repository.py:26: def make_case(self, case_id="DEMO-REPO-001"):
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\test_case_repository.py:37: def test_create_and_retrieve_case(self):
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\test_case_repository.py:42: def test_list_cases(self):
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\test_case_repository.py:50: def test_missing_case_returns_none(self):
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\test_case_repository.py:53: def test_creation_records_audit_event(self):
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\test_case_repository.py:61: def test_invalid_severity_is_rejected(self):
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\test_case_repository.py:73: def test_empty_actor_is_rejected(self):
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\test_case_repository.py:85: def test_duplicate_case_id_is_rejected(self):
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\test_case_repository.py:90: def test_audit_event_cannot_be_updated(self):
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\test_case_repository.py:97: def test_audit_event_cannot_be_deleted(self):
+
+MARKER: Audit event operations
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_store.py:47: actor_id="DEMO-SYSTEM",
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_repository.py:31: actor_id: str,
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_repository.py:35: case_id, title, severity, status, actor_id, timestamp
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_repository.py:50: (case_id, title, severity, status, timestamp, timestamp, actor_id),
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_repository.py:53: """INSERT INTO audit_events
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_repository.py:54: (case_id, event_type, actor_id, event_time, details_json)
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_repository.py:56: (case_id, "CASE_CREATED", actor_id, timestamp, details),
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_repository.py:81: def list_audit_events(
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_repository.py:85: """SELECT event_id, case_id, event_type, actor_id,
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_repository.py:86: event_time, details_json, previous_hash, event_hash
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_repository.py:87: FROM audit_events
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_schema.sql:16: CREATE TABLE IF NOT EXISTS audit_events (
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_schema.sql:19: event_type TEXT NOT NULL CHECK (length(trim(event_type)) > 0),
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_schema.sql:20: actor_id TEXT NOT NULL CHECK (length(trim(actor_id)) > 0),
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_schema.sql:23: previous_hash TEXT,
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_schema.sql:24: event_hash TEXT,
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_schema.sql:30: CREATE INDEX IF NOT EXISTS idx_audit_case_time ON audit_events(case_id, event_time);
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_schema.sql:34: CREATE TRIGGER IF NOT EXISTS audit_events_no_update
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_schema.sql:35: BEFORE UPDATE ON audit_events
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_schema.sql:40: CREATE TRIGGER IF NOT EXISTS audit_events_no_delete
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_schema.sql:41: BEFORE DELETE ON audit_events
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py:31: actor_id: str,
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py:35: case_id, title, severity, status, actor_id, timestamp
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py:50: (case_id, title, severity, status, timestamp, timestamp, actor_id),
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py:53: """INSERT INTO audit_events
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py:54: (case_id, event_type, actor_id, event_time, details_json)
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py:56: (case_id, "CASE_CREATED", actor_id, timestamp, details),
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py:81: def list_audit_events(
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py:85: """SELECT event_id, case_id, event_type, actor_id,
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py:86: event_time, details_json, previous_hash, event_hash
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py:87: FROM audit_events
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\test_case_repository.py:8: connect, create_case, get_case, initialize, list_audit_events, list_cases
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\test_case_repository.py:33: actor_id="synthetic-test",
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\test_case_repository.py:55: events = list_audit_events(self.db, "DEMO-REPO-001")
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\test_case_repository.py:57: self.assertEqual(events[0]["event_type"], "CASE_CREATED")
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\test_case_repository.py:58: self.assertEqual(events[0]["actor_id"], "synthetic-test")
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\test_case_repository.py:69: actor_id="synthetic-test",
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\test_case_repository.py:81: actor_id="",
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\test_case_repository.py:94: "UPDATE audit_events SET event_type='ALTERED' WHERE event_id=1"
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\test_case_repository.py:100: self.db.execute("DELETE FROM audit_events WHERE event_id=1")
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\phase6_schema.sql:16: CREATE TABLE IF NOT EXISTS audit_events (
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\phase6_schema.sql:19: event_type TEXT NOT NULL CHECK (length(trim(event_type)) > 0),
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\phase6_schema.sql:20: actor_id TEXT NOT NULL CHECK (length(trim(actor_id)) > 0),
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\phase6_schema.sql:23: previous_hash TEXT,
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\phase6_schema.sql:24: event_hash TEXT,
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\phase6_schema.sql:30: CREATE INDEX IF NOT EXISTS idx_audit_case_time ON audit_events(case_id, event_time);
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\phase6_schema.sql:34: CREATE TRIGGER IF NOT EXISTS audit_events_no_update
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\phase6_schema.sql:35: BEFORE UPDATE ON audit_events
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\phase6_schema.sql:40: CREATE TRIGGER IF NOT EXISTS audit_events_no_delete
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\phase6_schema.sql:41: BEFORE DELETE ON audit_events
+
+MARKER: Case status/severity fields
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\main.py:7: version="0.1.0",
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\main.py:13: status: str
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\main.py:20: severity: str
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\main.py:21: status: str
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\main.py:28: severity="High",
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\main.py:29: status="Investigating",
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\main.py:34: severity="Medium",
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\main.py:35: status="Triage",
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\main.py:40: severity="Medium",
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\main.py:41: status="Evidence review",
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\main.py:48: return HealthResponse(status="ok", mode="development-scaffold")
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_store.py:40: for case_id, title, severity, status in demo_records:
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_store.py:45: severity=severity,
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_store.py:46: status=status,
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_repository.py:29: severity: str,
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_repository.py:30: status: str,
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_repository.py:35: case_id, title, severity, status, actor_id, timestamp
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_repository.py:48: (case_id, title, severity, status, created_at, updated_at, created_by)
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_repository.py:50: (case_id, title, severity, status, timestamp, timestamp, actor_id),
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_repository.py:64: """SELECT case_id, title, severity, status, created_at,
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_repository.py:65: updated_at, created_by, version
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_repository.py:74: """SELECT case_id, title, severity, status, created_at,
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_repository.py:75: updated_at, created_by, version
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_schema.sql:6: severity TEXT NOT NULL CHECK (severity IN ('Low', 'Medium', 'High', 'Critical')),
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_schema.sql:7: status TEXT NOT NULL CHECK (
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_schema.sql:8: status IN ('Triage', 'Investigating', 'Evidence review', 'Contained', 'Closed')
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_schema.sql:11: updated_at TEXT NOT NULL,
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_schema.sql:13: version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1)
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_schema.sql:28: CREATE INDEX IF NOT EXISTS idx_cases_status ON cases(status);
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\case_schema.sql:29: CREATE INDEX IF NOT EXISTS idx_cases_severity ON cases(severity);
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py:29: severity: str,
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py:30: status: str,
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py:35: case_id, title, severity, status, actor_id, timestamp
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py:48: (case_id, title, severity, status, created_at, updated_at, created_by)
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py:50: (case_id, title, severity, status, timestamp, timestamp, actor_id),
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py:64: """SELECT case_id, title, severity, status, created_at,
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py:65: updated_at, created_by, version
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py:74: """SELECT case_id, title, severity, status, created_at,
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py:75: updated_at, created_by, version
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\test_case_repository.py:31: severity="High",
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\test_case_repository.py:32: status="Investigating",
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\test_case_repository.py:40: self.assertEqual(get_case(self.db, "DEMO-REPO-001")["severity"], "High")
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\test_case_repository.py:61: def test_invalid_severity_is_rejected(self):
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\test_case_repository.py:67: severity="Extreme",
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\test_case_repository.py:68: status="Triage",
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\test_case_repository.py:79: severity="Low",
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\test_case_repository.py:80: status="Triage",
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\phase6_schema.sql:6: severity TEXT NOT NULL CHECK (severity IN ('Low', 'Medium', 'High', 'Critical')),
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\phase6_schema.sql:7: status TEXT NOT NULL CHECK (
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\phase6_schema.sql:8: status IN ('Triage', 'Investigating', 'Evidence review', 'Contained', 'Closed')
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\phase6_schema.sql:11: updated_at TEXT NOT NULL,
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\phase6_schema.sql:13: version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1)
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\phase6_schema.sql:28: CREATE INDEX IF NOT EXISTS idx_cases_status ON cases(status);
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\phase6_schema.sql:29: CREATE INDEX IF NOT EXISTS idx_cases_severity ON cases(severity);
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\App.tsx:6: severity: string;
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\App.tsx:7: status: string;
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\App.tsx:22: { case_id: "DEMO-2026-001", title: "Endpoint Alert Review", severity: "High", status: "Investigating" },
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\App.tsx:23: { case_id: "DEMO-2026-002", title: "Suspicious Login Review", severity: "Medium", status: "Triage" },
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\App.tsx:24: { case_id: "DEMO-2026-003", title: "Mailbox Rule Assessment", severity: "Medium", status: "Evidence review" },
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\App.tsx:37: const [caseSeverityFilter, setCaseSeverityFilter] = useState("All");
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\App.tsx:38: const [caseStatusFilter, setCaseStatusFilter] = useState("All");
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\App.tsx:56: throw new Error(`API returned HTTP ${response.status}`);
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\App.tsx:69: typeof item.severity === "string" &&
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\App.tsx:70: typeof item.status === "string",
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\App.tsx:98: `${item.case_id} ${item.title} ${item.severity} ${item.status}`
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\App.tsx:104: const severityOptions = useMemo(
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\App.tsx:105: () => ["All", ...Array.from(new Set(cases.map((item) => item.severity))).sort()],
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\App.tsx:108: const statusOptions = useMemo(
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\App.tsx:109: () => ["All", ...Array.from(new Set(cases.map((item) => item.status))).sort()],
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\App.tsx:113: (caseSeverityFilter === "All" || item.severity === caseSeverityFilter) &&
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\App.tsx:114: (caseStatusFilter === "All" || item.status === caseStatusFilter)
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\App.tsx:115: ), [filteredCases, caseSeverityFilter, caseStatusFilter]);
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\App.tsx:140: <span className="status-dot" /> Development mode
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\App.tsx:169: <article className="metric"><span>High severity</span><strong>{cases.filter((item) => item.severity.toLowerCase() === "high").length}</strong><small>Synthetic records only</small></article>
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\App.tsx:170: <article className="metric"><span>Investigating</span><strong>{cases.filter((item) => item.status.toLowerCase() === "investigating").length}</strong><small>Returned case data</small></article>
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\App.tsx:174: {loading && <section className="panel" role="status">Loading synthetic cases from the development API…</section>}
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\App.tsx:195: aria-label="Filter cases by severity"
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\App.tsx:196: value={caseSeverityFilter}
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\App.tsx:197: onChange={(event) => setCaseSeverityFilter(event.target.value)}
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\App.tsx:199: {severityOptions.map((value) => <option key={value} value={value}>{value === "All" ? "All severities" : value}</option>)}
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\App.tsx:202: aria-label="Filter cases by status"
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\App.tsx:203: value={caseStatusFilter}
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\App.tsx:204: onChange={(event) => setCaseStatusFilter(event.target.value)}
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\App.tsx:206: {statusOptions.map((value) => <option key={value} value={value}>{value === "All" ? "All statuses" : value}</option>)}
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\App.tsx:215: <thead><tr><th>Case ID</th><th>Incident</th><th>Severity</th><th>Status</th></tr></thead>
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\App.tsx:230: <td><span className={`pill ${item.severity.toLowerCase()}`}>{item.severity}</span></td>
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\App.tsx:231: <td>{item.status}</td>
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\App.tsx:253: <div><dt>Severity</dt><dd><span className={`pill ${selectedCase.severity.toLowerCase()}`}>{selectedCase.severity}</span></dd></div>
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\App.tsx:254: <div><dt>Status</dt><dd>{selectedCase.status}</dd></div>
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\style.css:20: .status-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#41d6a3;margin-right:6px}
+
+MARKER: Frontend API calls
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\main.py:46: @app.get("/api/v1/health", response_model=HealthResponse)
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\main.py:51: @app.get("/api/v1/demo/cases", response_model=list[DemoCase])
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\App.tsx:50: const response = await fetch(`${API_BASE}/api/v1/demo/cases`, {
+
+==============================================================================
+PREFLIGHT RESULT
+PASS - All expected files were backed up and SHA256 hashes match.
+Missing files: 0
+Backup hash mismatches: 0
+Backup directory: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\Phase7A_Preflight_20261015_234316
+Report path: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase7A_Preflight_20261015_234316.txt

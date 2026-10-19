@@ -1,0 +1,10 @@
+package.json: VALID JSON
+  name: cirt-dfir-platform-frontend
+  lockfileVersion: (not applicable)
+  @azure/msal-browser declared: 5.25.1
+  @azure/msal-react declared: 5.7.2
+package-lock.json: VALID JSON
+  name: cirt-dfir-platform-frontend
+  lockfileVersion: 3
+  @azure/msal-browser locked: 5.25.1
+  @azure/msal-react locked: 5.7.2

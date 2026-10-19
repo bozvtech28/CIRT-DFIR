@@ -1,0 +1,73 @@
+CIRT-DFIR - PHASE 8B181
+Entra ID Configuration and Approval Handoff
+Generated UTC: 2026-10-19T01:35:10.526153+00:00
+
+========================================================================
+1. PURPOSE
+========================================================================
+Prepare an Entra ID authentication approval handoff for CIRT-DFIR.
+This document is a planning artifact, not an authorization to enable authentication.
+
+========================================================================
+2. REQUIRED CONFIGURATION
+========================================================================
+CIRT_DFIR_ENTRA_TENANT_ID
+  Required: approved Microsoft Entra tenant UUID.
+  Owner: Identity / Entra administrator.
+
+CIRT_DFIR_ENTRA_EXPECTED_ISSUER
+  Required: exact HTTPS issuer verified against approved tenant metadata.
+  Owner: Identity administrator and application security.
+
+CIRT_DFIR_ENTRA_AUDIENCE
+  Required: exact API audience / Application ID URI.
+  Owner: API application owner and Entra administrator.
+
+Additional trusted-code configuration must define and approve:
+  discovery_url
+  trusted_metadata_hosts
+  allowed_jwks_hosts
+  approved_role_map
+
+========================================================================
+3. ROLE MAPPING APPROVAL
+========================================================================
+Document each actual Entra application role and its approved internal role.
+Existing internal role names identified in the project:
+  Administrator
+  DFIR Analyst
+  Viewer
+Do not assume any Entra role names or grant Administrator by default.
+Reject unmapped roles and keep least-privilege access.
+
+========================================================================
+4. REQUIRED VALIDATION
+========================================================================
+[ ] Tenant UUID and tenant ownership verified.
+[ ] Expected issuer matches trusted tenant metadata exactly.
+[ ] Audience matches the API registration.
+[ ] Discovery URL uses HTTPS and an approved metadata hostname.
+[ ] JWKS URL hostname is explicitly allowlisted.
+[ ] Role mapping is approved and limited to known internal roles.
+[ ] Invalid, expired, wrong-issuer, wrong-audience, and wrong-tenant tokens fail.
+[ ] Unknown roles and metadata/JWKS outages fail closed.
+[ ] Unauthenticated API requests remain rejected.
+[ ] Authenticated requests still enforce per-route permissions.
+[ ] Audit actor identity comes only from the validated principal.
+[ ] Security/admin approval recorded.
+
+========================================================================
+5. CURRENT PROJECT BOUNDARY
+========================================================================
+The current auth_dependencies.py gate rejects requests by default.
+The Entra authenticator and bearer adapter are not wired into FastAPI.
+Keep that boundary unchanged until all required approvals are recorded.
+Do not place client secrets, access tokens, private keys, or credentials in this report.
+
+========================================================================
+6. DECISION
+========================================================================
+STATUS: BLOCKED PENDING APPROVED CONFIGURATION AND SIGN-OFF
+Next authorized step: review configuration with the identity administrator,
+then create a separately reviewed integration change and regression plan.
+

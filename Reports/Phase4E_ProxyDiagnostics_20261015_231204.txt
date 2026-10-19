@@ -1,0 +1,41 @@
+﻿Phase 4E proxy diagnostics
+Timestamp: 2026-10-15 23:12:04
+
+PORT 8000
+No listening process found.
+
+PORT 5173
+No listening process found.
+
+URL: http://127.0.0.1:8000/api/v1/health
+REQUEST FAILED: Unable to connect to the remote server
+
+URL: http://127.0.0.1:8000/api/v1/demo/cases
+REQUEST FAILED: Unable to connect to the remote server
+
+URL: http://127.0.0.1:5173/
+REQUEST FAILED: Unable to connect to the remote server
+
+URL: http://127.0.0.1:5173/api/v1/health
+REQUEST FAILED: Unable to connect to the remote server
+
+URL: http://127.0.0.1:5173/api/v1/demo/cases
+REQUEST FAILED: Unable to connect to the remote server
+
+VITE CONFIGURATION
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    host: "127.0.0.1",
+    strictPort: true,
+    proxy: {
+      "/api": {
+        target: "http://127.0.0.1:8000",
+        changeOrigin: false,
+      },
+    },
+  },
+});

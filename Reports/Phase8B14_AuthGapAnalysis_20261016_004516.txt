@@ -1,0 +1,47 @@
+﻿CIRT DFIR PROFESSIONAL - PHASE 8B.14
+Timestamp: 2026-10-16T00:45:17.0197938+08:00
+Purpose: Static authentication integration gap analysis
+Identity provider target: Microsoft Entra ID
+Execution: No application execution, network requests, or source edits
+
+=== SOURCE INVENTORY AND BACKUP HASH VERIFICATION ===
+BACKUP VERIFIED: app\main.py SHA256=55D66D658ED9182535E1FFD6F98507958CB52AFAD3A4DEFFECECEC960A5F17B6
+BACKUP VERIFIED: app\auth_dependencies.py SHA256=79502FBC9DD630408C2694DD6B4C1CD4E3B9D84B944CEB326F051980A0DAEF11
+BACKUP VERIFIED: app\oidc_claims.py SHA256=CC2EB813B999C669F8A0E26C74BB92AA18968F107E4416736F3738FF1EB3CFCE
+BACKUP VERIFIED: app\security.py SHA256=0022274BA349E8B72A26590814909D3A327403BAD44C63A200E8B1807584AB28
+BACKUP VERIFIED: tests\conftest.py SHA256=A4F17BDF5B03C97F6A2A6698A7988F5CBBBEEEF40A2C1A44CE158B9B0797485C
+BACKUP VERIFIED: tests\test_api_auth_gate.py SHA256=ABC212FCB6F25E9968C41375B78510FFF4E55205BC0E8F9D2F4986A07A9B66AF
+BACKUP VERIFIED: tests\test_api_oidc_fail_closed.py SHA256=500809FC8AA3720AB13D24B9960F68D2585F6F5CE3BA06BB46A0A73A52787456
+BACKUP VERIFIED: tests\test_oidc_claims.py SHA256=774D49EA91750FCE9625EEDBDBD4E875E9A6EA310EDF01ADF304D128092827C0
+BACKUP VERIFIED: tests\test_security.py SHA256=C498A420C97DE213CB0B29E92950845018AEF3345B25EC8823BAE103A4AF9D5F
+BACKUP VERIFIED: tests\test_synthetic_rs256_harness.py SHA256=D1A545E9BCAF2F39B074C61EEEB62E1179C63CC6268574DB201B7C041D6652AE
+BACKUP VERIFIED: synthetic_test_support\rs256_harness.py SHA256=7B82C05EE8C3F594791C874860AEFBC7D2354A95D207C662571BF3B232BBE9EB
+BACKUP VERIFIED: requirements.txt SHA256=8BB22C30443951A3A1B13B26CCB1DE16A637FA30F7C1F9614913BA02B947B614
+
+=== STATIC CHECKS ===
+Auth dependency rejects unauthenticated callers by default: True
+Protected case-read permission referenced in API: True
+Protected case-update permission referenced in API: True
+Claims module mentions issuer validation: True
+Claims module mentions audience validation: True
+PyJWT declared in requirements: True
+Synthetic principal override exists in test fixture: True
+Authentication gate tests exist: True
+Fail-closed OIDC tests exist: True
+Production Entra discovery/JWKS integration confirmed: False
+Production signature verification integration confirmed: False
+Tenant-specific issuer and audience configuration confirmed: False
+Trusted Entra application-role mapping confirmed: False
+
+=== REQUIRED FOLLOW-UP ===
+1. Review auth_dependencies.py and ensure test overrides cannot apply in production.
+2. Implement trusted Entra OIDC metadata and JWKS validation using a maintained library.
+3. Pin accepted algorithms and validate signature, issuer, audience, expiry, and tenant.
+4. Map only trusted application roles to server-side permissions.
+5. Test every protected route with missing, malformed, invalid, and unauthorized tokens.
+6. Keep the authentication gate closed until implementation and review are complete.
+7. Obtain organizational approval for tenant ID, client ID, app registration, and deployment settings.
+
+Backup: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\Phase8B14_20261016_004516
+No server started. No provider contacted. No packages installed.
+This report is static analysis only and is not a production security certification.

@@ -1,0 +1,37 @@
+﻿Phase 8B.81.2 - Safe Dependency Diagnosis
+Timestamp: 20261016_091740
+No package installation or authentication changes performed.
+
+JSON validation exit code: 0
+JSON validation output:
+package.json: VALID JSON
+  name: cirt-dfir-platform-frontend
+  lockfileVersion: (not applicable)
+  @azure/msal-browser declared: 5.25.1
+  @azure/msal-react declared: 5.7.2
+package-lock.json: VALID JSON
+  name: cirt-dfir-platform-frontend
+  lockfileVersion: 3
+  @azure/msal-browser locked: 5.25.1
+  @azure/msal-react locked: 5.7.2
+
+COMMAND: npm dependency tree
+Exit code: 0
+STDOUT:
+cirt-dfir-platform-frontend@0.1.0 C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend
++-- @azure/msal-browser@5.25.1
+`-- @azure/msal-react@5.7.2
+
+STDERR:
+
+COMMAND: npm allow-scripts setting
+Exit code: 0
+STDOUT:
+
+STDERR:
+
+COMMAND: npm ignore-scripts setting
+Exit code: 0
+STDOUT:
+false
+STDERR:

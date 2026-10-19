@@ -1,0 +1,75 @@
+﻿CIRT-DFIR - PHASE 8B198
+Source, Deployment and Release Blocker Inventory
+Timestamp: 2026-10-19 13:59:27
+Inspection only; no source or configuration changes.
+
+=== PROJECT STRUCTURE ===
+README.md : FOUND
+.gitignore : FOUND
+.env.example : FOUND
+pyproject.toml : NOT FOUND
+requirements.txt : NOT FOUND
+Dockerfile : NOT FOUND
+docker-compose.yml : NOT FOUND
+compose.yaml : NOT FOUND
+Makefile : NOT FOUND
+frontend : NOT FOUND
+platform : FOUND
+platform\backend : FOUND
+tests : NOT FOUND
+Reports : FOUND
+
+=== BACKEND AND DEPLOYMENT ASSETS ===
+app\main.py : FOUND
+app\auth_dependencies.py : FOUND
+app\security.py : FOUND
+requirements.txt : FOUND
+pyproject.toml : NOT FOUND
+Dockerfile : NOT FOUND
+.env.example : NOT FOUND
+alembic.ini : NOT FOUND
+migrations : NOT FOUND
+tests : FOUND
+.venv\Scripts\python.exe : FOUND
+
+=== ENTRA COMPONENT INVENTORY ===
+entra_bearer_adapter.py : FOUND
+entra_token_verifier.py : FOUND
+entra_principal.py : FOUND
+entra_jwks.py : FOUND
+entra_jwks_cache.py : FOUND
+entra_metadata_client.py : FOUND
+entra_http_transport.py : FOUND
+entra_authenticator.py : FOUND
+Permission dependency referenced in main.py: True
+Entra authenticator referenced in main.py: False
+Fail-closed 401 marker in auth_dependencies.py: True
+
+=== ROUTE AND PERMISSION MARKERS ===
+
+=== ENVIRONMENT FILE PRESENCE ===
+.env : NOT PRESENT
+.env.example : PRESENT - contents not read or displayed
+platform\backend\.env : NOT PRESENT
+platform\backend\.env.example : NOT PRESENT
+
+=== VERSION CONTROL ===
+Git executable: FOUND
+
+=== PRIORITIZED RELEASE BLOCKERS ===
+P0 - Obtain approved tenant ID, issuer, and API audience from identity/API owners.
+P0 - Approve metadata/JWKS host allowlists, role mapping, and audit requirements.
+P0 - Wire authentication only through reviewed, tested, fail-closed integration.
+P0 - Pass invalid-token, expiry, issuer, audience, signature, and authorization tests.
+P1 - Confirm intended Git repository and verify secret exclusion before committing.
+P1 - Confirm deployment packaging, database/migration strategy, and operational configuration.
+P1 - Confirm frontend and end-to-end integration readiness if required for release.
+
+=== FINAL STATUS ===
+Regression baseline from Phase8B197: 290 tests passed; pip check clean.
+This phase does not rerun tests.
+Authentication enabled by this script: NO
+Application source changed by this script: NO
+Environment configuration changed by this script: NO
+Git repository initialized by this script: NO
+OVERALL: INVENTORY ONLY - release and identity approval remain separate.

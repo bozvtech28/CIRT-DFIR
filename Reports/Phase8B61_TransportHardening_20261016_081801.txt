@@ -1,0 +1,72 @@
+﻿CIRT DFIR PROFESSIONAL - PHASE 8B.61
+Timestamp: 2026-10-16T08:18:02.4386071+08:00
+Backup: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\Phase8B61_20261016_081801
+Change: restrict HTTPS URL port to implicit 443 or explicit 443
+Network requests: NONE; tests use synthetic httpx.MockTransport
+Production authentication gate modified: NO
+
+=== FOCUSED TESTS ===
+............................F                                            [100%]
+================================== FAILURES ===================================
+__________________ test_accepts_explicit_standard_https_port __________________
+
+    def test_accepts_explicit_standard_https_port():
+        def handler(request):
+            assert request.url.port == 443
+            return json_response({"issuer": "synthetic"})
+    
+>       result = fetch_json_document(
+            "https://login.microsoftonline.com:443/discovery",
+            trusted_hosts=HOSTS,
+            client_factory=make_client_factory(handler),
+        )
+
+tests\test_entra_http_transport.py:246: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+app\entra_http_transport.py:75: in fetch_json_document
+    with client.stream("GET", url, headers={"Accept": "application/json"}) as response:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\..\AppData\Local\Programs\Python\Python312\Lib\contextlib.py:137: in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+.venv\Lib\site-packages\httpx\_client.py:868: in stream
+    response = self.send(
+.venv\Lib\site-packages\httpx\_client.py:914: in send
+    response = self._send_handling_auth(
+.venv\Lib\site-packages\httpx\_client.py:942: in _send_handling_auth
+    response = self._send_handling_redirects(
+.venv\Lib\site-packages\httpx\_client.py:979: in _send_handling_redirects
+    response = self._send_single_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\httpx\_client.py:1014: in _send_single_request
+    response = transport.handle_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\httpx\_transports\mock.py:24: in handle_request
+    response = self.handler(request)
+               ^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+request = <Request('GET', 'https://login.microsoftonline.com/discovery')>
+
+    def handler(request):
+>       assert request.url.port == 443
+E       AssertionError: assert None == 443
+E        +  where None = URL('https://login.microsoftonline.com/discovery').port
+E        +    where URL('https://login.microsoftonline.com/discovery') = <Request('GET', 'https://login.microsoftonline.com/discovery')>.url
+
+tests\test_entra_http_transport.py:243: AssertionError
+============================== warnings summary ===============================
+.venv\Lib\site-packages\fastapi\testclient.py:1
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/test_entra_http_transport.py::test_accepts_explicit_standard_https_port
+1 failed, 28 passed, 1 warning in 0.23s
+Focused exit code: 1
+Full regression not run because focused tests failed.
+
+Production authentication remains fail-closed.
+Transport is not connected to auth_dependencies.py.
+Overall result: FAIL - inspect test output

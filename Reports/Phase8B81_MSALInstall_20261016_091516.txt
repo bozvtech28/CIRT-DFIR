@@ -1,0 +1,42 @@
+﻿Phase 8B.81 - MSAL Dependency Installation
+Timestamp: 20261016_091516
+Backup: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\Phase8B81_20261016_091516
+No tenant configuration or authentication code will be changed.
+
+INSTALLATION FAILED. Original package files are backed up.
+cirt-dfir-platform-frontend@0.1.0 C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend
++-- @azure/msal-browser@5.25.1
+`-- @azure/msal-react@5.7.2
+
+Dependency verification exit code: 0
+
+> cirt-dfir-platform-frontend@0.1.0 build
+> tsc -b && vite build
+
+[36mvite v7.3.7 [32mbuilding client environment for production...[36m[39m
+transforming...
+[32mΓ£ô[39m 29 modules transformed.
+rendering chunks...
+computing gzip size...
+[2mdist/[22m[32mindex.html                 [39m[1m[2m  0.45 kB[22m[1m[22m[2m Γöé gzip:  0.30 kB[22m
+[2mdist/[22m[35massets/index-BPJY-tX1.css  [39m[1m[2m  4.87 kB[22m[1m[22m[2m Γöé gzip:  1.64 kB[22m
+[2mdist/[22m[36massets/index-CfTLV-Tt.js   [39m[1m[2m231.03 kB[22m[1m[22m[2m Γöé gzip: 72.02 kB[22m
+[32mΓ£ô built in 711ms[39m
+Frontend build exit code: 0
+........................................................................ [ 31%]
+........................................................................ [ 63%]
+........................................................................ [ 94%]
+............                                                             [100%]
+============================== warnings summary ===============================
+.venv\Lib\site-packages\fastapi\testclient.py:1
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+228 passed, 1 warning in 2.10s
+Backend regression exit code: 0
+
+package.json changed by dependency installation: True
+package-lock.json changed by dependency installation: True
+Authentication gate intentionally unchanged.
+OVERALL RESULT: False

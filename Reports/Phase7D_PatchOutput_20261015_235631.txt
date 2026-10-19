@@ -1,0 +1,3 @@
+PASS: Added PATCH /api/v1/cases/{case_id}.
+PASS: Unknown request fields are forbidden.
+PASS: Source syntax is valid.

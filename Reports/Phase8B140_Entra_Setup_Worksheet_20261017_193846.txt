@@ -1,0 +1,54 @@
+﻿CIRT-DFIR - PHASE 8B140
+Microsoft Entra setup worksheet
+Timestamp: 20261017_193846
+Mode: Configuration inspection; no production source changes
+
+=== REQUIRED CONFIGURATION PRESENCE ===
+CIRT_DFIR_ENTRA_TENANT_ID : Configured=False; Scopes=
+CIRT_DFIR_ENTRA_EXPECTED_ISSUER : Configured=False; Scopes=
+CIRT_DFIR_ENTRA_AUDIENCE : Configured=False; Scopes=
+
+=== SOURCE FILE PRESENCE ===
+main.py : Exists=True
+auth_dependencies.py : Exists=True
+security.py : Exists=True
+entra_authenticator.py : Exists=True
+entra_bearer_adapter.py : Exists=True
+entra_token_verifier.py : Exists=True
+entra_jwks.py : Exists=True
+entra_jwks_cache.py : Exists=True
+entra_metadata_client.py : Exists=True
+entra_http_transport.py : Exists=True
+test_entra_authenticator.py : Exists=True
+
+=== EXISTING ROLE DEFINITIONS ===
+ROLE_ADMINISTRATOR = "Administrator"
+ROLE_ANALYST = "DFIR Analyst"
+ROLE_VIEWER = "Viewer"
+
+=== AUTHENTICATION BOUNDARY ===
+Fail-closed denial message present: True
+Bearer challenge header present: True
+Case update path referenced: True
+Demo cases path referenced: True
+
+=== README REFERENCES ===
+README line 16: This is a UI mock-up only. It has no backend, authentication, scanner integration, evidence upload, database, or live response actions. All records are fictional.
+
+=== SETUP CHECKLIST ===
+1. Confirm an approved Microsoft Entra tenant and tenant ID.
+2. Confirm the API app registration and its Application ID URI/audience.
+3. Confirm the issuer URL for the token version configured for this API.
+4. Confirm the approved application roles and their exact role strings.
+5. Confirm which client applications may request these API roles.
+6. Confirm deployment owner approval before enabling authentication.
+7. Do not place client secrets, access tokens, or private keys in this worksheet.
+
+Expected issuer, tenant ID and audience must come from the actual approved registration.
+Do not guess values or enable production wiring while these values remain unverified.
+
+=== VALIDATION COMMAND ===
+Project Python environment exists.
+After configuration changes, validate with: .\.venv\Scripts\python.exe -X utf8 -m pytest -q
+
+RESULT: Preparation only. No environment variables or application source files changed.

@@ -1,0 +1,21 @@
+﻿CIRT DFIR Professional - Phase 6F Retest
+Timestamp: 2026-10-15 23:41:04
+Python integration exit code: 1
+Repository unit-test exit code: 0
+Frontend build exit code: 0
+Frontend dist/index.html exists: True
+Runner backup directory: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\Phase6F_TestRunnerFix_20261015_234058
+API stdout: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase6F_Retest_API_stdout_20261015_234058.txt
+API stderr: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase6F_Retest_API_stderr_20261015_234058.txt
+Repository stdout: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase6F_Retest_Repository_stdout_20261015_234058.txt
+Repository stderr: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase6F_Retest_Repository_stderr_20261015_234058.txt
+Build stdout: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase6F_Retest_Build_stdout_20261015_234058.txt
+Build stderr: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase6F_Retest_Build_stderr_20261015_234058.txt
+Integration database: Temporary synthetic SQLite database
+Persistent application database accessed: No
+Server started: No
+Production collector executed: No
+Real evidence accessed: No
+Application source modified: No
+
+Overall result: FAIL - Review logs before proceeding

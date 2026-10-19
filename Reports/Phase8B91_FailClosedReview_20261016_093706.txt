@@ -1,0 +1,137 @@
+﻿Phase 8B.91 - Fail-Closed API Gate Review
+Timestamp: 20261016_093706
+Mode: Read-only source review; no server started.
+
+===== C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_api_auth_gate.py =====
+"""API access-control tests using synthetic identities only."""
+from fastapi.testclient import TestClient
+
+from app.auth_dependencies import get_current_principal
+from app.main import app
+from app.security import Principal, ROLE_ADMINISTRATOR, ROLE_VIEWER
+
+client = TestClient(app)
+
+def test_demo_cases_reject_unauthenticated_request():
+    app.dependency_overrides.clear()
+    try:
+        response = client.get("/api/v1/demo/cases")
+        assert response.status_code == 401
+        assert "Authentication" in response.json()["detail"]
+    finally:
+        app.dependency_overrides.clear()
+
+def test_case_update_rejects_unauthenticated_request():
+    app.dependency_overrides.clear()
+    try:
+        response = client.patch(
+            "/api/v1/cases/DEMO-2026-001",
+            json={"status": "Contained"},
+        )
+        assert response.status_code == 401
+    finally:
+        app.dependency_overrides.clear()
+
+def test_viewer_cannot_update_case():
+    app.dependency_overrides[get_current_principal] = lambda: Principal(
+        subject="synthetic-test-viewer",
+        roles=frozenset({ROLE_VIEWER}),
+    )
+    try:
+        response = client.patch(
+            "/api/v1/cases/DEMO-2026-001",
+            json={"status": "Contained"},
+        )
+        assert response.status_code == 403
+    finally:
+        app.dependency_overrides.clear()
+
+def test_admin_can_pass_case_update_authorization_gate():
+    # Dependency override represents an already validated synthetic principal.
+    # This test checks authorization only; it does not perform a database update.
+    from app.auth_dependencies import require_permission
+    from fastapi import Depends, FastAPI
+    from fastapi.testclient import TestClient as LocalClient
+
+    test_app = FastAPI()
+    test_app.dependency_overrides[get_current_principal] = lambda: Principal(
+        subject="synthetic-test-admin",
+        roles=frozenset({ROLE_ADMINISTRATOR}),
+    )
+
+    @test_app.get("/test-protected-update-permission")
+    def protected_permission_check(principal=Depends(require_permission("cases:update"))):
+        return {"authorized": True}
+
+    response = LocalClient(test_app).get("/test-protected-update-permission")
+    assert response.status_code == 200
+    assert response.json()["authorized"] is True
+
+===== C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\conftest.py =====
+"""Test-only identity override for legacy API tests.
+
+This fixture is confined to the test suite. It is not used by the application
+outside pytest and does not establish real user identity.
+"""
+import pytest
+from fastapi.testclient import TestClient
+
+from app.auth_dependencies import get_current_principal
+from app.main import app
+from app.security import Principal, ROLE_ANALYST
+
+@pytest.fixture(autouse=True)
+def test_identity_override():
+    app.dependency_overrides[get_current_principal] = lambda: Principal(
+        subject="synthetic-test-analyst",
+        roles=frozenset({ROLE_ANALYST}),
+    )
+    yield
+    app.dependency_overrides.clear()
+
+===== C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\auth_dependencies.py =====
+"""Fail-closed authentication gate pending approved OIDC integration.
+
+This module intentionally authenticates nobody. Replace the placeholder
+identity provider integration only after the organization chooses a provider.
+Never trust roles supplied by a browser or request body.
+"""
+from fastapi import Depends, HTTPException
+
+from app.security import (
+    AuthenticationRequired,
+    AuthorizationDenied,
+    Principal,
+    authorize,
+)
+
+def get_current_principal() -> Principal:
+    """Reject all requests until real token/session validation is implemented."""
+    raise HTTPException(
+        status_code=401,
+        detail="Authentication is not configured. Access is denied by default.",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+def require_permission(permission: str):
+    """Require a validated principal and enforce the RBAC permission."""
+    def dependency(principal: Principal = Depends(get_current_principal)) -> Principal:
+        try:
+            authorize(principal, permission)
+        except AuthenticationRequired as exc:
+            raise HTTPException(
+                status_code=401,
+                detail="Authentication required.",
+                headers={"WWW-Authenticate": "Bearer"},
+            ) from exc
+        except AuthorizationDenied as exc:
+            raise HTTPException(
+                status_code=403,
+                detail="Insufficient permission.",
+            ) from exc
+        return principal
+    return dependency
+
+No production source files were modified.
+A test dependency override is not proof of live authentication.
+Do not enable the production gate until approved Entra configuration and trusted JWKS integration are available.

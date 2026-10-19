@@ -1,0 +1,848 @@
+﻿============================================================
+CIRT-DFIR Phase 8B.135 - Corrected Entra Composition Audit
+Timestamp: 2026-10-17 19:16:57 +08:00
+Backend: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend
+============================================================
+
+[1] Python version
+
+--- Python version ---
+Python 3.12.10
+EXIT_CODE=0
+
+[2] Dependency import and versions
+
+--- Dependency import check ---
+Traceback (most recent call last):
+Python executable: C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\python.exe
+  File "<string>", line 1, in <module>
+ModuleNotFoundError: No module named 'fastapi'
+EXIT_CODE=1
+
+[3] Authentication module inventory
+
+--- auth_dependencies.py ---
+L7: from fastapi import Depends, HTTPException
+L11: AuthorizationDenied,
+L16: def get_current_principal() -> Principal:
+L18: raise HTTPException(
+L21: headers={"WWW-Authenticate": "Bearer"},
+L24: def require_permission(permission: str):
+L26: def dependency(principal: Principal = Depends(get_current_principal)) -> Principal:
+L30: raise HTTPException(
+L33: headers={"WWW-Authenticate": "Bearer"},
+L35: except AuthorizationDenied as exc:
+L36: raise HTTPException(
+
+--- security.py ---
+L23: "cases:read": frozenset({
+L28: "cases:update": frozenset({
+L42: class Principal:
+L48: class AuthenticationRequired(PermissionError):
+L52: class AuthorizationDenied(PermissionError):
+L56: def validate_principal(principal: Principal | None) -> Principal:
+L64: raise AuthorizationDenied("Principal has no assigned roles.")
+L66: raise AuthorizationDenied("Principal contains an unknown role.")
+L70: def authorize(principal: Principal | None, permission: str) -> bool:
+L80: raise AuthorizationDenied("Unknown permission.")
+L82: raise AuthorizationDenied("Permission denied.")
+
+--- entra_bearer_adapter.py ---
+L1: """Offline-tested bearer-token adapter for the CIRT DFIR Entra integration.
+L3: This module does not fetch metadata or JWKS and is not wired into FastAPI.
+L15: from app.entra_token_verifier import verify_entra_access_token
+L19: class BearerAuthenticationError(Exception):
+L20: """Raised when a bearer token cannot produce a trusted principal."""
+L23: def principal_from_authorization_header(
+L24: authorization: str | None,
+L27: expected_issuer: str,
+L28: expected_audience: str,
+L29: expected_tenant_id: str,
+L30: approved_role_map: Mapping[str, str],
+L32: """Validate a Bearer header, verify its JWT, and map verified roles.
+L35: untrusted JWKS data or configuration supplied by a browser/request body.
+L37: if not isinstance(authorization, str):
+L38: raise BearerAuthenticationError("A Bearer authorization header is required.")
+L40: scheme, separator, raw_token = authorization.partition(" ")
+L45: or scheme.lower() != "bearer"
+L49: raise BearerAuthenticationError("The authorization header is malformed.")
+L52: claims = verify_entra_access_token(
+L55: expected_issuer=expected_issuer,
+L56: expected_audience=expected_audience,
+L57: expected_tenant_id=expected_tenant_id,
+L61: approved_role_map=approved_role_map,
+L64: raise BearerAuthenticationError(
+L65: "Bearer token validation or role mapping failed."
+
+--- entra_token_verifier.py ---
+L6: OpenID Connect metadata/JWKS, with HTTPS and safe key-rotation handling.
+L8: - Never use this verifier until tenant, issuer, and audience are approved.
+L19: def verify_entra_access_token(
+L23: expected_issuer: str,
+L24: expected_audience: str,
+L25: expected_tenant_id: str,
+L27: """Verify an RS256 token against a trusted key resolver and fixed config.
+L30: trusted JWKS source. This function deliberately performs no network access.
+L33: raise InvalidTokenError("A non-empty bearer token is required.")
+L36: ("expected_issuer", expected_issuer),
+L37: ("expected_audience", expected_audience),
+L38: ("expected_tenant_id", expected_tenant_id),
+L46: # The key resolver must select a key from a trusted JWKS source.
+L56: issuer=expected_issuer,
+L57: audience=expected_audience,
+L60: "verify_signature": True,
+L61: "verify_exp": True,
+L62: "verify_iat": True,
+L63: "verify_nbf": True,
+L64: "verify_iss": True,
+L65: "verify_aud": True,
+L73: if claims.get("tid") != expected_tenant_id:
+L74: raise InvalidTokenError("The token tenant does not match the configured tenant.")
+
+--- entra_principal.py ---
+L4: Only pass the claims returned by verify_entra_access_token after successful
+L5: cryptographic and issuer/audience/tenant validation. This module does not
+L8: approved_role_map must come from trusted server-side configuration. Never
+L17: class PrincipalMappingError(ValueError):
+L21: def principal_from_verified_claims(
+L24: approved_role_map: Mapping[str, str],
+L34: if not isinstance(approved_role_map, Mapping) or not approved_role_map:
+L37: for app_role, internal_role in approved_role_map.items():
+L53: unknown_roles = [role for role in raw_roles if role not in approved_role_map]
+L57: internal_roles = frozenset(approved_role_map[role] for role in raw_roles)
+
+--- entra_jwks.py ---
+L1: """Offline JWKS key selector for the Entra verifier prototype.
+L3: No HTTP calls are made by this module. The JWKS document must come from a
+L14: def build_jwks_resolver(jwks: Mapping[str, Any]):
+L15: """Build a resolver from a supplied JWKS document.
+L18: does not establish that the supplied JWKS document is authentic.
+L20: if not isinstance(jwks, Mapping):
+L21: raise ValueError("JWKS must be a mapping.")
+L23: keys = jwks.get("keys")
+L25: raise ValueError("JWKS must contain a non-empty keys array.")
+L31: raise ValueError("Every JWKS key must be an object.")
+L35: raise ValueError("Every JWKS key must have a non-empty kid.")
+L44: raise ValueError("JWKS key use must be sig.")
+L47: raise ValueError("Only RS256 JWKS keys are supported.")
+L49: # A public JWKS must not include RSA private-key parameters.
+L59: def resolve(token: str):
+L74: raise InvalidTokenError("JWT kid was not found in the trusted JWKS set.")
+
+--- entra_jwks_cache.py ---
+L1: """Bounded in-memory JWKS cache with explicit refresh.
+L18: from app.entra_metadata_client import (
+L19: MetadataTrustError,
+L20: validate_jwks_document,
+L24: class JWKSCacheError(RuntimeError):
+L25: """Raised when trusted JWKS data cannot be loaded or validated."""
+L28: class JWKSCache:
+L29: """Thread-safe in-memory JWKS cache with bounded TTL."""
+L31: def __init__(
+L56: def _load_and_validate(self) -> dict[str, Any]:
+L59: validated = validate_jwks_document(document)
+L62: except (MetadataTrustError, TypeError, ValueError) as exc:
+L63: raise JWKSCacheError("Loaded JWKS failed validation") from exc
+L65: raise JWKSCacheError("JWKS loader failed") from exc
+L67: def get(self) -> dict[str, Any]:
+L85: def refresh(self) -> dict[str, Any]:
+L93: def invalidate(self) -> None:
+L100: def is_valid(self) -> bool:
+
+--- entra_metadata_client.py ---
+L1: """Provider-neutral Entra metadata/JWKS client primitives.
+L5: approved tenant, issuer, discovery endpoint, and JWKS URI.
+L7: Do not use token-provided URLs to select a metadata endpoint.
+L18: class MetadataTrustError(ValueError):
+L19: """Raised when discovery metadata or JWKS data is not trusted."""
+L23: class TrustedMetadata:
+L24: issuer: str
+L25: jwks_uri: str
+L28: def _require_https_url(value: str, field_name: str) -> str:
+L30: raise MetadataTrustError(f"{field_name} must be a non-empty URL")
+L35: raise MetadataTrustError(f"{field_name} must use HTTPS")
+L37: raise MetadataTrustError(f"{field_name} must include a hostname")
+L39: raise MetadataTrustError(f"{field_name} must not contain URL credentials")
+L41: raise MetadataTrustError(f"{field_name} must not contain a fragment")
+L46: def validate_discovery_document(
+L49: expected_issuer: str,
+L50: allowed_jwks_hosts: set[str],
+L51: ) -> TrustedMetadata:
+L52: """Validate discovery metadata against caller-approved trust settings.
+L59: raise MetadataTrustError("Discovery document must be a JSON object")
+L61: if not isinstance(expected_issuer, str) or not expected_issuer.strip():
+L62: raise MetadataTrustError("Expected issuer is not configured")
+L64: issuer = document.get("issuer")
+L65: jwks_uri = document.get("jwks_uri")
+L67: if not isinstance(issuer, str) or issuer != expected_issuer:
+L68: raise MetadataTrustError("Discovery issuer does not match configuration")
+L70: _require_https_url(issuer, "issuer")
+L71: _require_https_url(jwks_uri, "jwks_uri")
+L73: parsed_jwks = urlparse(jwks_uri)
+L76: for host in allowed_jwks_hosts
+L80: if (parsed_jwks.hostname or "").lower().rstrip(".") not in allowed_hosts:
+L81: raise MetadataTrustError("JWKS hostname is not in the approved allowlist")
+L83: if parsed_jwks.query:
+L84: raise MetadataTrustError("JWKS URI query parameters are not allowed")
+L85: if parsed_jwks.fragment:
+L86: raise MetadataTrustError("JWKS URI fragments are not allowed")
+L88: return TrustedMetadata(issuer=issuer, jwks_uri=jwks_uri)
+L91: def fetch_trusted_document(
+L107: raise MetadataTrustError("Timeout must be greater than 0 and at most 10 seconds")
+L117: raise MetadataTrustError("Request hostname is not in the approved allowlist")
+L122: raise MetadataTrustError("Transport must return a decoded JSON object")
+L127: def validate_jwks_document(document: Any) -> dict[str, Any]:
+L128: """Perform structural checks before the existing offline JWKS resolver."""
+L131: raise MetadataTrustError("JWKS document must be a JSON object")
+L135: raise MetadataTrustError("JWKS must contain a non-empty keys array")
+L141: raise MetadataTrustError("Each JWKS key must be a JSON object")
+L145: raise MetadataTrustError("Each JWKS key must have a non-empty kid")
+L148: raise MetadataTrustError("JWKS contains duplicate key IDs")
+L152: raise MetadataTrustError("Only RSA signing keys are accepted")
+L154: raise MetadataTrustError("JWKS key must be designated for signatures")
+L156: raise MetadataTrustError("Only RS256 signing keys are accepted")
+L160: raise MetadataTrustError("JWKS must not contain private key parameters")
+L163: raise MetadataTrustError("RSA key modulus is missing")
+L165: raise MetadataTrustError("RSA key exponent is missing")
+
+--- entra_http_transport.py ---
+L1: """Bounded HTTPS JSON transport for trusted identity metadata.
+L15: from app.entra_metadata_client import MetadataTrustError
+L21: def fetch_json_document(
+L33: supply a fixed, approved metadata URL, never a URL from a token.
+L36: raise MetadataTrustError("Request URL must be a non-empty string")
+L43: raise MetadataTrustError("Request URL is malformed") from exc
+L46: raise MetadataTrustError("Request URL must use HTTPS and include a hostname")
+L48: raise MetadataTrustError("Request URL must use the standard HTTPS port 443")
+L50: raise MetadataTrustError("Request URL credentials and fragments are not allowed")
+L53: raise MetadataTrustError("Timeout must be numeric")
+L55: raise MetadataTrustError("Timeout must be greater than 0 and at most 10 seconds")
+L58: raise MetadataTrustError("Response-size limit must be an integer")
+L60: raise MetadataTrustError("Response-size limit must be between 1 byte and 4 MiB")
+L63: raise MetadataTrustError("Trusted host allowlist must be a non-empty set")
+L72: raise MetadataTrustError("Request hostname is not in the approved allowlist")
+L78: verify=True,
+L83: raise MetadataTrustError(
+L84: f"Metadata endpoint returned unexpected HTTP status {response.status_code}"
+L92: raise MetadataTrustError("Metadata endpoint did not return JSON content")
+L99: raise MetadataTrustError("Invalid response Content-Length") from exc
+L101: raise MetadataTrustError("Metadata response exceeds the size limit")
+L108: raise MetadataTrustError("Metadata response exceeds the size limit")
+L113: except MetadataTrustError:
+L116: raise MetadataTrustError("Trusted metadata HTTPS request failed") from exc
+L118: raise MetadataTrustError("Trusted metadata transport failed") from exc
+L123: raise MetadataTrustError("Metadata response is not valid JSON") from exc
+L126: raise MetadataTrustError("Metadata response must be a JSON object")
+
+--- main.py ---
+L1: from fastapi import FastAPI, HTTPException, Depends
+L15: class HealthResponse(BaseModel):
+L22: class CaseUpdateRequest(BaseModel):
+L28: class DemoCase(BaseModel):
+L58: def health() -> HealthResponse:
+L65: def update_case_endpoint(
+L68: principal = Depends(require_permission("cases:update")),
+L72: raise HTTPException(
+L96: raise HTTPException(status_code=409, detail=message) from exc
+L97: raise HTTPException(status_code=422, detail=message) from exc
+L100: raise HTTPException(status_code=404, detail="Case not found.")
+L104: @app.get("/api/v1/demo/cases", response_model=list[DemoCase], dependencies=[Depends(require_permission("cases:read"))])
+L105: def get_demo_cases() -> list[DemoCase]:
+
+[4] Current authentication dependency
+   1: """Fail-closed authentication gate pending approved OIDC integration.
+   2: 
+   3: This module intentionally authenticates nobody. Replace the placeholder
+   4: identity provider integration only after the organization chooses a provider.
+   5: Never trust roles supplied by a browser or request body.
+   6: """
+   7: from fastapi import Depends, HTTPException
+   8: 
+   9: from app.security import (
+  10:     AuthenticationRequired,
+  11:     AuthorizationDenied,
+  12:     Principal,
+  13:     authorize,
+  14: )
+  15: 
+  16: def get_current_principal() -> Principal:
+  17:     """Reject all requests until real token/session validation is implemented."""
+  18:     raise HTTPException(
+  19:         status_code=401,
+  20:         detail="Authentication is not configured. Access is denied by default.",
+  21:         headers={"WWW-Authenticate": "Bearer"},
+  22:     )
+  23: 
+  24: def require_permission(permission: str):
+  25:     """Require a validated principal and enforce the RBAC permission."""
+  26:     def dependency(principal: Principal = Depends(get_current_principal)) -> Principal:
+  27:         try:
+  28:             authorize(principal, permission)
+  29:         except AuthenticationRequired as exc:
+  30:             raise HTTPException(
+  31:                 status_code=401,
+  32:                 detail="Authentication required.",
+  33:                 headers={"WWW-Authenticate": "Bearer"},
+  34:             ) from exc
+  35:         except AuthorizationDenied as exc:
+  36:             raise HTTPException(
+  37:                 status_code=403,
+  38:                 detail="Insufficient permission.",
+  39:             ) from exc
+  40:         return principal
+  41:     return dependency
+
+[5] Authentication-related test inventory
+
+--- tests\test_api_auth_gate.py ---
+L4: from app.auth_dependencies import get_current_principal
+L6: from app.security import Principal, ROLE_ADMINISTRATOR, ROLE_VIEWER
+L10: def test_demo_cases_reject_unauthenticated_request():
+L11: app.dependency_overrides.clear()
+L15: assert "Authentication" in response.json()["detail"]
+L17: app.dependency_overrides.clear()
+L19: def test_case_update_rejects_unauthenticated_request():
+L20: app.dependency_overrides.clear()
+L28: app.dependency_overrides.clear()
+L31: app.dependency_overrides[get_current_principal] = lambda: Principal(
+L42: app.dependency_overrides.clear()
+L44: def test_case_update_audit_actor_comes_from_principal(tmp_path, monkeypatch):
+L73: app.dependency_overrides[get_current_principal] = lambda: Principal(
+L94: app.dependency_overrides.clear()
+L96: def test_admin_can_pass_case_update_authorization_gate():
+L97: # Dependency override represents an already validated synthetic principal.
+L98: # This test checks authorization only; it does not perform a database update.
+L99: from app.auth_dependencies import require_permission
+L104: test_app.dependency_overrides[get_current_principal] = lambda: Principal(
+L110: def protected_permission_check(principal=Depends(require_permission("cases:update"))):
+L111: return {"authorized": True}
+L115: assert response.json()["authorized"] is True
+
+--- tests\test_api_oidc_fail_closed.py ---
+L3: from app.auth_dependencies import get_current_principal
+L10: def test_missing_bearer_token_is_rejected():
+L11: app.dependency_overrides.clear()
+L16: app.dependency_overrides.clear()
+L19: def test_malformed_bearer_token_is_rejected():
+L20: app.dependency_overrides.clear()
+L24: headers={"Authorization": "Bearer not.a.valid.token"},
+L28: app.dependency_overrides.clear()
+L31: def test_case_update_without_authentication_is_rejected():
+L32: app.dependency_overrides.clear()
+L40: app.dependency_overrides.clear()
+
+--- tests\test_entra_bearer_adapter.py ---
+L8: from app.entra_bearer_adapter import (
+L9: BearerAuthenticationError,
+L10: principal_from_authorization_header,
+L12: from app.entra_jwks import build_jwks_resolver
+L17: AuthorizationDenied,
+L18: authorize,
+L21: TENANT = "11111111-2222-4333-8444-555555555555"
+L22: ISSUER = f"https://login.microsoftonline.com/{TENANT}/v2.0"
+L23: AUDIENCE = "api://synthetic-cirt-dfir-api"
+L45: resolver = build_jwks_resolver({"keys": [public_jwk]})
+L50: "iss": ISSUER,
+L51: "aud": AUDIENCE,
+L53: "tid": TENANT,
+L70: def authenticate(header, resolver):
+L71: return principal_from_authorization_header(
+L74: expected_issuer=ISSUER,
+L75: expected_audience=AUDIENCE,
+L76: expected_tenant_id=TENANT,
+L81: def test_valid_analyst_bearer_produces_principal(identity):
+L83: principal = authenticate("Bearer " + issue(), resolver)
+L84: assert principal.subject == "synthetic-adapter-user"
+L85: assert principal.roles == frozenset({ROLE_ANALYST})
+L86: assert authorize(principal, "cases:read")
+L87: assert authorize(principal, "cases:update")
+L92: principal = authenticate(
+L93: "Bearer " + issue(roles=["CIRT.DFIR.Viewer"]),
+L96: with pytest.raises(AuthorizationDenied):
+L97: authorize(principal, "cases:update")
+L102: principal = authenticate(
+L103: "Bearer " + issue(roles=["CIRT.DFIR.Administrator"]),
+L106: assert authorize(principal, "users:manage")
+L107: assert authorize(principal, "audit:read")
+L116: "Bearer",
+L117: "Bearer ",
+L118: "Bearer first second",
+L123: with pytest.raises(BearerAuthenticationError):
+L124: authenticate(header, resolver)
+L132: with pytest.raises(BearerAuthenticationError):
+L133: authenticate(f"Bearer {header}.{payload}.{altered}", resolver)
+L136: def test_wrong_tenant_is_rejected(identity):
+L138: with pytest.raises(BearerAuthenticationError):
+L139: authenticate(
+L140: "Bearer " + issue(tid="aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"),
+L147: with pytest.raises(BearerAuthenticationError):
+L148: authenticate(
+L149: "Bearer " + issue(roles=["CIRT.DFIR.Unapproved"]),
+L156: with pytest.raises(BearerAuthenticationError):
+L157: authenticate("Bearer " + issue(roles=[]), resolver)
+L159: def test_wrong_audience_is_rejected(identity):
+L161: with pytest.raises(BearerAuthenticationError):
+L162: authenticate("Bearer " + issue(aud="api://wrong-synthetic-audience"), resolver)
+L165: def test_wrong_issuer_is_rejected(identity):
+L167: with pytest.raises(BearerAuthenticationError):
+L168: authenticate("Bearer " + issue(iss="https://invalid.example/tenant/v2.0"), resolver)
+L173: with pytest.raises(BearerAuthenticationError):
+L174: authenticate("Bearer " + issue(exp=int(time.time()) - 60), resolver)
+L179: with pytest.raises(BearerAuthenticationError):
+L180: authenticate("Bearer " + issue(iat=int(time.time()) + 120), resolver)
+
+--- tests\test_entra_end_to_end_offline.py ---
+L9: from app.entra_jwks import build_jwks_resolver
+L10: from app.entra_principal import (
+L11: PrincipalMappingError,
+L12: principal_from_verified_claims,
+L14: from app.entra_token_verifier import verify_entra_access_token
+L16: AuthorizationDenied,
+L20: authorize,
+L23: TENANT_ID = "11111111-2222-4333-8444-555555555555"
+L24: ISSUER = f"https://login.microsoftonline.com/{TENANT_ID}/v2.0"
+L25: AUDIENCE = "api://synthetic-cirt-dfir-api"
+L47: jwks = {"keys": [public_jwk]}
+L48: resolver = build_jwks_resolver(jwks)
+L53: "iss": ISSUER,
+L54: "aud": AUDIENCE,
+L56: "tid": TENANT_ID,
+L74: return verify_entra_access_token(
+L77: expected_issuer=ISSUER,
+L78: expected_audience=AUDIENCE,
+L79: expected_tenant_id=TENANT_ID,
+L83: def test_synthetic_token_verifies_maps_and_authorizes(identity_material):
+L86: principal = principal_from_verified_claims(
+L91: assert principal.subject == "synthetic-user-001"
+L92: assert principal.roles == frozenset({ROLE_ANALYST})
+L93: assert authorize(principal, "cases:read")
+L94: assert authorize(principal, "cases:update")
+L96: with pytest.raises(AuthorizationDenied):
+L97: authorize(principal, "users:manage")
+L106: principal = principal_from_verified_claims(
+L111: assert authorize(principal, "cases:read")
+L112: with pytest.raises(AuthorizationDenied):
+L113: authorize(principal, "cases:update")
+L131: {"aud": "api://wrong-audience"},
+L150: with pytest.raises(PrincipalMappingError):
+L151: principal_from_verified_claims(
+L161: with pytest.raises(PrincipalMappingError):
+L162: principal_from_verified_claims(
+
+--- tests\test_entra_http_transport.py ---
+L7: from app.entra_http_transport import fetch_json_document
+L8: from app.entra_metadata_client import MetadataTrustError
+L65: with pytest.raises(MetadataTrustError):
+L85: with pytest.raises(MetadataTrustError, match="status"):
+L99: with pytest.raises(MetadataTrustError, match="status"):
+L111: with pytest.raises(MetadataTrustError, match="JSON content"):
+L130: with pytest.raises(MetadataTrustError, match="size limit"):
+L147: with pytest.raises(MetadataTrustError, match="size limit"):
+L165: with pytest.raises(MetadataTrustError):
+L175: with pytest.raises(MetadataTrustError):
+L181: with pytest.raises(MetadataTrustError):
+L192: with pytest.raises(MetadataTrustError, match="allowlist"):
+L207: content=b'{"issuer":"synthetic"}',
+L214: ) == {"issuer": "synthetic"}
+L231: with pytest.raises(MetadataTrustError, match="port 443"):
+L244: return json_response({"issuer": "synthetic"})
+L252: assert result == {"issuer": "synthetic"}
+L263: def test_malformed_url_is_rejected_as_metadata_trust_error(url):
+L270: with pytest.raises(MetadataTrustError, match="malformed"):
+
+--- tests\test_entra_jwks.py ---
+L8: from app.entra_jwks import build_jwks_resolver
+L27: def test_selects_matching_key_from_jwks():
+L29: resolver = build_jwks_resolver({"keys": [public_jwk]})
+L44: resolver = build_jwks_resolver({"keys": [jwk_a, jwk_b]})
+L50: resolver = build_jwks_resolver({"keys": [jwk]})
+L59: resolver = build_jwks_resolver({"keys": [old_jwk, new_jwk]})
+L67: resolver_after_rotation = build_jwks_resolver({"keys": [new_jwk]})
+L78: def test_rejects_malformed_jwks_documents(document):
+L80: build_jwks_resolver(document)
+L87: build_jwks_resolver({"keys": [jwk_a, jwk_b]})
+L92: build_jwks_resolver({"keys": [{"kid": "ec-key", "kty": "EC"}]})
+L99: build_jwks_resolver({"keys": [jwk]})
+L106: build_jwks_resolver({"keys": [jwk]})
+L109: def test_rejects_private_key_material_in_jwks():
+L113: build_jwks_resolver({"keys": [jwk]})
+L118: resolver = build_jwks_resolver({"keys": [jwk]})
+L131: resolver = build_jwks_resolver({"keys": [jwk]})
+L144: resolver = build_jwks_resolver({"keys": [jwk]})
+
+--- tests\test_entra_jwks_cache.py ---
+L3: from app.entra_jwks_cache import JWKSCache, JWKSCacheError
+L6: def make_jwks(kid="synthetic-key-1"):
+L34: source = make_jwks()
+L40: cache = JWKSCache(loader, ttl_seconds=30)
+L53: return make_jwks()
+L55: cache = JWKSCache(loader, ttl_seconds=10, clock=clock)
+L72: return make_jwks(f"synthetic-key-{len(calls)}")
+L74: cache = JWKSCache(loader, ttl_seconds=5, clock=clock)
+L82: current = {"value": make_jwks("synthetic-old-key")}
+L84: cache = JWKSCache(lambda: current["value"])
+L87: current["value"] = make_jwks("synthetic-new-key")
+L99: return make_jwks()
+L101: cache = JWKSCache(loader)
+L111: cache = JWKSCache(lambda: make_jwks())
+L120: source = make_jwks()
+L121: cache = JWKSCache(lambda: source)
+L135: return make_jwks()
+L137: cache = JWKSCache(loader, ttl_seconds=2, clock=clock)
+L143: with pytest.raises(JWKSCacheError):
+L150: state = {"document": make_jwks("synthetic-original")}
+L155: cache = JWKSCache(loader, ttl_seconds=30)
+L159: with pytest.raises(JWKSCacheError):
+L170: JWKSCache(lambda: make_jwks(), ttl_seconds=ttl)
+L175: JWKSCache(None)
+L180: JWKSCache(lambda: make_jwks(), clock=None)
+L183: def test_invalid_loaded_jwks_is_rejected():
+L184: cache = JWKSCache(lambda: {"keys": []})
+L185: with pytest.raises(JWKSCacheError):
+L193: cache = JWKSCache(loader)
+L194: with pytest.raises(JWKSCacheError):
+L203: return make_jwks(f"synthetic-key-{len(calls)}")
+L205: cache = JWKSCache(loader)
+L213: JWKSCache(lambda: make_jwks(), ttl_seconds=3600.01)
+L217: cache = JWKSCache(lambda: make_jwks())
+L222: cache = JWKSCache(lambda: make_jwks())
+
+--- tests\test_entra_jwks_cache_hardening.py ---
+L7: from app.entra_jwks_cache import JWKSCache, JWKSCacheError
+L10: def make_jwks(kid="synthetic-key-1"):
+L44: return make_jwks()
+L46: cache = JWKSCache(loader, ttl_seconds=30)
+L52: assert all(item == make_jwks() for item in results)
+L64: return make_jwks(f"synthetic-key-{number}")
+L66: cache = JWKSCache(loader, ttl_seconds=30)
+L88: return make_jwks()
+L90: cache = JWKSCache(loader, ttl_seconds=5, clock=clock)
+L95: with pytest.raises(JWKSCacheError):
+L104: with pytest.raises(JWKSCacheError):
+L109: state = {"document": make_jwks("synthetic-original")}
+L110: cache = JWKSCache(lambda: state["document"], ttl_seconds=30)
+L115: with pytest.raises(JWKSCacheError):
+L129: return make_jwks()
+L131: cache = JWKSCache(loader, ttl_seconds=2, clock=clock)
+L136: with pytest.raises(JWKSCacheError):
+L150: return make_jwks()
+L152: cache = JWKSCache(loader)
+L160: assert all(item == make_jwks() for item in results)
+L164: cache = JWKSCache(lambda: make_jwks())
+L180: cache = JWKSCache(lambda: make_jwks(), ttl_seconds=10, clock=clock)
+L192: cache = JWKSCache(loader)
+L194: with pytest.raises(JWKSCacheError):
+L206: return make_jwks()
+L208: cache = JWKSCache(loader, ttl_seconds=10, clock=clock)
+
+--- tests\test_entra_metadata_client.py ---
+L3: from app.entra_metadata_client import (
+L4: MetadataTrustError,
+L7: validate_jwks_document,
+L11: ISSUER = "https://login.microsoftonline.com/tenant-test/v2.0"
+L12: JWKS_URI = "https://login.microsoftonline.com/tenant-test/discovery/v2.0/keys"
+L17: return {"issuer": ISSUER, "jwks_uri": JWKS_URI}
+L20: def valid_jwks():
+L36: metadata = validate_discovery_document(
+L38: expected_issuer=ISSUER,
+L39: allowed_jwks_hosts=HOSTS,
+L41: assert metadata.issuer == ISSUER
+L42: assert metadata.jwks_uri == JWKS_URI
+L45: def test_rejects_wrong_issuer():
+L47: document["issuer"] = "https://attacker.example/issuer"
+L48: with pytest.raises(MetadataTrustError):
+L51: expected_issuer=ISSUER,
+L52: allowed_jwks_hosts=HOSTS,
+L56: def test_rejects_http_jwks_url():
+L58: document["jwks_uri"] = "http://login.microsoftonline.com/keys"
+L59: with pytest.raises(MetadataTrustError):
+L62: expected_issuer=ISSUER,
+L63: allowed_jwks_hosts=HOSTS,
+L67: def test_rejects_unapproved_jwks_host():
+L69: document["jwks_uri"] = "https://attacker.example/keys"
+L70: with pytest.raises(MetadataTrustError):
+L73: expected_issuer=ISSUER,
+L74: allowed_jwks_hosts=HOSTS,
+L78: def test_rejects_missing_expected_issuer():
+L79: with pytest.raises(MetadataTrustError):
+L82: expected_issuer="",
+L83: allowed_jwks_hosts=HOSTS,
+L101: assert result["issuer"] == ISSUER
+L114: with pytest.raises(MetadataTrustError):
+L125: with pytest.raises(MetadataTrustError):
+L134: with pytest.raises(MetadataTrustError):
+L144: with pytest.raises(MetadataTrustError):
+L152: def test_accepts_structurally_valid_jwks():
+L153: result = validate_jwks_document(valid_jwks())
+L158: def test_rejects_invalid_jwks_container(document):
+L159: with pytest.raises(MetadataTrustError):
+L160: validate_jwks_document(document)
+L164: document = valid_jwks()
+L166: with pytest.raises(MetadataTrustError):
+L167: validate_jwks_document(document)
+L171: document = valid_jwks()
+L173: with pytest.raises(MetadataTrustError):
+L174: validate_jwks_document(document)
+L178: document = valid_jwks()
+L180: with pytest.raises(MetadataTrustError):
+L181: validate_jwks_document(document)
+L185: document = valid_jwks()
+L187: with pytest.raises(MetadataTrustError):
+L188: validate_jwks_document(document)
+L192: document = valid_jwks()
+L194: with pytest.raises(MetadataTrustError):
+L195: validate_jwks_document(document)
+L199: document = valid_jwks()
+L201: with pytest.raises(MetadataTrustError):
+L202: validate_jwks_document(document)
+
+--- tests\test_entra_principal.py ---
+L4: from app.entra_principal import (
+L5: PrincipalMappingError,
+L6: principal_from_verified_claims,
+L18: principal = principal_from_verified_claims(
+L22: assert principal.subject == "synthetic-user-01"
+L23: assert principal.roles == frozenset({"DFIR Analyst"})
+L27: principal = principal_from_verified_claims(
+L34: assert principal.roles == frozenset({"Viewer", "DFIR Analyst"})
+L38: principal = principal_from_verified_claims(
+L42: assert principal.subject == "synthetic-user-03"
+L51: with pytest.raises(PrincipalMappingError):
+L52: principal_from_verified_claims(
+L65: with pytest.raises(PrincipalMappingError):
+L66: principal_from_verified_claims(
+L84: with pytest.raises(PrincipalMappingError):
+L85: principal_from_verified_claims(
+L92: with pytest.raises(PrincipalMappingError):
+L93: principal_from_verified_claims(
+L107: with pytest.raises(PrincipalMappingError):
+L108: principal_from_verified_claims(
+L119: principal = principal_from_verified_claims(
+L123: "scp": "cases:update",
+L128: assert principal.roles == frozenset({"Viewer"})
+
+--- tests\test_entra_principal_authorization.py ---
+L3: from app.security import authorize, AuthorizationDenied
+L4: from app.entra_principal import principal_from_verified_claims
+L14: def make_principal(app_role):
+L15: return principal_from_verified_claims(
+L17: "sub": "synthetic-authorization-test-user",
+L25: principal = make_principal("CIRT.DFIR.Viewer")
+L26: authorize(principal, "cases:read")
+L30: principal = make_principal("CIRT.DFIR.Viewer")
+L31: with pytest.raises(AuthorizationDenied):
+L32: authorize(principal, "cases:update")
+L36: principal = make_principal("CIRT.DFIR.Analyst")
+L37: authorize(principal, "cases:read")
+L41: principal = make_principal("CIRT.DFIR.Analyst")
+L42: authorize(principal, "cases:update")
+L46: principal = make_principal("CIRT.DFIR.Analyst")
+L47: with pytest.raises(AuthorizationDenied):
+L48: authorize(principal, "users:manage")
+L52: principal = make_principal("CIRT.DFIR.Administrator")
+L53: authorize(principal, "cases:read")
+L57: principal = make_principal("CIRT.DFIR.Administrator")
+L58: authorize(principal, "cases:update")
+L62: principal = make_principal("CIRT.DFIR.Administrator")
+L63: authorize(principal, "users:manage")
+L67: principal = make_principal("CIRT.DFIR.Administrator")
+L68: authorize(principal, "audit:read")
+L72: principal = make_principal("CIRT.DFIR.Administrator")
+L73: with pytest.raises(AuthorizationDenied):
+L74: authorize(principal, "system:unapproved")
+
+--- tests\test_entra_token_verifier.py ---
+L8: from app.entra_token_verifier import verify_entra_access_token
+L11: ISSUER = "https://login.microsoftonline.com/synthetic-tenant/v2.0"
+L12: AUDIENCE = "api://synthetic-cirt-dfir"
+L13: TENANT = "synthetic-tenant"
+L14: OTHER_TENANT = "another-synthetic-tenant"
+L26: "iss": ISSUER,
+L27: "aud": AUDIENCE,
+L29: "tid": TENANT,
+L40: return verify_entra_access_token(
+L43: expected_issuer=ISSUER,
+L44: expected_audience=AUDIENCE,
+L45: expected_tenant_id=TENANT,
+L72: def test_rejects_wrong_issuer(signing_material):
+L78: def test_rejects_wrong_audience(signing_material):
+L81: verify(make_token(private_key, aud="api://wrong-audience"), public_key)
+L84: def test_rejects_wrong_tenant(signing_material):
+L87: verify(make_token(private_key, tid=OTHER_TENANT), public_key)
+L100: {"iss": ISSUER, "aud": AUDIENCE, "sub": "synthetic-user",
+L101: "tid": TENANT, "iat": 1, "nbf": 1, "exp": 4102444800},
+L113: "iss": ISSUER,
+L114: "aud": AUDIENCE,
+L115: "tid": TENANT,
+L128: "iss": ISSUER, "aud": AUDIENCE, "sub": "synthetic-user-001",
+L129: "tid": TENANT, "iat": now, "nbf": now - timedelta(seconds=1),
+L136: def test_requires_configured_tenant(signing_material):
+L140: verify_entra_access_token(
+L143: expected_issuer=ISSUER,
+L144: expected_audience=AUDIENCE,
+L145: expected_tenant_id="",
+
+--- tests\test_entra_verifier_jwks_integration.py ---
+L9: from app.entra_jwks import build_jwks_resolver
+L10: from app.entra_token_verifier import verify_entra_access_token
+L13: ISSUER = "https://login.microsoftonline.com/synthetic-tenant/v2.0"
+L14: AUDIENCE = "api://synthetic-cirt-dfir"
+L15: TENANT = "synthetic-tenant"
+L35: "iss": ISSUER,
+L36: "aud": AUDIENCE,
+L38: "tid": TENANT,
+L53: def verify_with_jwks(token, jwks):
+L54: resolver = build_jwks_resolver(jwks)
+L55: return verify_entra_access_token(
+L58: expected_issuer=ISSUER,
+L59: expected_audience=AUDIENCE,
+L60: expected_tenant_id=TENANT,
+L64: def test_valid_token_verifies_through_jwks_and_verifier(test_material):
+L68: claims = verify_with_jwks(token, {"keys": [jwk]})
+L71: assert claims["tid"] == TENANT
+L81: verify_with_jwks(token, {"keys": [trusted_jwk]})
+L89: verify_with_jwks(token, {"keys": [jwk]})
+L103: verify_with_jwks(token, {"keys": [jwk]})
+L106: def test_wrong_issuer_is_rejected(test_material):
+L111: verify_with_jwks(token, {"keys": [jwk]})
+L114: def test_wrong_audience_is_rejected(test_material):
+L116: token = make_token(private_key, aud="api://wrong-audience")
+L119: verify_with_jwks(token, {"keys": [jwk]})
+L122: def test_wrong_tenant_is_rejected(test_material):
+L124: token = make_token(private_key, tid="another-synthetic-tenant")
+L127: verify_with_jwks(token, {"keys": [jwk]})
+L140: verify_with_jwks(token, {"keys": [jwk]})
+L157: jwks = {"keys": [old_jwk, new_jwk]}
+L159: old_claims = verify_with_jwks(
+L160: make_token(old_private, kid="old-key"), jwks
+L162: new_claims = verify_with_jwks(
+L163: make_token(new_private, kid="new-key"), jwks
+L182: verify_with_jwks(token, {"keys": [new_jwk]})
+L185: def test_private_key_material_in_jwks_is_rejected(test_material):
+L191: build_jwks_resolver({"keys": [malicious_document]})
+L194: def test_missing_tenant_configuration_fails_closed(test_material):
+L197: resolver = build_jwks_resolver({"keys": [jwk]})
+L199: with pytest.raises(ValueError, match="expected_tenant_id"):
+L200: verify_entra_access_token(
+L203: expected_issuer=ISSUER,
+L204: expected_audience=AUDIENCE,
+L205: expected_tenant_id="",
+
+--- tests\test_oidc_claims.py ---
+L6: ISSUER = "https://identity.example.invalid/"
+L7: AUDIENCE = "cirt-dfir-api"
+L13: "iss": ISSUER,
+L14: "aud": AUDIENCE,
+L23: expected_issuer=ISSUER,
+L24: expected_audience=AUDIENCE,
+L36: expected_issuer=ISSUER,
+L37: expected_audience=AUDIENCE,
+L42: def test_rejects_wrong_issuer():
+L45: with pytest.raises(InvalidOIDCClaims, match="issuer"):
+L48: expected_issuer=ISSUER,
+L49: expected_audience=AUDIENCE,
+L54: def test_rejects_wrong_audience():
+L57: with pytest.raises(InvalidOIDCClaims, match="audience"):
+L60: expected_issuer=ISSUER,
+L61: expected_audience=AUDIENCE,
+L66: def test_accepts_expected_audience_in_audience_list():
+L68: claims["aud"] = ["another-api", AUDIENCE]
+L71: expected_issuer=ISSUER,
+L72: expected_audience=AUDIENCE,
+L83: expected_issuer=ISSUER,
+L84: expected_audience=AUDIENCE,
+L95: expected_issuer=ISSUER,
+L96: expected_audience=AUDIENCE,
+L107: expected_issuer=ISSUER,
+L108: expected_audience=AUDIENCE,
+
+--- tests\test_security.py ---
+L4: AuthenticationRequired,
+L5: AuthorizationDenied,
+L6: Principal,
+L10: authorize,
+L16: self.admin = Principal("synthetic-admin", frozenset({ROLE_ADMINISTRATOR}))
+L17: self.analyst = Principal("synthetic-analyst", frozenset({ROLE_ANALYST}))
+L18: self.viewer = Principal("synthetic-viewer", frozenset({ROLE_VIEWER}))
+L21: for permission in ("cases:read", "cases:update", "users:manage", "audit:read"):
+L23: self.assertTrue(authorize(self.admin, permission))
+L26: self.assertTrue(authorize(self.analyst, "cases:read"))
+L27: self.assertTrue(authorize(self.analyst, "cases:update"))
+L32: with self.assertRaises(AuthorizationDenied):
+L33: authorize(self.analyst, permission)
+L36: self.assertTrue(authorize(self.viewer, "cases:read"))
+L39: with self.assertRaises(AuthorizationDenied):
+L40: authorize(self.viewer, "cases:update")
+L42: def test_missing_principal_is_rejected(self):
+L43: with self.assertRaises(AuthenticationRequired):
+L44: authorize(None, "cases:read")
+L47: principal = Principal("synthetic-user", frozenset({"SuperUser"}))
+L48: with self.assertRaises(AuthorizationDenied):
+L49: authorize(principal, "cases:read")
+L52: with self.assertRaises(AuthorizationDenied):
+L53: authorize(self.admin, "database:destroy")
+L56: principal = Principal(" ", frozenset({ROLE_ADMINISTRATOR}))
+L57: with self.assertRaises(AuthenticationRequired):
+L58: authorize(principal, "cases:read")
+L61: principal = Principal("synthetic-user", frozenset())
+L62: with self.assertRaises(AuthorizationDenied):
+L63: authorize(principal, "cases:read")
+
+--- tests\test_synthetic_jwt_harness.py ---
+L12: ISSUER = "https://issuer.synthetic.invalid/"
+L13: AUDIENCE = "cirt-dfir-synthetic-test"
+L21: "iss": ISSUER,
+L22: "aud": AUDIENCE,
+L43: expected_issuer=ISSUER,
+L44: expected_audience=AUDIENCE,
+L58: def test_wrong_issuer_is_rejected():
+L59: with pytest.raises(SyntheticTokenError, match="issuer"):
+L63: def test_wrong_audience_is_rejected():
+L64: with pytest.raises(SyntheticTokenError, match="audience"):
+
+--- tests\test_synthetic_role_mapping.py ---
+L10: "cases:read",
+L16: "cases:read",
+L17: "cases:update",
+L23: "cases:read",
+L24: "cases:update",
+L32: "cases:read",
+L33: "cases:update",
+L68: "cases:read",
+L74: map_synthetic_roles_to_permissions(["cases:update"])
+
+--- tests\test_synthetic_rs256_harness.py ---
+L13: ISSUER = "https://issuer.synthetic.invalid/"
+L14: AUDIENCE = "cirt-dfir-synthetic-api"
+L26: "iss": ISSUER,
+L27: "aud": AUDIENCE,
+L48: expected_issuer=ISSUER,
+L49: expected_audience=AUDIENCE,
+L63: def test_wrong_issuer_is_rejected():
+L64: with pytest.raises(SyntheticRS256Error, match="issuer"):
+L68: def test_wrong_audience_is_rejected():
+L69: with pytest.raises(SyntheticRS256Error, match="audience"):
+
+[6] Baseline pytest run
+
+--- python -m pytest -q ---
+C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\python.exe: No module named pytest
+EXIT_CODE=1
+PYTEST_EXIT_CODE=1
+
+[7] Entra environment configuration presence only
+CIRT_DFIR_ENTRA_TENANT_ID: Process=UNSET; User=UNSET; Machine=UNSET
+CIRT_DFIR_ENTRA_EXPECTED_ISSUER: Process=UNSET; User=UNSET; Machine=UNSET
+CIRT_DFIR_ENTRA_AUDIENCE: Process=UNSET; User=UNSET; Machine=UNSET
+
+[8] Configuration-file presence
+.env: NOT FOUND
+.env.example: NOT FOUND
+.env.sample: NOT FOUND
+pyproject.toml: NOT FOUND
+README.md: NOT FOUND
+
+[9] Summary
+BASELINE=FAIL
+NEXT=Inspect the captured pytest/import error before making authentication changes.
+PRODUCTION_AUTH_MODIFIED=NO

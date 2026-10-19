@@ -1,0 +1,14 @@
+﻿Timestamp: 2026-10-15 23:48:26
+Fix exit code: 0
+Test exit code: 1
+Tests reported: 14
+All 14 tests passed: False
+Test output: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase7A_MainGuardTests_20261015_234824.txt
+Test errors: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase7A_MainGuardErrors_20261015_234824.txt
+Backup: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\Phase7A_MainGuardFix_20261015_234824
+Backend application modified: No
+Server started: No
+Production collector executed: No
+Real evidence accessed: No
+
+STOP - Expected 14 passing tests; observed 14. Inspect test output.

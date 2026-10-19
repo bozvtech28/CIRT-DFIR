@@ -1,0 +1,35 @@
+﻿CIRT DFIR PROFESSIONAL - PHASE 8B.46
+Timestamp: 2026-10-16T01:42:21.8340224+08:00
+Mode: FINAL OFFLINE SECURITY GATE
+
+=== STATIC SECURITY CHECKS ===
+PASS - Authentication gate returns 401 when not configured
+PASS - Cases read endpoint requires permission
+PASS - Case update endpoint requires permission
+PASS - Entra scope intake section exists
+PASS - Application role intake section exists
+
+=== BACKEND REGRESSION ===
+........................................................................ [ 65%]
+......................................                                   [100%]
+============================== warnings summary ===============================
+.venv\Lib\site-packages\fastapi\testclient.py:1
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+110 passed, 1 warning in 1.87s
+Pytest exit code: 0
+
+Static checks: 5/5 passed
+Administrator configuration pending: True
+Application source modified: NO
+Authentication gate modified: NO
+Packages installed: NO
+Server started: NO
+Microsoft endpoints contacted: NO
+Production authentication enabled: NO
+
+Overall result: PASS - OFFLINE CHECKS ONLY; PRODUCTION REMAINS BLOCKED
+Production deployment requires approved Entra configuration, trusted live issuer/JWKS integration,
+verified app-role mapping, frontend token handling, audit attribution, HTTPS and security review.

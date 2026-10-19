@@ -1,0 +1,688 @@
+﻿Phase 8B.82 - MSAL Frontend Integration Preflight
+Timestamp: 20261016_092058
+READ-ONLY: no source files, packages, or authentication settings changed.
+
+
+========================================================================
+FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\package.json
+========================================================================
+{
+  "name": "cirt-dfir-platform-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@azure/msal-browser": "5.25.1",
+    "@azure/msal-react": "5.7.2",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "typescript": "~5.8.3",
+    "vite": "^7.0.0"
+  }
+}
+
+========================================================================
+FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\main.tsx
+========================================================================
+import React from "react";
+import { createRoot } from "react-dom/client";
+import App from "./App";
+import "./style.css";
+
+createRoot(document.getElementById("root")!).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
+);
+
+========================================================================
+FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\App.tsx
+========================================================================
+import { useEffect, useMemo, useState } from "react";
+
+type DemoCase = {
+  case_id: string;
+  title: string;
+  severity: string;
+  status: string;
+};
+
+const navigation = [
+  "Dashboard",
+  "Cases",
+  "Assets & Scans",
+  "Findings",
+  "Evidence Vault",
+  "Response Actions",
+  "Reports",
+  "Administration",
+];
+
+const fallbackCases: DemoCase[] = [
+  { case_id: "DEMO-2026-001", title: "Endpoint Alert Review", severity: "High", status: "Investigating" },
+  { case_id: "DEMO-2026-002", title: "Suspicious Login Review", severity: "Medium", status: "Triage" },
+  { case_id: "DEMO-2026-003", title: "Mailbox Rule Assessment", severity: "Medium", status: "Evidence review" },
+];
+
+const API_BASE = "";
+
+function App() {
+  const [page, setPage] = useState("Dashboard");
+  const [search, setSearch] = useState("");
+  const [cases, setCases] = useState<DemoCase[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [usingFallback, setUsingFallback] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [caseSeverityFilter, setCaseSeverityFilter] = useState("All");
+  const [caseStatusFilter, setCaseStatusFilter] = useState("All");
+  const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadCases() {
+      setLoading(true);
+      setError("");
+      setUsingFallback(false);
+
+      try {
+        const response = await fetch(`${API_BASE}/api/v1/demo/cases`, {
+          headers: { Accept: "application/json" },
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error(`API returned HTTP ${response.status}`);
+        }
+
+        const payload: unknown = await response.json();
+
+        if (
+          !Array.isArray(payload) ||
+          !payload.every(
+            (item) =>
+              item !== null &&
+              typeof item === "object" &&
+              typeof item.case_id === "string" &&
+              typeof item.title === "string" &&
+              typeof item.severity === "string" &&
+              typeof item.status === "string",
+          )
+        ) {
+          throw new Error("Unexpected API response format.");
+        }
+
+        if (!controller.signal.aborted) setCases(payload as DemoCase[]);
+      } catch (err) {
+        if (controller.signal.aborted) return;
+
+        const message = err instanceof Error ? err.message : "Unknown connection error";
+        setError(`Could not load cases from the localhost development API: ${message}`);
+        setCases(fallbackCases);
+        setUsingFallback(true);
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    }
+
+    void loadCases();
+    return () => controller.abort();
+  }, [refreshKey]);
+
+  const filteredCases = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return cases;
+
+    return cases.filter((item) =>
+      `${item.case_id} ${item.title} ${item.severity} ${item.status}`
+        .toLowerCase()
+        .includes(term),
+    );
+  }, [cases, search]);
+
+  const severityOptions = useMemo(
+    () => ["All", ...Array.from(new Set(cases.map((item) => item.severity))).sort()],
+    [cases],
+  );
+  const statusOptions = useMemo(
+    () => ["All", ...Array.from(new Set(cases.map((item) => item.status))).sort()],
+    [cases],
+  );
+  const visibleCases = useMemo(() => filteredCases.filter((item) =>
+    (caseSeverityFilter === "All" || item.severity === caseSeverityFilter) &&
+    (caseStatusFilter === "All" || item.status === caseStatusFilter)
+  ), [filteredCases, caseSeverityFilter, caseStatusFilter]);
+  const selectedCase = cases.find((item) => item.case_id === selectedCaseId) ?? null;
+
+  return (
+    <div className="shell">
+      <aside className="sidebar">
+        <div className="brand">
+          <div className="brand-mark">DFIR</div>
+          <div><strong>CIRT RESPONSE</strong><small>Investigation Platform</small></div>
+        </div>
+        <p className="nav-label">WORKSPACE</p>
+        <nav aria-label="Main navigation">
+          {navigation.map((item) => (
+            <button
+              className={`nav-item ${page === item ? "active" : ""}`}
+              key={item}
+              onClick={() => setPage(item)}
+              aria-current={page === item ? "page" : undefined}
+            >
+              <span aria-hidden="true">{item === "Dashboard" ? "â–¦" : "â—‡"}</span>
+              {item}
+            </button>
+          ))}
+        </nav>
+        <div className="side-note">
+          <span className="status-dot" /> Development mode
+          <small>Synthetic records only. No scanner or evidence repository connected.</small>
+        </div>
+      </aside>
+
+      <main className="main">
+        <header className="topbar">
+          <span>CIRT / DFIR <span className="muted"> / {page}</span></span>
+          <span className="demo-label">DEVELOPMENT SCAFFOLD</span>
+        </header>
+
+        <div className="content">
+          <div className="page-heading">
+            <div>
+              <span className="eyebrow">SECURITY OPERATIONS</span>
+              <h1>{page === "Dashboard" ? "Incident Response Overview" : page}</h1>
+              <p className="muted">Case management and forensic workflow development.</p>
+            </div>
+          </div>
+
+          <div className="notice" role="note">
+            DEVELOPMENT ONLY â€” records are synthetic. This is not an operational
+            incident-response or evidence-management system.
+          </div>
+
+          {page === "Dashboard" || page === "Cases" ? (
+            <>
+              <div className="metrics">
+                <article className="metric"><span>Cases returned</span><strong>{loading ? "â€¦" : cases.length}</strong><small>Current case-list response</small></article>
+                <article className="metric"><span>High severity</span><strong>{cases.filter((item) => item.severity.toLowerCase() === "high").length}</strong><small>Synthetic records only</small></article>
+                <article className="metric"><span>Investigating</span><strong>{cases.filter((item) => item.status.toLowerCase() === "investigating").length}</strong><small>Returned case data</small></article>
+                <article className="metric"><span>API state</span><strong>{loading ? "Loading" : usingFallback ? "Offline" : "Ready"}</strong><small>Local development endpoint</small></article>
+              </div>
+
+              {loading && <section className="panel" role="status">Loading synthetic cases from the development APIâ€¦</section>}
+
+              {error && (
+                <section className="panel" role="alert">
+                  <h2>API connection notice</h2>
+                  <p>{error}</p>
+                  <p>Showing clearly identified local synthetic fallback records.</p>
+                </section>
+              )}
+
+              <section className="panel">
+                <div className="panel-heading">
+                  <h2>Case Register</h2>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <input
+                      aria-label="Search synthetic cases"
+                      placeholder="Search cases..."
+                      value={search}
+                      onChange={(event) => setSearch(event.target.value)}
+                    />
+                    <select
+                      aria-label="Filter cases by severity"
+                      value={caseSeverityFilter}
+                      onChange={(event) => setCaseSeverityFilter(event.target.value)}
+                    >
+                      {severityOptions.map((value) => <option key={value} value={value}>{value === "All" ? "All severities" : value}</option>)}
+                    </select>
+                    <select
+                      aria-label="Filter cases by status"
+                      value={caseStatusFilter}
+                      onChange={(event) => setCaseStatusFilter(event.target.value)}
+                    >
+                      {statusOptions.map((value) => <option key={value} value={value}>{value === "All" ? "All statuses" : value}</option>)}
+                    </select>
+                    <button type="button" onClick={() => setRefreshKey((value) => value + 1)} disabled={loading}>
+                      {loading ? "Loadingâ€¦" : "Refresh"}
+                    </button>
+                  </div>
+                </div>
+                <div className="table-wrap">
+                  <table>
+                    <thead><tr><th>Case ID</th><th>Incident</th><th>Severity</th><th>Status</th></tr></thead>
+                    <tbody>
+                      {visibleCases.map((item) => (
+                        <tr key={item.case_id} className={selectedCaseId === item.case_id ? "selected-case-row" : ""}>
+                          <td>
+                            <button
+                              type="button"
+                              className="case-link"
+                              onClick={() => setSelectedCaseId((current) => current === item.case_id ? null : item.case_id)}
+                              aria-expanded={selectedCaseId === item.case_id}
+                            >
+                              {item.case_id}
+                            </button>
+                          </td>
+                          <td>{item.title}</td>
+                          <td><span className={`pill ${item.severity.toLowerCase()}`}>{item.severity}</span></td>
+                          <td>{item.status}</td>
+                        </tr>
+                      ))}
+                      {!loading && visibleCases.length === 0 && <tr><td colSpan={4}>No cases match the current search and filters.</td></tr>}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="muted">
+                  Showing {visibleCases.length} of {cases.length} synthetic cases.
+                  {" "}{usingFallback ? "Data source: local fallback; API unavailable." : "Data source: development API response."}
+                </p>
+              </section>
+
+              {selectedCase && (
+                <section className="panel case-detail-panel" aria-labelledby="case-detail-title">
+                  <div className="panel-heading">
+                    <h2 id="case-detail-title">Case details</h2>
+                    <button type="button" onClick={() => setSelectedCaseId(null)}>Close details</button>
+                  </div>
+                  <dl className="case-detail-grid">
+                    <div><dt>Case ID</dt><dd>{selectedCase.case_id}</dd></div>
+                    <div><dt>Incident</dt><dd>{selectedCase.title}</dd></div>
+                    <div><dt>Severity</dt><dd><span className={`pill ${selectedCase.severity.toLowerCase()}`}>{selectedCase.severity}</span></dd></div>
+                    <div><dt>Status</dt><dd>{selectedCase.status}</dd></div>
+                  </dl>
+                  <p className="muted">Read-only details from synthetic development data. Editing and persistence are not enabled.</p>
+                </section>
+              )}
+            </>
+          ) : (
+            <section className="panel placeholder">
+              <h2>{page}</h2>
+              <p>This module is a scaffold; its workflow has not been implemented.</p>
+              <p>Production access controls, audit logging, evidence safeguards, and security review are required before operational use.</p>
+            </section>
+          )}
+        </div>
+        <footer className="app-footer">
+          <div>CIRT DFIR Â· Development scaffold Â· Synthetic data Â· Not for operational use</div>
+          <div className="bozv-signature">
+            <span>Developed by: <strong>BozV</strong></span>
+            <span>Powered by: <strong>BozV</strong></span>
+          </div>
+        </footer>
+      </main>
+    </div>
+  );
+}
+
+export default App;
+
+========================================================================
+FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\style.css
+========================================================================
+:root{font-family:Inter,"Segoe UI",Arial,sans-serif;color:#e6edf7;background:#0b1120;font-synthesis:none;text-rendering:optimizeLegibility}
+*{box-sizing:border-box}
+body{margin:0;min-width:320px;min-height:100vh}
+button,input{font:inherit}
+.shell{min-height:100vh;display:grid;grid-template-columns:245px minmax(0,1fr)}
+.sidebar{background:#0d1627;border-right:1px solid #26354d;padding:22px 14px}
+.brand{display:flex;align-items:center;gap:11px;padding:0 7px 23px;border-bottom:1px solid #26354d}
+.brand-mark{background:#1b3c70;border:1px solid #3767a8;color:#a9ceff;padding:10px;border-radius:9px;font-weight:800}
+.brand strong,.brand small{display:block}
+.brand strong{font-size:13px;letter-spacing:.5px}
+.brand small{color:#8fa1ba;font-size:11px;margin-top:5px}
+.nav-label,.eyebrow{font-size:10px;letter-spacing:1.5px;font-weight:700;color:#7193c2}
+.nav-label{margin:25px 10px 10px}
+nav{display:grid;gap:4px}
+.nav-item{display:flex;align-items:center;gap:11px;text-align:left;border:0;border-radius:7px;padding:11px;background:transparent;color:#a9bad1;cursor:pointer}
+.nav-item:hover,.nav-item.active{background:#1b2b45;color:#fff}
+.nav-item.active{box-shadow:inset 3px 0 #5597ff}
+.side-note{margin:28px 5px;padding:12px;border:1px solid #26354d;border-radius:8px;color:#41d6a3;font-size:11px}
+.side-note small{display:block;color:#8fa1ba;line-height:1.6;margin-top:8px}
+.status-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#41d6a3;margin-right:6px}
+.main{min-width:0}
+.topbar{height:67px;display:flex;align-items:center;justify-content:space-between;padding:0 30px;border-bottom:1px solid #26354d;background:#0d1627;font-size:12px}
+.muted{color:#8fa1ba}
+.demo-label{font-size:10px;color:#8fa1ba;letter-spacing:1px}
+.content{max-width:1450px;margin:auto;padding:29px 30px}
+.page-heading{display:flex;justify-content:space-between;margin-bottom:22px}
+h1{font-size:27px;margin:8px 0}
+h2{font-size:15px;margin:0}
+.page-heading p{font-size:13px}
+.notice{background:#192a41;border:1px solid #304967;color:#b8cce5;padding:13px 15px;border-radius:8px;font-size:12px;line-height:1.6}
+.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin:20px 0}
+.metric,.panel{background:#111b2e;border:1px solid #26354d;border-radius:10px}
+.metric{padding:17px}
+.metric span,.metric small{display:block;color:#8fa1ba;font-size:12px}
+.metric strong{display:block;font-size:29px;margin:12px 0}
+.metric small{font-size:11px}
+.panel{padding:18px;margin-top:16px}
+.panel-heading{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-bottom:15px}
+input{background:#0b1424;border:1px solid #30405a;border-radius:7px;padding:10px 12px;color:#e6edf7;max-width:100%}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;white-space:nowrap}
+th,td{text-align:left;padding:13px 10px;border-bottom:1px solid #223047;font-size:12px}
+th{font-size:10px;letter-spacing:.8px;color:#8fa1ba;text-transform:uppercase}
+tbody tr:last-child td{border-bottom:0}
+.pill{display:inline-block;padding:5px 8px;border-radius:20px;font-size:10px;background:#24344a}
+.pill.high{background:#48252e;color:#ff9ba3}
+.pill.medium{background:#45361f;color:#f4cb78}
+.pill.low{background:#193d38;color:#75e5bd}
+.placeholder{line-height:1.7;color:#b8cce5}
+footer{text-align:center;padding:20px;color:#6f829b;font-size:10px}
+@media(max-width:950px){.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.shell{grid-template-columns:205px minmax(0,1fr)}.content{padding:22px 18px}}
+@media(max-width:650px){.shell{grid-template-columns:1fr}.sidebar{padding:12px}.brand{padding-bottom:12px}.nav-label,.side-note{display:none}nav{display:flex;flex-wrap:wrap;margin-top:12px}.nav-item{padding:9px;font-size:12px}.topbar{padding:0 14px}.content{padding:18px 12px}.metrics{gap:8px}.metric{padding:12px}.metric strong{font-size:23px}.panel-heading{align-items:flex-start;flex-direction:column}}
+
+/* BozV application signature */
+.app-footer {
+  text-align: center;
+  padding: 20px 16px;
+  color: #6f829b;
+  font-size: 10px;
+  line-height: 1.8;
+}
+
+.bozv-signature {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+  margin-top: 7px;
+  color: #9bb2d1;
+  letter-spacing: 0.2px;
+}
+
+.bozv-signature strong {
+  color: #8fc0ff;
+  font-weight: 700;
+}
+
+/* Phase 5C: synthetic case filters and read-only details */
+.panel-heading select {
+  min-width: 130px;
+  max-width: 100%;
+}
+.case-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #8fc0ff;
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+.case-link:hover,
+.case-link:focus-visible {
+  color: #c2ddff;
+  text-decoration: underline;
+}
+.selected-case-row {
+  background: rgba(82, 145, 219, 0.1);
+}
+.case-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin: 18px 0;
+}
+.case-detail-grid > div {
+  padding: 14px;
+  border: 1px solid #263c56;
+  border-radius: 8px;
+  background: rgba(9, 20, 35, 0.5);
+  min-width: 0;
+}
+.case-detail-grid dt {
+  color: #91a5bf;
+  font-size: 11px;
+  margin-bottom: 8px;
+}
+.case-detail-grid dd {
+  margin: 0;
+  color: #e4edf9;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 700px) {
+  .panel-heading select {
+    width: 100%;
+  }
+}
+
+========================================================================
+FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\.env.example
+========================================================================
+# Example only. Replace placeholders using organization-approved Entra settings.
+# Do not put client secrets or certificates in frontend VITE_ variables.
+# VITE_ values are exposed to browser-side code.
+
+VITE_ENTRA_TENANT_ID=REPLACE_WITH_APPROVED_TENANT_ID
+VITE_ENTRA_CLIENT_ID=REPLACE_WITH_APPROVED_SPA_CLIENT_ID
+VITE_ENTRA_API_SCOPE=REPLACE_WITH_APPROVED_API_SCOPE
+VITE_ENTRA_REDIRECT_URI=http://localhost:5173/
+VITE_API_BASE_URL=/api
+
+========================================================================
+FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\vite.config.ts
+========================================================================
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    host: "127.0.0.1",
+    strictPort: true,
+    proxy: {
+      "/api": {
+        target: "http://127.0.0.1:8000",
+        changeOrigin: false,
+      },
+    },
+  },
+});
+
+========================================================================
+FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\auth_dependencies.py
+========================================================================
+"""Fail-closed authentication gate pending approved OIDC integration.
+
+This module intentionally authenticates nobody. Replace the placeholder
+identity provider integration only after the organization chooses a provider.
+Never trust roles supplied by a browser or request body.
+"""
+from fastapi import Depends, HTTPException
+
+from app.security import (
+    AuthenticationRequired,
+    AuthorizationDenied,
+    Principal,
+    authorize,
+)
+
+def get_current_principal() -> Principal:
+    """Reject all requests until real token/session validation is implemented."""
+    raise HTTPException(
+        status_code=401,
+        detail="Authentication is not configured. Access is denied by default.",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+def require_permission(permission: str):
+    """Require a validated principal and enforce the RBAC permission."""
+    def dependency(principal: Principal = Depends(get_current_principal)) -> Principal:
+        try:
+            authorize(principal, permission)
+        except AuthenticationRequired as exc:
+            raise HTTPException(
+                status_code=401,
+                detail="Authentication required.",
+                headers={"WWW-Authenticate": "Bearer"},
+            ) from exc
+        except AuthorizationDenied as exc:
+            raise HTTPException(
+                status_code=403,
+                detail="Insufficient permission.",
+            ) from exc
+        return principal
+    return dependency
+
+========================================================================
+FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_principal.py
+========================================================================
+"""Map verified Entra application-role claims to internal CIRT DFIR roles.
+
+SECURITY BOUNDARY:
+Only pass the claims returned by verify_entra_access_token after successful
+cryptographic and issuer/audience/tenant validation. This module does not
+validate token signatures or establish claim provenance.
+
+approved_role_map must come from trusted server-side configuration. Never
+accept it, the claims, or role assignments from browser-controlled input.
+"""
+from collections.abc import Mapping
+from typing import Any
+
+from app.security import KNOWN_ROLES, Principal
+
+
+class PrincipalMappingError(ValueError):
+    """Raised when verified claims cannot safely become an application principal."""
+
+
+def principal_from_verified_claims(
+    claims: Mapping[str, Any],
+    *,
+    approved_role_map: Mapping[str, str],
+) -> Principal:
+    """Create an internal Principal from verified claims and an explicit role map."""
+    if not isinstance(claims, Mapping):
+        raise PrincipalMappingError("Verified claims must be a mapping.")
+
+    subject = claims.get("sub")
+    if not isinstance(subject, str) or not subject.strip():
+        raise PrincipalMappingError("A non-empty subject claim is required.")
+
+    if not isinstance(approved_role_map, Mapping) or not approved_role_map:
+        raise PrincipalMappingError("An explicit server-side role map is required.")
+
+    for app_role, internal_role in approved_role_map.items():
+        if not isinstance(app_role, str) or not app_role.strip():
+            raise PrincipalMappingError("Role-map keys must be non-empty strings.")
+        if not isinstance(internal_role, str) or internal_role not in KNOWN_ROLES:
+            raise PrincipalMappingError("Role map contains an unrecognized internal role.")
+
+    raw_roles = claims.get("roles")
+    if not isinstance(raw_roles, list) or not raw_roles:
+        raise PrincipalMappingError("A non-empty roles array is required.")
+
+    if any(not isinstance(role, str) or not role.strip() for role in raw_roles):
+        raise PrincipalMappingError("Every application role must be a non-empty string.")
+
+    if len(set(raw_roles)) != len(raw_roles):
+        raise PrincipalMappingError("Duplicate application roles are not accepted.")
+
+    unknown_roles = [role for role in raw_roles if role not in approved_role_map]
+    if unknown_roles:
+        raise PrincipalMappingError("Claims contain an unapproved application role.")
+
+    internal_roles = frozenset(approved_role_map[role] for role in raw_roles)
+    if not internal_roles:
+        raise PrincipalMappingError("No approved internal roles were resolved.")
+
+    return Principal(subject=subject.strip(), roles=internal_roles)
+
+========================================================================
+FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_token_verifier.py
+========================================================================
+"""Isolated Microsoft Entra access-token verification foundation.
+
+SECURITY BOUNDARY:
+- This module is NOT wired into application routes.
+- The caller must provide a key resolver backed by trusted Microsoft
+  OpenID Connect metadata/JWKS, with HTTPS and safe key-rotation handling.
+- Never use a token-provided URL or arbitrary token-provided key as trusted.
+- Never use this verifier until tenant, issuer, and audience are approved.
+"""
+from collections.abc import Callable
+from typing import Any
+
+import jwt
+from jwt import InvalidTokenError
+
+TrustedKeyResolver = Callable[[str], Any]
+
+
+def verify_entra_access_token(
+    token: str,
+    *,
+    trusted_key_resolver: TrustedKeyResolver,
+    expected_issuer: str,
+    expected_audience: str,
+    expected_tenant_id: str,
+) -> dict[str, Any]:
+    """Verify an RS256 token against a trusted key resolver and fixed config.
+
+    The resolver must obtain keys only from an administrator-approved,
+    trusted JWKS source. This function deliberately performs no network access.
+    """
+    if not isinstance(token, str) or not token.strip():
+        raise InvalidTokenError("A non-empty bearer token is required.")
+
+    for name, value in (
+        ("expected_issuer", expected_issuer),
+        ("expected_audience", expected_audience),
+        ("expected_tenant_id", expected_tenant_id),
+    ):
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(f"{name} must be configured before verification.")
+
+    if not callable(trusted_key_resolver):
+        raise ValueError("A trusted signing-key resolver is required.")
+
+    # The key resolver must select a key from a trusted JWKS source.
+    # The token's algorithm is not allowed to select the accepted algorithm.
+    signing_key = trusted_key_resolver(token)
+    if signing_key is None:
+        raise InvalidTokenError("No trusted signing key was found.")
+
+    claims = jwt.decode(
+        token,
+        key=signing_key,
+        algorithms=["RS256"],
+        issuer=expected_issuer,
+        audience=expected_audience,
+        options={
+            "require": ["exp", "iat", "nbf", "iss", "aud", "sub", "tid"],
+            "verify_signature": True,
+            "verify_exp": True,
+            "verify_iat": True,
+            "verify_nbf": True,
+            "verify_iss": True,
+            "verify_aud": True,
+        },
+        leeway=0,
+    )
+
+    if not isinstance(claims.get("sub"), str) or not claims["sub"].strip():
+        raise InvalidTokenError("The subject claim is missing or invalid.")
+
+    if claims.get("tid") != expected_tenant_id:
+        raise InvalidTokenError("The token tenant does not match the configured tenant.")
+
+    return claims
+
+Fail-closed authentication message present: True
+Production sign-in enabled by this preflight: False

@@ -1,0 +1,89 @@
+CIRT-DFIR - PHASE 8B180
+Read-only Entra integration contract and approval-gap audit
+Backend: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend
+
+=== REQUIRED ENVIRONMENT SETTINGS ===
+CIRT_DFIR_ENTRA_TENANT_ID: MISSING OR EMPTY
+CIRT_DFIR_ENTRA_EXPECTED_ISSUER: MISSING OR EMPTY
+CIRT_DFIR_ENTRA_AUDIENCE: MISSING OR EMPTY
+
+=== SOURCE FILE INVENTORY ===
+FOUND: app/main.py
+FOUND: app/auth_dependencies.py
+FOUND: app/entra_config_preflight.py
+FOUND: app/entra_authenticator.py
+FOUND: app/entra_bearer_adapter.py
+FOUND: app/entra_token_verifier.py
+FOUND: app/entra_principal.py
+FOUND: app/entra_jwks.py
+FOUND: app/entra_jwks_cache.py
+FOUND: app/entra_metadata_client.py
+FOUND: app/entra_http_transport.py
+FOUND: app/security.py
+FOUND: tests/test_entra_config_preflight.py
+FOUND: tests/test_entra_authenticator.py
+FOUND: tests/test_api_auth_gate.py
+FOUND: tests/test_api_oidc_fail_closed.py
+
+=== AUTHENTICATION BOUNDARY MARKERS ===
+
+--- app/main.py ---
+6: from app.auth_dependencies import require_permission
+68: principal = Depends(require_permission("cases:update")),
+104: @app.get("/api/v1/demo/cases", response_model=list[DemoCase], dependencies=[Depends(require_permission("cases:read"))])
+
+--- app/auth_dependencies.py ---
+16: def get_current_principal() -> Principal:
+20: detail="Authentication is not configured. Access is denied by default.",
+21: headers={"WWW-Authenticate": "Bearer"},
+24: def require_permission(permission: str):
+26: def dependency(principal: Principal = Depends(get_current_principal)) -> Principal:
+33: headers={"WWW-Authenticate": "Bearer"},
+
+--- app/entra_authenticator.py ---
+3: This module is deliberately NOT wired into FastAPI. Configuration must be
+54: class EntraAuthConfig:
+61: trusted_metadata_hosts: frozenset[str]
+62: allowed_jwks_hosts: frozenset[str]
+63: approved_role_map: Mapping[str, str]
+114: self.trusted_metadata_hosts, "trusted_metadata_hosts"
+117: self.allowed_jwks_hosts, "allowed_jwks_hosts"
+121: raise ValueError("discovery_url host is not in trusted_metadata_hosts")
+123: if not isinstance(self.approved_role_map, Mapping) or not self.approved_role_map:
+124: raise ValueError("approved_role_map must be a non-empty mapping")
+127: for app_role, internal_role in self.approved_role_map.items():
+155: object.__setattr__(self, "trusted_metadata_hosts", metadata_hosts)
+156: object.__setattr__(self, "allowed_jwks_hosts", jwks_hosts)
+157: object.__setattr__(self, "approved_role_map", MappingProxyType(role_map))
+165: config: EntraAuthConfig,
+195: approved_role_map=self._config.approved_role_map,
+199: def create_entra_authenticator(
+200: config: EntraAuthConfig,
+207: expected_issuer, and its JWKS hostname must be in allowed_jwks_hosts.
+228: config.discovery_url, config.trusted_metadata_hosts
+233: allowed_jwks_hosts=set(config.allowed_jwks_hosts),
+237: return fetch_document(metadata.jwks_uri, config.allowed_jwks_hosts)
+
+--- app/entra_bearer_adapter.py ---
+3: This module does not fetch metadata or JWKS and is not wired into FastAPI.
+30: approved_role_map: Mapping[str, str],
+61: approved_role_map=approved_role_map,
+
+--- app/security.py ---
+No selected markers found.
+
+=== APPROVAL GAPS ===
+[ ] Approved Entra tenant ID and tenant ownership
+[ ] Exact expected issuer validated against the selected tenant's metadata
+[ ] API audience / Application ID URI approved by the API owner
+[ ] Application roles and their mapping to internal CIRT-DFIR roles
+[ ] Trusted discovery metadata and JWKS host allowlists
+[ ] Deployment-specific secure environment configuration
+[ ] Security/admin approval and integration test plan
+
+=== SAFETY CONCLUSION ===
+Source files missing: None
+Environment values were not displayed.
+No network requests, source edits, or environment changes were performed.
+Do not wire Entra authentication into FastAPI until configuration and approvals are complete.
+STATUS: REVIEW ONLY

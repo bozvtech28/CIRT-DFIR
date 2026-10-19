@@ -1,0 +1,896 @@
+﻿CIRT DFIR PROFESSIONAL - PHASE 8B.58
+Timestamp: 2026-10-16T01:58:57.4769971+08:00
+Scope: read-only verifier and test review
+Source modified: NO
+Network requests: NONE
+Production auth gate modified: NO
+
+============================================================
+FILE: app\entra_token_verifier.py
+============================================================
+Line count: 76
+   1: """Isolated Microsoft Entra access-token verification foundation.
+   2: 
+   3: SECURITY BOUNDARY:
+   4: - This module is NOT wired into application routes.
+   5: - The caller must provide a key resolver backed by trusted Microsoft
+   6:   OpenID Connect metadata/JWKS, with HTTPS and safe key-rotation handling.
+   7: - Never use a token-provided URL or arbitrary token-provided key as trusted.
+   8: - Never use this verifier until tenant, issuer, and audience are approved.
+   9: """
+  10: from collections.abc import Callable
+  11: from typing import Any
+  12: 
+  13: import jwt
+  14: from jwt import InvalidTokenError
+  15: 
+  16: TrustedKeyResolver = Callable[[str], Any]
+  17: 
+  18: 
+  19: def verify_entra_access_token(
+  20:     token: str,
+  21:     *,
+  22:     trusted_key_resolver: TrustedKeyResolver,
+  23:     expected_issuer: str,
+  24:     expected_audience: str,
+  25:     expected_tenant_id: str,
+  26: ) -> dict[str, Any]:
+  27:     """Verify an RS256 token against a trusted key resolver and fixed config.
+  28: 
+  29:     The resolver must obtain keys only from an administrator-approved,
+  30:     trusted JWKS source. This function deliberately performs no network access.
+  31:     """
+  32:     if not isinstance(token, str) or not token.strip():
+  33:         raise InvalidTokenError("A non-empty bearer token is required.")
+  34: 
+  35:     for name, value in (
+  36:         ("expected_issuer", expected_issuer),
+  37:         ("expected_audience", expected_audience),
+  38:         ("expected_tenant_id", expected_tenant_id),
+  39:     ):
+  40:         if not isinstance(value, str) or not value.strip():
+  41:             raise ValueError(f"{name} must be configured before verification.")
+  42: 
+  43:     if not callable(trusted_key_resolver):
+  44:         raise ValueError("A trusted signing-key resolver is required.")
+  45: 
+  46:     # The key resolver must select a key from a trusted JWKS source.
+  47:     # The token's algorithm is not allowed to select the accepted algorithm.
+  48:     signing_key = trusted_key_resolver(token)
+  49:     if signing_key is None:
+  50:         raise InvalidTokenError("No trusted signing key was found.")
+  51: 
+  52:     claims = jwt.decode(
+  53:         token,
+  54:         key=signing_key,
+  55:         algorithms=["RS256"],
+  56:         issuer=expected_issuer,
+  57:         audience=expected_audience,
+  58:         options={
+  59:             "require": ["exp", "iat", "nbf", "iss", "aud", "sub", "tid"],
+  60:             "verify_signature": True,
+  61:             "verify_exp": True,
+  62:             "verify_iat": True,
+  63:             "verify_nbf": True,
+  64:             "verify_iss": True,
+  65:             "verify_aud": True,
+  66:         },
+  67:         leeway=0,
+  68:     )
+  69: 
+  70:     if not isinstance(claims.get("sub"), str) or not claims["sub"].strip():
+  71:         raise InvalidTokenError("The subject claim is missing or invalid.")
+  72: 
+  73:     if claims.get("tid") != expected_tenant_id:
+  74:         raise InvalidTokenError("The token tenant does not match the configured tenant.")
+  75: 
+  76:     return claims
+
+============================================================
+FILE: app\entra_jwks.py
+============================================================
+Line count: 78
+   1: """Offline JWKS key selector for the Entra verifier prototype.
+   2: 
+   3: No HTTP calls are made by this module. The JWKS document must come from a
+   4: trusted, administrator-approved source before any production use.
+   5: This module is not wired into application routes.
+   6: """
+   7: from collections.abc import Mapping
+   8: from typing import Any
+   9: 
+  10: import jwt
+  11: from jwt import InvalidTokenError
+  12: 
+  13: 
+  14: def build_jwks_resolver(jwks: Mapping[str, Any]):
+  15:     """Build a resolver from a supplied JWKS document.
+  16: 
+  17:     Intended for offline tests and later integration design. This function
+  18:     does not establish that the supplied JWKS document is authentic.
+  19:     """
+  20:     if not isinstance(jwks, Mapping):
+  21:         raise ValueError("JWKS must be a mapping.")
+  22: 
+  23:     keys = jwks.get("keys")
+  24:     if not isinstance(keys, list) or not keys:
+  25:         raise ValueError("JWKS must contain a non-empty keys array.")
+  26: 
+  27:     indexed: dict[str, Any] = {}
+  28: 
+  29:     for item in keys:
+  30:         if not isinstance(item, Mapping):
+  31:             raise ValueError("Every JWKS key must be an object.")
+  32: 
+  33:         kid = item.get("kid")
+  34:         if not isinstance(kid, str) or not kid.strip():
+  35:             raise ValueError("Every JWKS key must have a non-empty kid.")
+  36: 
+  37:         if kid in indexed:
+  38:             raise ValueError("Duplicate kid values are not allowed.")
+  39: 
+  40:         if item.get("kty") != "RSA":
+  41:             raise ValueError("Only RSA signing keys are supported.")
+  42: 
+  43:         if item.get("use", "sig") != "sig":
+  44:             raise ValueError("JWKS key use must be sig.")
+  45: 
+  46:         if item.get("alg", "RS256") != "RS256":
+  47:             raise ValueError("Only RS256 JWKS keys are supported.")
+  48: 
+  49:         # A public JWKS must not include RSA private-key parameters.
+  50:         if any(name in item for name in ("d", "p", "q", "dp", "dq", "qi", "oth")):
+  51:             raise ValueError("Private RSA key material is not accepted.")
+  52: 
+  53:         try:
+  54:             parsed = jwt.PyJWK.from_dict(dict(item), algorithm="RS256")
+  55:             indexed[kid] = parsed.key
+  56:         except Exception as exc:
+  57:             raise ValueError(f"Invalid RSA JWK for kid {kid!r}.") from exc
+  58: 
+  59:     def resolve(token: str):
+  60:         try:
+  61:             header = jwt.get_unverified_header(token)
+  62:         except Exception as exc:
+  63:             raise InvalidTokenError("Malformed JWT header.") from exc
+  64: 
+  65:         if header.get("alg") != "RS256":
+  66:             raise InvalidTokenError("Only RS256 tokens are accepted.")
+  67: 
+  68:         kid = header.get("kid")
+  69:         if not isinstance(kid, str) or not kid.strip():
+  70:             raise InvalidTokenError("JWT header must contain a non-empty kid.")
+  71: 
+  72:         key = indexed.get(kid)
+  73:         if key is None:
+  74:             raise InvalidTokenError("JWT kid was not found in the trusted JWKS set.")
+  75: 
+  76:         return key
+  77: 
+  78:     return resolve
+
+============================================================
+FILE: app\entra_metadata_client.py
+============================================================
+Line count: 167
+   1: """Provider-neutral Entra metadata/JWKS client primitives.
+   2: 
+   3: This module intentionally performs no network I/O.
+   4: A caller must inject a trusted transport and must validate the
+   5: approved tenant, issuer, discovery endpoint, and JWKS URI.
+   6: 
+   7: Do not use token-provided URLs to select a metadata endpoint.
+   8: This module is not wired into the production authentication gate.
+   9: """
+  10: 
+  11: from __future__ import annotations
+  12: 
+  13: from dataclasses import dataclass
+  14: from typing import Any, Callable
+  15: from urllib.parse import urlparse
+  16: 
+  17: 
+  18: class MetadataTrustError(ValueError):
+  19:     """Raised when discovery metadata or JWKS data is not trusted."""
+  20: 
+  21: 
+  22: @dataclass(frozen=True)
+  23: class TrustedMetadata:
+  24:     issuer: str
+  25:     jwks_uri: str
+  26: 
+  27: 
+  28: def _require_https_url(value: str, field_name: str) -> str:
+  29:     if not isinstance(value, str) or not value.strip():
+  30:         raise MetadataTrustError(f"{field_name} must be a non-empty URL")
+  31: 
+  32:     parsed = urlparse(value)
+  33: 
+  34:     if parsed.scheme.lower() != "https":
+  35:         raise MetadataTrustError(f"{field_name} must use HTTPS")
+  36:     if not parsed.hostname:
+  37:         raise MetadataTrustError(f"{field_name} must include a hostname")
+  38:     if parsed.username or parsed.password:
+  39:         raise MetadataTrustError(f"{field_name} must not contain URL credentials")
+  40:     if parsed.fragment:
+  41:         raise MetadataTrustError(f"{field_name} must not contain a fragment")
+  42: 
+  43:     return value
+  44: 
+  45: 
+  46: def validate_discovery_document(
+  47:     document: Any,
+  48:     *,
+  49:     expected_issuer: str,
+  50:     allowed_jwks_hosts: set[str],
+  51: ) -> TrustedMetadata:
+  52:     """Validate discovery metadata against caller-approved trust settings.
+  53: 
+  54:     The caller is responsible for obtaining the document from the
+  55:     approved, fixed discovery URL over a trusted HTTPS transport.
+  56:     """
+  57: 
+  58:     if not isinstance(document, dict):
+  59:         raise MetadataTrustError("Discovery document must be a JSON object")
+  60: 
+  61:     if not isinstance(expected_issuer, str) or not expected_issuer.strip():
+  62:         raise MetadataTrustError("Expected issuer is not configured")
+  63: 
+  64:     issuer = document.get("issuer")
+  65:     jwks_uri = document.get("jwks_uri")
+  66: 
+  67:     if not isinstance(issuer, str) or issuer != expected_issuer:
+  68:         raise MetadataTrustError("Discovery issuer does not match configuration")
+  69: 
+  70:     _require_https_url(issuer, "issuer")
+  71:     _require_https_url(jwks_uri, "jwks_uri")
+  72: 
+  73:     parsed_jwks = urlparse(jwks_uri)
+  74:     allowed_hosts = {
+  75:         host.lower().rstrip(".")
+  76:         for host in allowed_jwks_hosts
+  77:         if isinstance(host, str) and host.strip()
+  78:     }
+  79: 
+  80:     if (parsed_jwks.hostname or "").lower().rstrip(".") not in allowed_hosts:
+  81:         raise MetadataTrustError("JWKS hostname is not in the approved allowlist")
+  82: 
+  83:     if parsed_jwks.query:
+  84:         raise MetadataTrustError("JWKS URI query parameters are not allowed")
+  85:     if parsed_jwks.fragment:
+  86:         raise MetadataTrustError("JWKS URI fragments are not allowed")
+  87: 
+  88:     return TrustedMetadata(issuer=issuer, jwks_uri=jwks_uri)
+  89: 
+  90: 
+  91: def fetch_trusted_document(
+  92:     url: str,
+  93:     *,
+  94:     trusted_hosts: set[str],
+  95:     transport: Callable[[str, float], Any],
+  96:     timeout_seconds: float = 3.0,
+  97: ) -> Any:
+  98:     """Use an injected transport to fetch JSON from an allowlisted HTTPS host.
+  99: 
+ 100:     The injected transport must enforce the timeout and validate every
+ 101:     redirect destination. This function never follows redirects itself.
+ 102:     """
+ 103: 
+ 104:     _require_https_url(url, "request URL")
+ 105: 
+ 106:     if timeout_seconds <= 0 or timeout_seconds > 10:
+ 107:         raise MetadataTrustError("Timeout must be greater than 0 and at most 10 seconds")
+ 108: 
+ 109:     host = (urlparse(url).hostname or "").lower().rstrip(".")
+ 110:     allowed = {
+ 111:         item.lower().rstrip(".")
+ 112:         for item in trusted_hosts
+ 113:         if isinstance(item, str) and item.strip()
+ 114:     }
+ 115: 
+ 116:     if host not in allowed:
+ 117:         raise MetadataTrustError("Request hostname is not in the approved allowlist")
+ 118: 
+ 119:     result = transport(url, timeout_seconds)
+ 120: 
+ 121:     if not isinstance(result, dict):
+ 122:         raise MetadataTrustError("Transport must return a decoded JSON object")
+ 123: 
+ 124:     return result
+ 125: 
+ 126: 
+ 127: def validate_jwks_document(document: Any) -> dict[str, Any]:
+ 128:     """Perform structural checks before the existing offline JWKS resolver."""
+ 129: 
+ 130:     if not isinstance(document, dict):
+ 131:         raise MetadataTrustError("JWKS document must be a JSON object")
+ 132: 
+ 133:     keys = document.get("keys")
+ 134:     if not isinstance(keys, list) or not keys:
+ 135:         raise MetadataTrustError("JWKS must contain a non-empty keys array")
+ 136: 
+ 137:     seen_kids: set[str] = set()
+ 138: 
+ 139:     for key in keys:
+ 140:         if not isinstance(key, dict):
+ 141:             raise MetadataTrustError("Each JWKS key must be a JSON object")
+ 142: 
+ 143:         kid = key.get("kid")
+ 144:         if not isinstance(kid, str) or not kid.strip():
+ 145:             raise MetadataTrustError("Each JWKS key must have a non-empty kid")
+ 146: 
+ 147:         if kid in seen_kids:
+ 148:             raise MetadataTrustError("JWKS contains duplicate key IDs")
+ 149:         seen_kids.add(kid)
+ 150: 
+ 151:         if key.get("kty") != "RSA":
+ 152:             raise MetadataTrustError("Only RSA signing keys are accepted")
+ 153:         if key.get("use", "sig") != "sig":
+ 154:             raise MetadataTrustError("JWKS key must be designated for signatures")
+ 155:         if key.get("alg", "RS256") != "RS256":
+ 156:             raise MetadataTrustError("Only RS256 signing keys are accepted")
+ 157: 
+ 158:         private_parameters = {"d", "p", "q", "dp", "dq", "qi", "oth"}
+ 159:         if private_parameters.intersection(key):
+ 160:             raise MetadataTrustError("JWKS must not contain private key parameters")
+ 161: 
+ 162:         if not isinstance(key.get("n"), str) or not key["n"]:
+ 163:             raise MetadataTrustError("RSA key modulus is missing")
+ 164:         if not isinstance(key.get("e"), str) or not key["e"]:
+ 165:             raise MetadataTrustError("RSA key exponent is missing")
+ 166: 
+ 167:     return document
+
+============================================================
+FILE: app\entra_jwks_cache.py
+============================================================
+Line count: 107
+   1: """Bounded in-memory JWKS cache with explicit refresh.
+   2: 
+   3: The loader is injected by the caller. This module performs no network
+   4: requests and is not wired into production authentication.
+   5: 
+   6: Expired keys are never returned by get(). A failed refresh does not
+   7: extend the previous expiry time. Callers must provide trusted loading
+   8: and transport logic before using this cache in an application.
+   9: """
+  10: 
+  11: from __future__ import annotations
+  12: 
+  13: from copy import deepcopy
+  14: from threading import RLock
+  15: from time import monotonic
+  16: from typing import Any, Callable
+  17: 
+  18: from app.entra_metadata_client import (
+  19:     MetadataTrustError,
+  20:     validate_jwks_document,
+  21: )
+  22: 
+  23: 
+  24: class JWKSCacheError(RuntimeError):
+  25:     """Raised when trusted JWKS data cannot be loaded or validated."""
+  26: 
+  27: 
+  28: class JWKSCache:
+  29:     """Thread-safe in-memory JWKS cache with bounded TTL."""
+  30: 
+  31:     def __init__(
+  32:         self,
+  33:         loader: Callable[[], Any],
+  34:         *,
+  35:         ttl_seconds: float = 300.0,
+  36:         clock: Callable[[], float] = monotonic,
+  37:     ) -> None:
+  38:         if not callable(loader):
+  39:             raise ValueError("loader must be callable")
+  40:         if not isinstance(ttl_seconds, (int, float)) or isinstance(
+  41:             ttl_seconds, bool
+  42:         ):
+  43:             raise ValueError("ttl_seconds must be numeric")
+  44:         if not 0 < ttl_seconds <= 3600:
+  45:             raise ValueError("ttl_seconds must be greater than 0 and at most 3600")
+  46:         if not callable(clock):
+  47:             raise ValueError("clock must be callable")
+  48: 
+  49:         self._loader = loader
+  50:         self._ttl_seconds = float(ttl_seconds)
+  51:         self._clock = clock
+  52:         self._lock = RLock()
+  53:         self._document: dict[str, Any] | None = None
+  54:         self._expires_at: float | None = None
+  55: 
+  56:     def _load_and_validate(self) -> dict[str, Any]:
+  57:         try:
+  58:             document = self._loader()
+  59:             validated = validate_jwks_document(document)
+  60:             # Never expose the loader's mutable object to the cache.
+  61:             return deepcopy(validated)
+  62:         except (MetadataTrustError, TypeError, ValueError) as exc:
+  63:             raise JWKSCacheError("Loaded JWKS failed validation") from exc
+  64:         except Exception as exc:
+  65:             raise JWKSCacheError("JWKS loader failed") from exc
+  66: 
+  67:     def get(self) -> dict[str, Any]:
+  68:         """Return a copy of cached keys, loading only when missing/expired."""
+  69:         with self._lock:
+  70:             now = self._clock()
+  71: 
+  72:             if (
+  73:                 self._document is not None
+  74:                 and self._expires_at is not None
+  75:                 and now < self._expires_at
+  76:             ):
+  77:                 return deepcopy(self._document)
+  78: 
+  79:             # Do not return expired keys if the loader fails.
+  80:             document = self._load_and_validate()
+  81:             self._document = document
+  82:             self._expires_at = self._clock() + self._ttl_seconds
+  83:             return deepcopy(document)
+  84: 
+  85:     def refresh(self) -> dict[str, Any]:
+  86:         """Force a fresh load and replace the cache only after validation."""
+  87:         with self._lock:
+  88:             document = self._load_and_validate()
+  89:             self._document = document
+  90:             self._expires_at = self._clock() + self._ttl_seconds
+  91:             return deepcopy(document)
+  92: 
+  93:     def invalidate(self) -> None:
+  94:         """Discard cached keys so the next get() must reload."""
+  95:         with self._lock:
+  96:             self._document = None
+  97:             self._expires_at = None
+  98: 
+  99:     @property
+ 100:     def is_valid(self) -> bool:
+ 101:         """Whether a non-expired cache entry currently exists."""
+ 102:         with self._lock:
+ 103:             return (
+ 104:                 self._document is not None
+ 105:                 and self._expires_at is not None
+ 106:                 and self._clock() < self._expires_at
+ 107:             )
+
+============================================================
+FILE: app\auth_dependencies.py
+============================================================
+Line count: 41
+   1: """Fail-closed authentication gate pending approved OIDC integration.
+   2: 
+   3: This module intentionally authenticates nobody. Replace the placeholder
+   4: identity provider integration only after the organization chooses a provider.
+   5: Never trust roles supplied by a browser or request body.
+   6: """
+   7: from fastapi import Depends, HTTPException
+   8: 
+   9: from app.security import (
+  10:     AuthenticationRequired,
+  11:     AuthorizationDenied,
+  12:     Principal,
+  13:     authorize,
+  14: )
+  15: 
+  16: def get_current_principal() -> Principal:
+  17:     """Reject all requests until real token/session validation is implemented."""
+  18:     raise HTTPException(
+  19:         status_code=401,
+  20:         detail="Authentication is not configured. Access is denied by default.",
+  21:         headers={"WWW-Authenticate": "Bearer"},
+  22:     )
+  23: 
+  24: def require_permission(permission: str):
+  25:     """Require a validated principal and enforce the RBAC permission."""
+  26:     def dependency(principal: Principal = Depends(get_current_principal)) -> Principal:
+  27:         try:
+  28:             authorize(principal, permission)
+  29:         except AuthenticationRequired as exc:
+  30:             raise HTTPException(
+  31:                 status_code=401,
+  32:                 detail="Authentication required.",
+  33:                 headers={"WWW-Authenticate": "Bearer"},
+  34:             ) from exc
+  35:         except AuthorizationDenied as exc:
+  36:             raise HTTPException(
+  37:                 status_code=403,
+  38:                 detail="Insufficient permission.",
+  39:             ) from exc
+  40:         return principal
+  41:     return dependency
+
+============================================================
+FILE: tests\test_api_auth_gate.py
+============================================================
+Line count: 63
+   1: """API access-control tests using synthetic identities only."""
+   2: from fastapi.testclient import TestClient
+   3: 
+   4: from app.auth_dependencies import get_current_principal
+   5: from app.main import app
+   6: from app.security import Principal, ROLE_ADMINISTRATOR, ROLE_VIEWER
+   7: 
+   8: client = TestClient(app)
+   9: 
+  10: def test_demo_cases_reject_unauthenticated_request():
+  11:     app.dependency_overrides.clear()
+  12:     try:
+  13:         response = client.get("/api/v1/demo/cases")
+  14:         assert response.status_code == 401
+  15:         assert "Authentication" in response.json()["detail"]
+  16:     finally:
+  17:         app.dependency_overrides.clear()
+  18: 
+  19: def test_case_update_rejects_unauthenticated_request():
+  20:     app.dependency_overrides.clear()
+  21:     try:
+  22:         response = client.patch(
+  23:             "/api/v1/cases/DEMO-2026-001",
+  24:             json={"status": "Contained"},
+  25:         )
+  26:         assert response.status_code == 401
+  27:     finally:
+  28:         app.dependency_overrides.clear()
+  29: 
+  30: def test_viewer_cannot_update_case():
+  31:     app.dependency_overrides[get_current_principal] = lambda: Principal(
+  32:         subject="synthetic-test-viewer",
+  33:         roles=frozenset({ROLE_VIEWER}),
+  34:     )
+  35:     try:
+  36:         response = client.patch(
+  37:             "/api/v1/cases/DEMO-2026-001",
+  38:             json={"status": "Contained"},
+  39:         )
+  40:         assert response.status_code == 403
+  41:     finally:
+  42:         app.dependency_overrides.clear()
+  43: 
+  44: def test_admin_can_pass_case_update_authorization_gate():
+  45:     # Dependency override represents an already validated synthetic principal.
+  46:     # This test checks authorization only; it does not perform a database update.
+  47:     from app.auth_dependencies import require_permission
+  48:     from fastapi import Depends, FastAPI
+  49:     from fastapi.testclient import TestClient as LocalClient
+  50: 
+  51:     test_app = FastAPI()
+  52:     test_app.dependency_overrides[get_current_principal] = lambda: Principal(
+  53:         subject="synthetic-test-admin",
+  54:         roles=frozenset({ROLE_ADMINISTRATOR}),
+  55:     )
+  56: 
+  57:     @test_app.get("/test-protected-update-permission")
+  58:     def protected_permission_check(principal=Depends(require_permission("cases:update"))):
+  59:         return {"authorized": True}
+  60: 
+  61:     response = LocalClient(test_app).get("/test-protected-update-permission")
+  62:     assert response.status_code == 200
+  63:     assert response.json()["authorized"] is True
+
+============================================================
+FILE: tests\test_entra_token_verifier.py
+============================================================
+Line count: 153
+   1: from datetime import datetime, timedelta, timezone
+   2: 
+   3: import jwt
+   4: import pytest
+   5: from cryptography.hazmat.primitives.asymmetric import rsa
+   6: from jwt import InvalidTokenError
+   7: 
+   8: from app.entra_token_verifier import verify_entra_access_token
+   9: 
+  10: 
+  11: ISSUER = "https://login.microsoftonline.com/synthetic-tenant/v2.0"
+  12: AUDIENCE = "api://synthetic-cirt-dfir"
+  13: TENANT = "synthetic-tenant"
+  14: OTHER_TENANT = "another-synthetic-tenant"
+  15: 
+  16: 
+  17: @pytest.fixture
+  18: def signing_material():
+  19:     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+  20:     return private_key, private_key.public_key()
+  21: 
+  22: 
+  23: def make_token(private_key, **overrides):
+  24:     now = datetime.now(timezone.utc)
+  25:     claims = {
+  26:         "iss": ISSUER,
+  27:         "aud": AUDIENCE,
+  28:         "sub": "synthetic-user-001",
+  29:         "tid": TENANT,
+  30:         "iat": now,
+  31:         "nbf": now - timedelta(seconds=5),
+  32:         "exp": now + timedelta(minutes=5),
+  33:         "roles": ["DFIR Analyst"],
+  34:     }
+  35:     claims.update(overrides)
+  36:     return jwt.encode(claims, private_key, algorithm="RS256", headers={"kid": "synthetic-key-1"})
+  37: 
+  38: 
+  39: def verify(token, public_key):
+  40:     return verify_entra_access_token(
+  41:         token,
+  42:         trusted_key_resolver=lambda _token: public_key,
+  43:         expected_issuer=ISSUER,
+  44:         expected_audience=AUDIENCE,
+  45:         expected_tenant_id=TENANT,
+  46:     )
+  47: 
+  48: 
+  49: def test_accepts_valid_synthetic_rs256_token(signing_material):
+  50:     private_key, public_key = signing_material
+  51:     claims = verify(make_token(private_key), public_key)
+  52:     assert claims["sub"] == "synthetic-user-001"
+  53: 
+  54: 
+  55: def test_rejects_tampered_signature(signing_material):
+  56:     private_key, public_key = signing_material
+  57:     token = make_token(private_key)
+  58:     parts = token.split(".")
+  59:     parts[2] = ("A" if parts[2][0] != "A" else "B") + parts[2][1:]
+  60:     with pytest.raises(InvalidTokenError):
+  61:         verify(".".join(parts), public_key)
+  62: 
+  63: 
+  64: def test_rejects_expired_token(signing_material):
+  65:     private_key, public_key = signing_material
+  66:     old = datetime.now(timezone.utc) - timedelta(minutes=10)
+  67:     token = make_token(private_key, exp=old, iat=old - timedelta(minutes=5), nbf=old - timedelta(minutes=5))
+  68:     with pytest.raises(InvalidTokenError):
+  69:         verify(token, public_key)
+  70: 
+  71: 
+  72: def test_rejects_wrong_issuer(signing_material):
+  73:     private_key, public_key = signing_material
+  74:     with pytest.raises(InvalidTokenError):
+  75:         verify(make_token(private_key, iss="https://untrusted.invalid/"), public_key)
+  76: 
+  77: 
+  78: def test_rejects_wrong_audience(signing_material):
+  79:     private_key, public_key = signing_material
+  80:     with pytest.raises(InvalidTokenError):
+  81:         verify(make_token(private_key, aud="api://wrong-audience"), public_key)
+  82: 
+  83: 
+  84: def test_rejects_wrong_tenant(signing_material):
+  85:     private_key, public_key = signing_material
+  86:     with pytest.raises(InvalidTokenError):
+  87:         verify(make_token(private_key, tid=OTHER_TENANT), public_key)
+  88: 
+  89: 
+  90: def test_rejects_token_signed_by_another_key(signing_material):
+  91:     private_key, _ = signing_material
+  92:     other_private = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+  93:     with pytest.raises(InvalidTokenError):
+  94:         verify(make_token(private_key), other_private.public_key())
+  95: 
+  96: 
+  97: def test_rejects_hs256_token(signing_material):
+  98:     private_key, public_key = signing_material
+  99:     token = jwt.encode(
+ 100:         {"iss": ISSUER, "aud": AUDIENCE, "sub": "synthetic-user",
+ 101:          "tid": TENANT, "iat": 1, "nbf": 1, "exp": 4102444800},
+ 102:         "synthetic-test-secret-at-least-32-bytes-long",
+ 103:         algorithm="HS256",
+ 104:     )
+ 105:     with pytest.raises(InvalidTokenError):
+ 106:         verify(token, public_key)
+ 107: 
+ 108: 
+ 109: def test_rejects_missing_subject(signing_material):
+ 110:     private_key, public_key = signing_material
+ 111:     now = datetime.now(timezone.utc)
+ 112:     claims = {
+ 113:         "iss": ISSUER,
+ 114:         "aud": AUDIENCE,
+ 115:         "tid": TENANT,
+ 116:         "iat": now,
+ 117:         "nbf": now - timedelta(seconds=1),
+ 118:         "exp": now + timedelta(minutes=5),
+ 119:     }
+ 120:     token = jwt.encode(claims, private_key, algorithm="RS256")
+ 121:     with pytest.raises(InvalidTokenError):
+ 122:         verify(token, public_key)
+ 123: 
+ 124: def test_rejects_missing_required_exp_claim(signing_material):
+ 125:     private_key, public_key = signing_material
+ 126:     now = datetime.now(timezone.utc)
+ 127:     claims = {
+ 128:         "iss": ISSUER, "aud": AUDIENCE, "sub": "synthetic-user-001",
+ 129:         "tid": TENANT, "iat": now, "nbf": now - timedelta(seconds=1),
+ 130:     }
+ 131:     token = jwt.encode(claims, private_key, algorithm="RS256")
+ 132:     with pytest.raises(InvalidTokenError):
+ 133:         verify(token, public_key)
+ 134: 
+ 135: 
+ 136: def test_requires_configured_tenant(signing_material):
+ 137:     private_key, public_key = signing_material
+ 138:     token = make_token(private_key)
+ 139:     with pytest.raises(ValueError):
+ 140:         verify_entra_access_token(
+ 141:             token,
+ 142:             trusted_key_resolver=lambda _token: public_key,
+ 143:             expected_issuer=ISSUER,
+ 144:             expected_audience=AUDIENCE,
+ 145:             expected_tenant_id="",
+ 146:         )
+ 147: 
+ 148: 
+ 149: def test_rejects_empty_token(signing_material):
+ 150:     _, public_key = signing_material
+ 151:     with pytest.raises(InvalidTokenError):
+ 152:         verify("", public_key)
+ 153: 
+
+============================================================
+FILE: tests\test_entra_jwks.py
+============================================================
+Line count: 146
+   1: import json
+   2: 
+   3: import jwt
+   4: import pytest
+   5: from cryptography.hazmat.primitives.asymmetric import rsa
+   6: from jwt import InvalidTokenError
+   7: 
+   8: from app.entra_jwks import build_jwks_resolver
+   9: 
+  10: 
+  11: def make_pair(kid):
+  12:     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+  13:     public_jwk = json.loads(jwt.algorithms.RSAAlgorithm.to_jwk(private_key.public_key()))
+  14:     public_jwk.update({"kid": kid, "use": "sig", "alg": "RS256"})
+  15:     return private_key, public_jwk
+  16: 
+  17: 
+  18: def make_token(private_key, kid="key-a", algorithm="RS256"):
+  19:     return jwt.encode(
+  20:         {"sub": "synthetic-user", "iat": 1800000000, "nbf": 1800000000, "exp": 4102444800},
+  21:         private_key,
+  22:         algorithm=algorithm,
+  23:         headers={"kid": kid},
+  24:     )
+  25: 
+  26: 
+  27: def test_selects_matching_key_from_jwks():
+  28:     private_key, public_jwk = make_pair("key-a")
+  29:     resolver = build_jwks_resolver({"keys": [public_jwk]})
+  30:     token = make_token(private_key, "key-a")
+  31:     selected = resolver(token)
+  32:     decoded = jwt.decode(
+  33:         token,
+  34:         selected,
+  35:         algorithms=["RS256"],
+  36:         options={"verify_exp": False, "verify_iat": False, "verify_nbf": False},
+  37:     )
+  38:     assert decoded["sub"] == "synthetic-user"
+  39: 
+  40: 
+  41: def test_selects_correct_key_when_multiple_keys_exist():
+  42:     private_a, jwk_a = make_pair("key-a")
+  43:     _, jwk_b = make_pair("key-b")
+  44:     resolver = build_jwks_resolver({"keys": [jwk_a, jwk_b]})
+  45:     assert resolver(make_token(private_a, "key-a")) is not None
+  46: 
+  47: 
+  48: def test_rejects_unknown_kid():
+  49:     _, jwk = make_pair("known-key")
+  50:     resolver = build_jwks_resolver({"keys": [jwk]})
+  51:     unrelated_private, _ = make_pair("unknown-key")
+  52:     with pytest.raises(InvalidTokenError, match="kid"):
+  53:         resolver(make_token(unrelated_private, "unknown-key"))
+  54: 
+  55: 
+  56: def test_supports_rotation_overlap_with_old_and_new_keys():
+  57:     old_private, old_jwk = make_pair("old-key")
+  58:     new_private, new_jwk = make_pair("new-key")
+  59:     resolver = build_jwks_resolver({"keys": [old_jwk, new_jwk]})
+  60:     assert resolver(make_token(old_private, "old-key")) is not None
+  61:     assert resolver(make_token(new_private, "new-key")) is not None
+  62: 
+  63: 
+  64: def test_removed_key_is_rejected_after_rotation():
+  65:     old_private, old_jwk = make_pair("old-key")
+  66:     _, new_jwk = make_pair("new-key")
+  67:     resolver_after_rotation = build_jwks_resolver({"keys": [new_jwk]})
+  68:     with pytest.raises(InvalidTokenError, match="kid"):
+  69:         resolver_after_rotation(make_token(old_private, "old-key"))
+  70: 
+  71: 
+  72: @pytest.mark.parametrize("document", [
+  73:     None,
+  74:     {},
+  75:     {"keys": []},
+  76:     {"keys": "not-a-list"},
+  77: ])
+  78: def test_rejects_malformed_jwks_documents(document):
+  79:     with pytest.raises(ValueError):
+  80:         build_jwks_resolver(document)
+  81: 
+  82: 
+  83: def test_rejects_duplicate_kids():
+  84:     _, jwk_a = make_pair("duplicate")
+  85:     _, jwk_b = make_pair("duplicate")
+  86:     with pytest.raises(ValueError, match="Duplicate"):
+  87:         build_jwks_resolver({"keys": [jwk_a, jwk_b]})
+  88: 
+  89: 
+  90: def test_rejects_non_rsa_key():
+  91:     with pytest.raises(ValueError, match="RSA"):
+  92:         build_jwks_resolver({"keys": [{"kid": "ec-key", "kty": "EC"}]})
+  93: 
+  94: 
+  95: def test_rejects_encryption_only_key():
+  96:     _, jwk = make_pair("enc-key")
+  97:     jwk["use"] = "enc"
+  98:     with pytest.raises(ValueError, match="sig"):
+  99:         build_jwks_resolver({"keys": [jwk]})
+ 100: 
+ 101: 
+ 102: def test_rejects_non_rs256_jwk():
+ 103:     _, jwk = make_pair("other-alg")
+ 104:     jwk["alg"] = "RS384"
+ 105:     with pytest.raises(ValueError, match="RS256"):
+ 106:         build_jwks_resolver({"keys": [jwk]})
+ 107: 
+ 108: 
+ 109: def test_rejects_private_key_material_in_jwks():
+ 110:     _, jwk = make_pair("private-key")
+ 111:     jwk["d"] = "not-accepted"
+ 112:     with pytest.raises(ValueError, match="Private"):
+ 113:         build_jwks_resolver({"keys": [jwk]})
+ 114: 
+ 115: 
+ 116: def test_rejects_token_without_kid():
+ 117:     private_key, jwk = make_pair("key-a")
+ 118:     resolver = build_jwks_resolver({"keys": [jwk]})
+ 119:     token = jwt.encode(
+ 120:         {"sub": "synthetic-user"},
+ 121:         private_key,
+ 122:         algorithm="RS256",
+ 123:     )
+ 124:     with pytest.raises(InvalidTokenError, match="kid"):
+ 125:         resolver(token)
+ 126: 
+ 127: 
+ 128: def test_rejects_non_rs256_token_header():
+ 129:     private_key = "synthetic-test-secret-at-least-32-bytes-long"
+ 130:     jwk_private, jwk = make_pair("key-a")
+ 131:     resolver = build_jwks_resolver({"keys": [jwk]})
+ 132:     token = jwt.encode(
+ 133:         {"sub": "synthetic-user"},
+ 134:         private_key,
+ 135:         algorithm="HS256",
+ 136:         headers={"kid": "key-a"},
+ 137:     )
+ 138:     with pytest.raises(InvalidTokenError, match="RS256"):
+ 139:         resolver(token)
+ 140: 
+ 141: 
+ 142: def test_rejects_malformed_token():
+ 143:     _, jwk = make_pair("key-a")
+ 144:     resolver = build_jwks_resolver({"keys": [jwk]})
+ 145:     with pytest.raises(InvalidTokenError, match="Malformed"):
+ 146:         resolver("not.a.valid.jwt")
+
+=== BACKEND REGRESSION ===
+
+........................................................................ [ 44%]
+........................................................................ [ 88%]
+...................                                                      [100%]
+============================== warnings summary ===============================
+.venv\Lib\site-packages\fastapi\testclient.py:1
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+163 passed, 1 warning in 2.21s
+
+Test exit code: 0
+Regression result: PASS
+
+Conclusion: source inspection and passing tests do not certify production readiness.
+Production authentication must remain fail-closed pending end-to-end security review.

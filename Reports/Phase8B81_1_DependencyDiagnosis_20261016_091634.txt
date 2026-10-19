@@ -1,0 +1,15 @@
+﻿Phase 8B.81.1 - Read-Only Dependency Diagnosis
+Timestamp: 20261016_091634
+No install, source edit, or script approval performed.
+package.json name: cirt-dfir-platform-frontend
+package-lock name: 
+package-lock version: 
+
+COMMAND: npm dependency tree
+Exit code: 0
+STDOUT:
+cirt-dfir-platform-frontend@0.1.0 C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend
++-- @azure/msal-browser@5.25.1
+`-- @azure/msal-react@5.7.2
+
+STDERR:

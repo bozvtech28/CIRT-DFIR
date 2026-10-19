@@ -1,0 +1,53 @@
+﻿Phase 8B.96 - Read-only Entra configuration audit
+Timestamp: 2026-10-16 12:39:53
+No files changed. No network requests. No servers started.
+
+===== C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\auth_dependencies.py =====
+Exists: True
+16: def get_current_principal() -> Principal: 19: status_code=401, 20: detail="Authentication is not configured. Access is denied by default.", 26: def dependency(principal: Principal = Depends(get_current_principal)) -> Principal: 31: status_code=401,
+
+===== C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\main.py =====
+Exists: True
+6: from app.auth_dependencies import require_permission 57: @app.get("/api/v1/health", response_model=HealthResponse) 64: @app.patch("/api/v1/cases/{case_id}", response_model=DemoCase, dependencies=[Depends(require_permission("cases:update"))]) 83: actor_id="DEVELOPMENT-API", 103: @app.get("/api/v1/demo/cases", response_model=list[DemoCase], dependencies=[Depends(require_permission("cases:read"))])
+
+===== C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_bearer_adapter.py =====
+Exists: True
+1: """Offline-tested bearer-token adapter for the CIRT DFIR Entra integration. 13: principal_from_verified_claims, 15: from app.entra_token_verifier import verify_entra_access_token 19: class BearerAuthenticationError(Exception): 20: """Raised when a bearer token cannot produce a trusted principal.""" 23: def principal_from_authorization_header( 24: authorization: str | None, 26: trusted_key_resolver, 27: expected_issuer: str, 28: expected_audience: str, 29: expected_tenant_id: str, 32: """Validate a Bearer header, verify its JWT, and map verified roles. 37: if not isinstance(authorization, str): 38: raise BearerAuthenticationError("A Bearer authorization header is required.") 40: scheme, separator, raw_token = authorization.partition(" ") 45: or scheme.lower() != "bearer" 49: raise BearerAuthenticationError("The authorization header is malformed.") 52: claims = verify_entra_access_token( 54: trusted_key_resolver=trusted_key_resolver, 55: expected_issuer=expected_issuer, 56: expected_audience=expected_audience, 57: expected_tenant_id=expected_tenant_id, 59: return principal_from_verified_claims( 64: raise BearerAuthenticationError( 65: "Bearer token validation or role mapping failed."
+
+===== C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_token_verifier.py =====
+Exists: True
+19: def verify_entra_access_token( 22: trusted_key_resolver: TrustedKeyResolver, 23: expected_issuer: str, 24: expected_audience: str, 25: expected_tenant_id: str, 33: raise InvalidTokenError("A non-empty bearer token is required.") 36: ("expected_issuer", expected_issuer), 37: ("expected_audience", expected_audience), 38: ("expected_tenant_id", expected_tenant_id), 43: if not callable(trusted_key_resolver): 48: signing_key = trusted_key_resolver(token) 56: issuer=expected_issuer, 57: audience=expected_audience, 73: if claims.get("tid") != expected_tenant_id:
+
+===== C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_metadata_client.py =====
+Exists: True
+18: class MetadataTrustError(ValueError): 23: class TrustedMetadata: 28: def _require_https_url(value: str, field_name: str) -> str: 46: def validate_discovery_document( 49: expected_issuer: str, 61: if not isinstance(expected_issuer, str) or not expected_issuer.strip(): 67: if not isinstance(issuer, str) or issuer != expected_issuer: 91: def fetch_trusted_document( 127: def validate_jwks_document(document: Any) -> dict[str, Any]:
+
+===== C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_jwks_cache.py =====
+Exists: True
+24: class JWKSCacheError(RuntimeError): 28: class JWKSCache: 63: raise JWKSCacheError("Loaded JWKS failed validation") from exc 65: raise JWKSCacheError("JWKS loader failed") from exc
+
+===== C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_principal.py =====
+Exists: True
+4: Only pass the claims returned by verify_entra_access_token after successful 17: class PrincipalMappingError(ValueError): 21: def principal_from_verified_claims(
+
+===== C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\auth\entraConfig.ts =====
+Exists: True
+3: const tenantId = (import.meta.env.VITE_ENTRA_TENANT_ID ?? "").trim(); 4: const clientId = (import.meta.env.VITE_ENTRA_CLIENT_ID ?? "").trim(); 5: const apiScope = (import.meta.env.VITE_ENTRA_API_SCOPE ?? "").trim(); 6: const redirectUri = (import.meta.env.VITE_ENTRA_REDIRECT_URI ?? "").trim(); 10: value.includes("REPLACE_WITH_APPROVED") || 21: if (isPlaceholder(tenantId) || !isGuid(tenantId)) { 25: if (isPlaceholder(clientId) || !isGuid(clientId)) { 30: isPlaceholder(apiScope) || 31: !/^(api:\/\/|https:\/\/)[^\s]+$/.test(apiScope) 36: if (isPlaceholder(redirectUri)) { 40: const redirect = new URL(redirectUri); 66: clientId, 67: authority: `https://login.microsoftonline.com/${tenantId}`, 68: redirectUri, 69: postLogoutRedirectUri: redirectUri, 77: export function getEntraApiScope(): string { 82: return apiScope;
+
+===== C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\auth\entraToken.ts =====
+Exists: True
+9: export async function acquireEntraApiAccessToken( 19: const result = await instance.acquireTokenSilent({
+
+===== C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\auth\authenticatedFetch.ts =====
+Exists: True
+7: * No browser-supplied role or identity is treated as authorization. 9: export async function authenticatedFetch( 16: headers.set("Authorization", `Bearer ${token}`);
+
+===== C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\.env.example =====
+Exists: True
+5: VITE_ENTRA_TENANT_ID=REPLACE_WITH_APPROVED_TENANT_ID 6: VITE_ENTRA_CLIENT_ID=REPLACE_WITH_APPROVED_SPA_CLIENT_ID 7: VITE_ENTRA_API_SCOPE=REPLACE_WITH_APPROVED_API_SCOPE 8: VITE_ENTRA_REDIRECT_URI=http://localhost:5173/
+
+===== Frontend local environment file =====
+Local .env exists: False
+Values from local .env were intentionally not displayed.
+
+NEXT: Confirm organization-approved Entra tenant, API audience, role names, SPA client ID, API scope, issuer and JWKS trust configuration before live integration.

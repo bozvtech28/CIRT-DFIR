@@ -1,0 +1,23 @@
+﻿CIRT DFIR - Phase 2 Prototype Setup Report
+Timestamp: 2026-10-15 22:40:35 +08:00
+Workspace: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Collector_Tools\Upgrade-Workspace\CIRT_DFIR_Upgrade_20261015_223611
+
+Created during this run:
+
+Existing files preserved:
+PRESERVED: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Collector_Tools\Upgrade-Workspace\CIRT_DFIR_Upgrade_20261015_223611\apps\web-prototype\index.html
+PRESERVED: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Collector_Tools\Upgrade-Workspace\CIRT_DFIR_Upgrade_20261015_223611\docs\Architecture.md
+PRESERVED: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Collector_Tools\Upgrade-Workspace\CIRT_DFIR_Upgrade_20261015_223611\docs\Requirements.md
+PRESERVED: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Collector_Tools\Upgrade-Workspace\CIRT_DFIR_Upgrade_20261015_223611\README.md
+
+Safety: No collector executed; no server started; no evidence accessed.
+Prototype status: Static HTML only; no backend or live scanning.
+
+Workspace inventory:
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Collector_Tools\Upgrade-Workspace\CIRT_DFIR_Upgrade_20261015_223611\README.md | 1043 bytes
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Collector_Tools\Upgrade-Workspace\CIRT_DFIR_Upgrade_20261015_223611\apps\web-prototype\index.html | 20526 bytes
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Collector_Tools\Upgrade-Workspace\CIRT_DFIR_Upgrade_20261015_223611\docs\Architecture.md | 2881 bytes
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Collector_Tools\Upgrade-Workspace\CIRT_DFIR_Upgrade_20261015_223611\docs\Requirements.md | 3610 bytes
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Collector_Tools\Upgrade-Workspace\CIRT_DFIR_Upgrade_20261015_223611\Reports\Baseline_Inventory_20261015_223611.csv | 13061975 bytes
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Collector_Tools\Upgrade-Workspace\CIRT_DFIR_Upgrade_20261015_223611\Reports\Baseline_Report_20261015_223611.txt | 1358 bytes
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Collector_Tools\Upgrade-Workspace\CIRT_DFIR_Upgrade_20261015_223611\Reports\Setup_Verification_20261015_223611.txt | 1815 bytes

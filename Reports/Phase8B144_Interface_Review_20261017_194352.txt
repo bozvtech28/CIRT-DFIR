@@ -1,0 +1,225 @@
+﻿CIRT-DFIR - PHASE 8B144
+Read-only Entra authentication interface review
+Timestamp: 20261017_194352
+
+
+=== entra_authenticator.py ===
+Line 32: DocumentFetcher = Callable[..., dict[str, Any]]
+Line 35: def _normalized_hosts(value: frozenset[str], field_name: str) -> frozenset[str]:
+Line 43: normalized = host.strip().lower().rstrip(".")
+Line 53: @dataclass(frozen=True)
+Line 54: class EntraAuthConfig:
+Line 68: def __post_init__(self) -> None:
+Line 75: value = getattr(self, name)
+Line 80: issuer = urlparse(self.expected_issuer)
+Line 81: issuer_port = issuer.port
+Line 97: parsed = urlparse(self.discovery_url)
+Line 98: port = parsed.port
+Line 113: metadata_hosts = _normalized_hosts(
+Line 116: jwks_hosts = _normalized_hosts(
+Line 160: class EntraAuthenticator:
+Line 163: def __init__(
+Line 174: def metadata(self) -> TrustedMetadata:
+Line 178: def _trusted_key_resolver(self, token: str):
+Line 180: document = self._jwks_cache.get()
+Line 181: resolver = build_jwks_resolver(document)
+Line 187: def authenticate(self, authorization: str | None) -> Principal:
+Line 191: trusted_key_resolver=self._trusted_key_resolver,
+Line 192: expected_issuer=self._config.expected_issuer,
+Line 193: expected_audience=self._config.expected_audience,
+Line 194: expected_tenant_id=self._config.tenant_id,
+Line 195: approved_role_map=self._config.approved_role_map,
+Line 199: def create_entra_authenticator(
+Line 214: def fetch_document(url: str, allowed_hosts: frozenset[str]) -> dict[str, Any]:
+Line 217: trusted_hosts=set(allowed_hosts),
+Line 218: timeout_seconds=config.timeout_seconds,
+Line 219: transport=lambda requested_url, timeout: document_fetcher(
+Line 221: trusted_hosts=set(allowed_hosts),
+Line 222: timeout_seconds=timeout,
+Line 223: max_response_bytes=config.max_response_bytes,
+Line 227: discovery = fetch_document(
+Line 230: metadata = validate_discovery_document(
+Line 232: expected_issuer=config.expected_issuer,
+Line 233: allowed_jwks_hosts=set(config.allowed_jwks_hosts),
+Line 236: def load_jwks() -> dict[str, Any]:
+Line 239: cache = JWKSCache(load_jwks, ttl_seconds=config.jwks_ttl_seconds)
+
+=== entra_bearer_adapter.py ===
+Line 19: class BearerAuthenticationError(Exception):
+Line 23: def principal_from_authorization_header(
+Line 41: token = raw_token.strip()
+Line 52: claims = verify_entra_access_token(
+Line 54: trusted_key_resolver=trusted_key_resolver,
+Line 55: expected_issuer=expected_issuer,
+Line 56: expected_audience=expected_audience,
+Line 57: expected_tenant_id=expected_tenant_id,
+Line 61: approved_role_map=approved_role_map,
+
+=== entra_token_verifier.py ===
+Line 16: TrustedKeyResolver = Callable[[str], Any]
+Line 19: def verify_entra_access_token(
+Line 48: signing_key = trusted_key_resolver(token)
+Line 52: claims = jwt.decode(
+Line 54: key=signing_key,
+Line 55: algorithms=["RS256"],
+Line 56: issuer=expected_issuer,
+Line 57: audience=expected_audience,
+Line 58: options={
+Line 67: leeway=0,
+
+=== entra_principal.py ===
+Line 17: class PrincipalMappingError(ValueError):
+Line 21: def principal_from_verified_claims(
+Line 30: subject = claims.get("sub")
+Line 43: raw_roles = claims.get("roles")
+Line 53: unknown_roles = [role for role in raw_roles if role not in approved_role_map]
+Line 57: internal_roles = frozenset(approved_role_map[role] for role in raw_roles)
+
+=== entra_jwks.py ===
+Line 14: def build_jwks_resolver(jwks: Mapping[str, Any]):
+Line 23: keys = jwks.get("keys")
+Line 33: kid = item.get("kid")
+Line 54: parsed = jwt.PyJWK.from_dict(dict(item), algorithm="RS256")
+Line 59: def resolve(token: str):
+Line 61: header = jwt.get_unverified_header(token)
+Line 68: kid = header.get("kid")
+Line 72: key = indexed.get(kid)
+
+=== entra_metadata_client.py ===
+Line 18: class MetadataTrustError(ValueError):
+Line 22: @dataclass(frozen=True)
+Line 23: class TrustedMetadata:
+Line 28: def _require_https_url(value: str, field_name: str) -> str:
+Line 32: parsed = urlparse(value)
+Line 46: def validate_discovery_document(
+Line 64: issuer = document.get("issuer")
+Line 65: jwks_uri = document.get("jwks_uri")
+Line 73: parsed_jwks = urlparse(jwks_uri)
+Line 74: allowed_hosts = {
+Line 91: def fetch_trusted_document(
+Line 109: host = (urlparse(url).hostname or "").lower().rstrip(".")
+Line 110: allowed = {
+Line 119: result = transport(url, timeout_seconds)
+Line 127: def validate_jwks_document(document: Any) -> dict[str, Any]:
+Line 133: keys = document.get("keys")
+Line 143: kid = key.get("kid")
+Line 158: private_parameters = {"d", "p", "q", "dp", "dq", "qi", "oth"}
+
+=== entra_http_transport.py ===
+Line 18: DEFAULT_MAX_RESPONSE_BYTES = 1_048_576
+Line 21: def fetch_json_document(
+Line 39: parsed = urlparse(url)
+Line 40: hostname = parsed.hostname
+Line 41: port = parsed.port
+Line 65: host = parsed.hostname.lower().rstrip(".")
+Line 66: allowed = {
+Line 76: timeout=httpx.Timeout(timeout_seconds),
+Line 77: follow_redirects=False,
+Line 78: verify=True,
+Line 79: trust_env=False,
+Line 87: content_type = response.headers.get("content-type", "")
+Line 88: media_type = content_type.split(";", 1)[0].strip().lower()
+Line 94: declared_length = response.headers.get("content-length")
+Line 97: length = int(declared_length)
+Line 104: total = 0
+Line 111: raw = b"".join(chunks)
+Line 121: document = json.loads(raw)
+
+=== auth_dependencies.py ===
+Line 16: def get_current_principal() -> Principal:
+Line 19: status_code=401,
+Line 20: detail="Authentication is not configured. Access is denied by default.",
+Line 21: headers={"WWW-Authenticate": "Bearer"},
+Line 24: def require_permission(permission: str):
+Line 26: def dependency(principal: Principal = Depends(get_current_principal)) -> Principal:
+Line 31: status_code=401,
+Line 32: detail="Authentication required.",
+Line 33: headers={"WWW-Authenticate": "Bearer"},
+Line 37: status_code=403,
+Line 38: detail="Insufficient permission.",
+
+=== security.py ===
+Line 12: ROLE_ADMINISTRATOR = "Administrator"
+Line 13: ROLE_ANALYST = "DFIR Analyst"
+Line 14: ROLE_VIEWER = "Viewer"
+Line 22: PERMISSIONS = {
+Line 41: @dataclass(frozen=True)
+Line 42: class Principal:
+Line 48: class AuthenticationRequired(PermissionError):
+Line 52: class AuthorizationDenied(PermissionError):
+Line 56: def validate_principal(principal: Principal | None) -> Principal:
+Line 70: def authorize(principal: Principal | None, permission: str) -> bool:
+Line 77: trusted = validate_principal(principal)
+Line 78: allowed_roles = PERMISSIONS.get(permission)
+
+=== main.py ===
+Line 8: app = FastAPI(
+Line 9: title="CIRT DFIR Platform API",
+Line 10: version="0.1.0",
+Line 11: description="Development scaffold only. Synthetic data; no evidence intake.",
+Line 15: class HealthResponse(BaseModel):
+Line 22: class CaseUpdateRequest(BaseModel):
+Line 23: model_config = ConfigDict(extra="forbid")
+Line 28: class DemoCase(BaseModel):
+Line 35: DEMO_CASES = [
+Line 37: case_id="DEMO-2026-001",
+Line 38: title="Endpoint Alert Review",
+Line 39: severity="High",
+Line 40: status="Investigating",
+Line 43: case_id="DEMO-2026-002",
+Line 44: title="Suspicious Login Review",
+Line 45: severity="Medium",
+Line 46: status="Triage",
+Line 49: case_id="DEMO-2026-003",
+Line 50: title="Mailbox Rule Assessment",
+Line 51: severity="Medium",
+Line 52: status="Evidence review",
+Line 58: def health() -> HealthResponse:
+Line 65: def update_case_endpoint(
+Line 68: principal = Depends(require_permission("cases:update")),
+Line 73: status_code=422,
+Line 74: detail="Provide status, severity, or both.",
+Line 79: db = connect(case_store.DB_PATH)
+Line 81: updated = update_case(
+Line 83: case_id=case_id,
+Line 84: actor_id=principal.subject,
+Line 85: timestamp=__import__("datetime").datetime.now(
+Line 88: status=payload.status,
+Line 89: severity=payload.severity,
+Line 94: message = str(exc)
+Line 105: def get_demo_cases() -> list[DemoCase]:
+
+=== AUTHENTICATOR AND ADAPTER TEST REFERENCES ===
+
+--- test_entra_authenticator.py ---
+No matching test references found.
+
+--- test_entra_bearer_adapter.py ---
+Line 10: principal_from_authorization_header,
+Line 71: return principal_from_authorization_header(
+
+--- test_entra_end_to_end_offline.py ---
+No matching test references found.
+
+--- test_api_auth_gate.py ---
+Line 4: from app.auth_dependencies import get_current_principal
+Line 14: assert response.status_code == 401
+Line 26: assert response.status_code == 401
+Line 31: app.dependency_overrides[get_current_principal] = lambda: Principal(
+Line 40: assert response.status_code == 403
+Line 73: app.dependency_overrides[get_current_principal] = lambda: Principal(
+Line 99: from app.auth_dependencies import require_permission
+Line 104: test_app.dependency_overrides[get_current_principal] = lambda: Principal(
+Line 110: def protected_permission_check(principal=Depends(require_permission("cases:update"))):
+
+--- test_api_oidc_fail_closed.py ---
+Line 3: from app.auth_dependencies import get_current_principal
+Line 14: assert response.status_code == 401
+Line 26: assert response.status_code == 401
+Line 38: assert response.status_code == 401
+
+=== REVIEW STATUS ===
+This report lists source definitions and test references only.
+No application source files or environment variables were changed.
+Do not wire production authentication until the exact interfaces,
+approved Entra configuration, and role mapping have been verified.

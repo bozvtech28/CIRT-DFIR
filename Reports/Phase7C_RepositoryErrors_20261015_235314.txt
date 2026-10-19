@@ -1,0 +1,19 @@
+test_audit_event_cannot_be_deleted (test_case_repository.RepositoryTests.test_audit_event_cannot_be_deleted) ... ok
+test_audit_event_cannot_be_updated (test_case_repository.RepositoryTests.test_audit_event_cannot_be_updated) ... ok
+test_create_and_retrieve_case (test_case_repository.RepositoryTests.test_create_and_retrieve_case) ... ok
+test_creation_records_audit_event (test_case_repository.RepositoryTests.test_creation_records_audit_event) ... ok
+test_duplicate_case_id_is_rejected (test_case_repository.RepositoryTests.test_duplicate_case_id_is_rejected) ... ok
+test_empty_actor_is_rejected (test_case_repository.RepositoryTests.test_empty_actor_is_rejected) ... ok
+test_invalid_severity_is_rejected (test_case_repository.RepositoryTests.test_invalid_severity_is_rejected) ... ok
+test_list_cases (test_case_repository.RepositoryTests.test_list_cases) ... ok
+test_missing_case_returns_none (test_case_repository.RepositoryTests.test_missing_case_returns_none) ... ok
+test_update_case_records_before_and_after_audit (test_case_repository.RepositoryTests.test_update_case_records_before_and_after_audit) ... ok
+test_update_missing_case_returns_none (test_case_repository.RepositoryTests.test_update_missing_case_returns_none) ... ok
+test_update_rejects_empty_actor (test_case_repository.RepositoryTests.test_update_rejects_empty_actor) ... ok
+test_update_rejects_invalid_status (test_case_repository.RepositoryTests.test_update_rejects_invalid_status) ... ok
+test_update_rejects_no_change (test_case_repository.RepositoryTests.test_update_rejects_no_change) ... ok
+
+----------------------------------------------------------------------
+Ran 14 tests in 0.581s
+
+OK

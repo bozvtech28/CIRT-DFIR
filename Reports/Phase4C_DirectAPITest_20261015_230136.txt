@@ -1,0 +1,6 @@
+﻿Phase 4C direct API test
+Timestamp: 2026-10-15 23:01:37
+Exit code: 0
+Server started: No
+Evidence accessed: No
+Production collector modified: No

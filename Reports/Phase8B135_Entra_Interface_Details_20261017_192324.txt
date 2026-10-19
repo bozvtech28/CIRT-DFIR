@@ -1,0 +1,892 @@
+﻿
+==============================================================================
+MODULE: app.entra_bearer_adapter
+FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_bearer_adapter.py
+==============================================================================
+
+SIGNATURE: BearerAuthenticationError (unavailable)
+
+SIGNATURE: principal_from_authorization_header (authorization: str | None, *, trusted_key_resolver, expected_issuer: str, expected_audience: str, expected_tenant_id: str, approved_role_map: collections.abc.Mapping[str, str]) -> app.security.Principal
+
+--- SOURCE: entra_bearer_adapter.py ---
+"""Offline-tested bearer-token adapter for the CIRT DFIR Entra integration.
+
+This module does not fetch metadata or JWKS and is not wired into FastAPI.
+The caller must supply a trusted key resolver and approved server-side config.
+"""
+from collections.abc import Mapping
+from typing import Any
+
+from jwt import InvalidTokenError
+
+from app.entra_principal import (
+    PrincipalMappingError,
+    principal_from_verified_claims,
+)
+from app.entra_token_verifier import verify_entra_access_token
+from app.security import Principal
+
+
+class BearerAuthenticationError(Exception):
+    """Raised when a bearer token cannot produce a trusted principal."""
+
+
+def principal_from_authorization_header(
+    authorization: str | None,
+    *,
+    trusted_key_resolver,
+    expected_issuer: str,
+    expected_audience: str,
+    expected_tenant_id: str,
+    approved_role_map: Mapping[str, str],
+) -> Principal:
+    """Validate a Bearer header, verify its JWT, and map verified roles.
+
+    This function deliberately performs no network requests. Do not pass
+    untrusted JWKS data or configuration supplied by a browser/request body.
+    """
+    if not isinstance(authorization, str):
+        raise BearerAuthenticationError("A Bearer authorization header is required.")
+
+    scheme, separator, raw_token = authorization.partition(" ")
+    token = raw_token.strip()
+
+    if (
+        not separator
+        or scheme.lower() != "bearer"
+        or not token
+        or any(character.isspace() for character in token)
+    ):
+        raise BearerAuthenticationError("The authorization header is malformed.")
+
+    try:
+        claims = verify_entra_access_token(
+            token,
+            trusted_key_resolver=trusted_key_resolver,
+            expected_issuer=expected_issuer,
+            expected_audience=expected_audience,
+            expected_tenant_id=expected_tenant_id,
+        )
+        return principal_from_verified_claims(
+            claims,
+            approved_role_map=approved_role_map,
+        )
+    except (InvalidTokenError, PrincipalMappingError, ValueError) as exc:
+        raise BearerAuthenticationError(
+            "Bearer token validation or role mapping failed."
+        ) from exc
+
+
+==============================================================================
+MODULE: app.entra_token_verifier
+FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_token_verifier.py
+==============================================================================
+
+SIGNATURE: verify_entra_access_token (token: str, *, trusted_key_resolver: collections.abc.Callable[[str], typing.Any], expected_issuer: str, expected_audience: str, expected_tenant_id: str) -> dict[str, typing.Any]
+
+--- SOURCE: entra_token_verifier.py ---
+"""Isolated Microsoft Entra access-token verification foundation.
+
+SECURITY BOUNDARY:
+- This module is NOT wired into application routes.
+- The caller must provide a key resolver backed by trusted Microsoft
+  OpenID Connect metadata/JWKS, with HTTPS and safe key-rotation handling.
+- Never use a token-provided URL or arbitrary token-provided key as trusted.
+- Never use this verifier until tenant, issuer, and audience are approved.
+"""
+from collections.abc import Callable
+from typing import Any
+
+import jwt
+from jwt import InvalidTokenError
+
+TrustedKeyResolver = Callable[[str], Any]
+
+
+def verify_entra_access_token(
+    token: str,
+    *,
+    trusted_key_resolver: TrustedKeyResolver,
+    expected_issuer: str,
+    expected_audience: str,
+    expected_tenant_id: str,
+) -> dict[str, Any]:
+    """Verify an RS256 token against a trusted key resolver and fixed config.
+
+    The resolver must obtain keys only from an administrator-approved,
+    trusted JWKS source. This function deliberately performs no network access.
+    """
+    if not isinstance(token, str) or not token.strip():
+        raise InvalidTokenError("A non-empty bearer token is required.")
+
+    for name, value in (
+        ("expected_issuer", expected_issuer),
+        ("expected_audience", expected_audience),
+        ("expected_tenant_id", expected_tenant_id),
+    ):
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(f"{name} must be configured before verification.")
+
+    if not callable(trusted_key_resolver):
+        raise ValueError("A trusted signing-key resolver is required.")
+
+    # The key resolver must select a key from a trusted JWKS source.
+    # The token's algorithm is not allowed to select the accepted algorithm.
+    signing_key = trusted_key_resolver(token)
+    if signing_key is None:
+        raise InvalidTokenError("No trusted signing key was found.")
+
+    claims = jwt.decode(
+        token,
+        key=signing_key,
+        algorithms=["RS256"],
+        issuer=expected_issuer,
+        audience=expected_audience,
+        options={
+            "require": ["exp", "iat", "nbf", "iss", "aud", "sub", "tid"],
+            "verify_signature": True,
+            "verify_exp": True,
+            "verify_iat": True,
+            "verify_nbf": True,
+            "verify_iss": True,
+            "verify_aud": True,
+        },
+        leeway=0,
+    )
+
+    if not isinstance(claims.get("sub"), str) or not claims["sub"].strip():
+        raise InvalidTokenError("The subject claim is missing or invalid.")
+
+    if claims.get("tid") != expected_tenant_id:
+        raise InvalidTokenError("The token tenant does not match the configured tenant.")
+
+    return claims
+
+
+==============================================================================
+MODULE: app.entra_principal
+FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_principal.py
+==============================================================================
+
+SIGNATURE: PrincipalMappingError (unavailable)
+
+SIGNATURE: principal_from_verified_claims (claims: collections.abc.Mapping[str, typing.Any], *, approved_role_map: collections.abc.Mapping[str, str]) -> app.security.Principal
+
+--- SOURCE: entra_principal.py ---
+"""Map verified Entra application-role claims to internal CIRT DFIR roles.
+
+SECURITY BOUNDARY:
+Only pass the claims returned by verify_entra_access_token after successful
+cryptographic and issuer/audience/tenant validation. This module does not
+validate token signatures or establish claim provenance.
+
+approved_role_map must come from trusted server-side configuration. Never
+accept it, the claims, or role assignments from browser-controlled input.
+"""
+from collections.abc import Mapping
+from typing import Any
+
+from app.security import KNOWN_ROLES, Principal
+
+
+class PrincipalMappingError(ValueError):
+    """Raised when verified claims cannot safely become an application principal."""
+
+
+def principal_from_verified_claims(
+    claims: Mapping[str, Any],
+    *,
+    approved_role_map: Mapping[str, str],
+) -> Principal:
+    """Create an internal Principal from verified claims and an explicit role map."""
+    if not isinstance(claims, Mapping):
+        raise PrincipalMappingError("Verified claims must be a mapping.")
+
+    subject = claims.get("sub")
+    if not isinstance(subject, str) or not subject.strip():
+        raise PrincipalMappingError("A non-empty subject claim is required.")
+
+    if not isinstance(approved_role_map, Mapping) or not approved_role_map:
+        raise PrincipalMappingError("An explicit server-side role map is required.")
+
+    for app_role, internal_role in approved_role_map.items():
+        if not isinstance(app_role, str) or not app_role.strip():
+            raise PrincipalMappingError("Role-map keys must be non-empty strings.")
+        if not isinstance(internal_role, str) or internal_role not in KNOWN_ROLES:
+            raise PrincipalMappingError("Role map contains an unrecognized internal role.")
+
+    raw_roles = claims.get("roles")
+    if not isinstance(raw_roles, list) or not raw_roles:
+        raise PrincipalMappingError("A non-empty roles array is required.")
+
+    if any(not isinstance(role, str) or not role.strip() for role in raw_roles):
+        raise PrincipalMappingError("Every application role must be a non-empty string.")
+
+    if len(set(raw_roles)) != len(raw_roles):
+        raise PrincipalMappingError("Duplicate application roles are not accepted.")
+
+    unknown_roles = [role for role in raw_roles if role not in approved_role_map]
+    if unknown_roles:
+        raise PrincipalMappingError("Claims contain an unapproved application role.")
+
+    internal_roles = frozenset(approved_role_map[role] for role in raw_roles)
+    if not internal_roles:
+        raise PrincipalMappingError("No approved internal roles were resolved.")
+
+    return Principal(subject=subject.strip(), roles=internal_roles)
+
+
+==============================================================================
+MODULE: app.entra_jwks
+FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_jwks.py
+==============================================================================
+
+SIGNATURE: build_jwks_resolver (jwks: collections.abc.Mapping[str, typing.Any])
+
+--- SOURCE: entra_jwks.py ---
+"""Offline JWKS key selector for the Entra verifier prototype.
+
+No HTTP calls are made by this module. The JWKS document must come from a
+trusted, administrator-approved source before any production use.
+This module is not wired into application routes.
+"""
+from collections.abc import Mapping
+from typing import Any
+
+import jwt
+from jwt import InvalidTokenError
+
+
+def build_jwks_resolver(jwks: Mapping[str, Any]):
+    """Build a resolver from a supplied JWKS document.
+
+    Intended for offline tests and later integration design. This function
+    does not establish that the supplied JWKS document is authentic.
+    """
+    if not isinstance(jwks, Mapping):
+        raise ValueError("JWKS must be a mapping.")
+
+    keys = jwks.get("keys")
+    if not isinstance(keys, list) or not keys:
+        raise ValueError("JWKS must contain a non-empty keys array.")
+
+    indexed: dict[str, Any] = {}
+
+    for item in keys:
+        if not isinstance(item, Mapping):
+            raise ValueError("Every JWKS key must be an object.")
+
+        kid = item.get("kid")
+        if not isinstance(kid, str) or not kid.strip():
+            raise ValueError("Every JWKS key must have a non-empty kid.")
+
+        if kid in indexed:
+            raise ValueError("Duplicate kid values are not allowed.")
+
+        if item.get("kty") != "RSA":
+            raise ValueError("Only RSA signing keys are supported.")
+
+        if item.get("use", "sig") != "sig":
+            raise ValueError("JWKS key use must be sig.")
+
+        if item.get("alg", "RS256") != "RS256":
+            raise ValueError("Only RS256 JWKS keys are supported.")
+
+        # A public JWKS must not include RSA private-key parameters.
+        if any(name in item for name in ("d", "p", "q", "dp", "dq", "qi", "oth")):
+            raise ValueError("Private RSA key material is not accepted.")
+
+        try:
+            parsed = jwt.PyJWK.from_dict(dict(item), algorithm="RS256")
+            indexed[kid] = parsed.key
+        except Exception as exc:
+            raise ValueError(f"Invalid RSA JWK for kid {kid!r}.") from exc
+
+    def resolve(token: str):
+        try:
+            header = jwt.get_unverified_header(token)
+        except Exception as exc:
+            raise InvalidTokenError("Malformed JWT header.") from exc
+
+        if header.get("alg") != "RS256":
+            raise InvalidTokenError("Only RS256 tokens are accepted.")
+
+        kid = header.get("kid")
+        if not isinstance(kid, str) or not kid.strip():
+            raise InvalidTokenError("JWT header must contain a non-empty kid.")
+
+        key = indexed.get(kid)
+        if key is None:
+            raise InvalidTokenError("JWT kid was not found in the trusted JWKS set.")
+
+        return key
+
+    return resolve
+
+
+==============================================================================
+MODULE: app.entra_jwks_cache
+FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_jwks_cache.py
+==============================================================================
+
+SIGNATURE: JWKSCache (loader: 'Callable[[], Any]', *, ttl_seconds: 'float' = 300.0, clock: 'Callable[[], float]' = <built-in function monotonic>) -> 'None'
+  METHOD: __init__ (self, loader: 'Callable[[], Any]', *, ttl_seconds: 'float' = 300.0, clock: 'Callable[[], float]' = <built-in function monotonic>) -> 'None'
+  METHOD: _load_and_validate (self) -> 'dict[str, Any]'
+  METHOD: get (self) -> 'dict[str, Any]'
+  METHOD: invalidate (self) -> 'None'
+  METHOD: refresh (self) -> 'dict[str, Any]'
+
+SIGNATURE: JWKSCacheError (unavailable)
+
+--- SOURCE: entra_jwks_cache.py ---
+"""Bounded in-memory JWKS cache with explicit refresh.
+
+The loader is injected by the caller. This module performs no network
+requests and is not wired into production authentication.
+
+Expired keys are never returned by get(). A failed refresh does not
+extend the previous expiry time. Callers must provide trusted loading
+and transport logic before using this cache in an application.
+"""
+
+from __future__ import annotations
+
+from copy import deepcopy
+from threading import RLock
+from time import monotonic
+from typing import Any, Callable
+
+from app.entra_metadata_client import (
+    MetadataTrustError,
+    validate_jwks_document,
+)
+
+
+class JWKSCacheError(RuntimeError):
+    """Raised when trusted JWKS data cannot be loaded or validated."""
+
+
+class JWKSCache:
+    """Thread-safe in-memory JWKS cache with bounded TTL."""
+
+    def __init__(
+        self,
+        loader: Callable[[], Any],
+        *,
+        ttl_seconds: float = 300.0,
+        clock: Callable[[], float] = monotonic,
+    ) -> None:
+        if not callable(loader):
+            raise ValueError("loader must be callable")
+        if not isinstance(ttl_seconds, (int, float)) or isinstance(
+            ttl_seconds, bool
+        ):
+            raise ValueError("ttl_seconds must be numeric")
+        if not 0 < ttl_seconds <= 3600:
+            raise ValueError("ttl_seconds must be greater than 0 and at most 3600")
+        if not callable(clock):
+            raise ValueError("clock must be callable")
+
+        self._loader = loader
+        self._ttl_seconds = float(ttl_seconds)
+        self._clock = clock
+        self._lock = RLock()
+        self._document: dict[str, Any] | None = None
+        self._expires_at: float | None = None
+
+    def _load_and_validate(self) -> dict[str, Any]:
+        try:
+            document = self._loader()
+            validated = validate_jwks_document(document)
+            # Never expose the loader's mutable object to the cache.
+            return deepcopy(validated)
+        except (MetadataTrustError, TypeError, ValueError) as exc:
+            raise JWKSCacheError("Loaded JWKS failed validation") from exc
+        except Exception as exc:
+            raise JWKSCacheError("JWKS loader failed") from exc
+
+    def get(self) -> dict[str, Any]:
+        """Return a copy of cached keys, loading only when missing/expired."""
+        with self._lock:
+            now = self._clock()
+
+            if (
+                self._document is not None
+                and self._expires_at is not None
+                and now < self._expires_at
+            ):
+                return deepcopy(self._document)
+
+            # Do not return expired keys if the loader fails.
+            document = self._load_and_validate()
+            self._document = document
+            self._expires_at = self._clock() + self._ttl_seconds
+            return deepcopy(document)
+
+    def refresh(self) -> dict[str, Any]:
+        """Force a fresh load and replace the cache only after validation."""
+        with self._lock:
+            document = self._load_and_validate()
+            self._document = document
+            self._expires_at = self._clock() + self._ttl_seconds
+            return deepcopy(document)
+
+    def invalidate(self) -> None:
+        """Discard cached keys so the next get() must reload."""
+        with self._lock:
+            self._document = None
+            self._expires_at = None
+
+    @property
+    def is_valid(self) -> bool:
+        """Whether a non-expired cache entry currently exists."""
+        with self._lock:
+            return (
+                self._document is not None
+                and self._expires_at is not None
+                and self._clock() < self._expires_at
+            )
+
+==============================================================================
+MODULE: app.entra_metadata_client
+FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_metadata_client.py
+==============================================================================
+
+SIGNATURE: MetadataTrustError (unavailable)
+
+SIGNATURE: TrustedMetadata (issuer: 'str', jwks_uri: 'str') -> None
+  METHOD: __delattr__ (self, name)
+  METHOD: __eq__ (self, other)
+  METHOD: __hash__ (self)
+  METHOD: __init__ (self, issuer: 'str', jwks_uri: 'str') -> None
+  METHOD: __repr__ (self)
+  METHOD: __setattr__ (self, name, value)
+
+SIGNATURE: _require_https_url (value: 'str', field_name: 'str') -> 'str'
+
+SIGNATURE: fetch_trusted_document (url: 'str', *, trusted_hosts: 'set[str]', transport: 'Callable[[str, float], Any]', timeout_seconds: 'float' = 3.0) -> 'Any'
+
+SIGNATURE: validate_discovery_document (document: 'Any', *, expected_issuer: 'str', allowed_jwks_hosts: 'set[str]') -> 'TrustedMetadata'
+
+SIGNATURE: validate_jwks_document (document: 'Any') -> 'dict[str, Any]'
+
+--- SOURCE: entra_metadata_client.py ---
+"""Provider-neutral Entra metadata/JWKS client primitives.
+
+This module intentionally performs no network I/O.
+A caller must inject a trusted transport and must validate the
+approved tenant, issuer, discovery endpoint, and JWKS URI.
+
+Do not use token-provided URLs to select a metadata endpoint.
+This module is not wired into the production authentication gate.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any, Callable
+from urllib.parse import urlparse
+
+
+class MetadataTrustError(ValueError):
+    """Raised when discovery metadata or JWKS data is not trusted."""
+
+
+@dataclass(frozen=True)
+class TrustedMetadata:
+    issuer: str
+    jwks_uri: str
+
+
+def _require_https_url(value: str, field_name: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise MetadataTrustError(f"{field_name} must be a non-empty URL")
+
+    parsed = urlparse(value)
+
+    if parsed.scheme.lower() != "https":
+        raise MetadataTrustError(f"{field_name} must use HTTPS")
+    if not parsed.hostname:
+        raise MetadataTrustError(f"{field_name} must include a hostname")
+    if parsed.username or parsed.password:
+        raise MetadataTrustError(f"{field_name} must not contain URL credentials")
+    if parsed.fragment:
+        raise MetadataTrustError(f"{field_name} must not contain a fragment")
+
+    return value
+
+
+def validate_discovery_document(
+    document: Any,
+    *,
+    expected_issuer: str,
+    allowed_jwks_hosts: set[str],
+) -> TrustedMetadata:
+    """Validate discovery metadata against caller-approved trust settings.
+
+    The caller is responsible for obtaining the document from the
+    approved, fixed discovery URL over a trusted HTTPS transport.
+    """
+
+    if not isinstance(document, dict):
+        raise MetadataTrustError("Discovery document must be a JSON object")
+
+    if not isinstance(expected_issuer, str) or not expected_issuer.strip():
+        raise MetadataTrustError("Expected issuer is not configured")
+
+    issuer = document.get("issuer")
+    jwks_uri = document.get("jwks_uri")
+
+    if not isinstance(issuer, str) or issuer != expected_issuer:
+        raise MetadataTrustError("Discovery issuer does not match configuration")
+
+    _require_https_url(issuer, "issuer")
+    _require_https_url(jwks_uri, "jwks_uri")
+
+    parsed_jwks = urlparse(jwks_uri)
+    allowed_hosts = {
+        host.lower().rstrip(".")
+        for host in allowed_jwks_hosts
+        if isinstance(host, str) and host.strip()
+    }
+
+    if (parsed_jwks.hostname or "").lower().rstrip(".") not in allowed_hosts:
+        raise MetadataTrustError("JWKS hostname is not in the approved allowlist")
+
+    if parsed_jwks.query:
+        raise MetadataTrustError("JWKS URI query parameters are not allowed")
+    if parsed_jwks.fragment:
+        raise MetadataTrustError("JWKS URI fragments are not allowed")
+
+    return TrustedMetadata(issuer=issuer, jwks_uri=jwks_uri)
+
+
+def fetch_trusted_document(
+    url: str,
+    *,
+    trusted_hosts: set[str],
+    transport: Callable[[str, float], Any],
+    timeout_seconds: float = 3.0,
+) -> Any:
+    """Use an injected transport to fetch JSON from an allowlisted HTTPS host.
+
+    The injected transport must enforce the timeout and validate every
+    redirect destination. This function never follows redirects itself.
+    """
+
+    _require_https_url(url, "request URL")
+
+    if timeout_seconds <= 0 or timeout_seconds > 10:
+        raise MetadataTrustError("Timeout must be greater than 0 and at most 10 seconds")
+
+    host = (urlparse(url).hostname or "").lower().rstrip(".")
+    allowed = {
+        item.lower().rstrip(".")
+        for item in trusted_hosts
+        if isinstance(item, str) and item.strip()
+    }
+
+    if host not in allowed:
+        raise MetadataTrustError("Request hostname is not in the approved allowlist")
+
+    result = transport(url, timeout_seconds)
+
+    if not isinstance(result, dict):
+        raise MetadataTrustError("Transport must return a decoded JSON object")
+
+    return result
+
+
+def validate_jwks_document(document: Any) -> dict[str, Any]:
+    """Perform structural checks before the existing offline JWKS resolver."""
+
+    if not isinstance(document, dict):
+        raise MetadataTrustError("JWKS document must be a JSON object")
+
+    keys = document.get("keys")
+    if not isinstance(keys, list) or not keys:
+        raise MetadataTrustError("JWKS must contain a non-empty keys array")
+
+    seen_kids: set[str] = set()
+
+    for key in keys:
+        if not isinstance(key, dict):
+            raise MetadataTrustError("Each JWKS key must be a JSON object")
+
+        kid = key.get("kid")
+        if not isinstance(kid, str) or not kid.strip():
+            raise MetadataTrustError("Each JWKS key must have a non-empty kid")
+
+        if kid in seen_kids:
+            raise MetadataTrustError("JWKS contains duplicate key IDs")
+        seen_kids.add(kid)
+
+        if key.get("kty") != "RSA":
+            raise MetadataTrustError("Only RSA signing keys are accepted")
+        if key.get("use", "sig") != "sig":
+            raise MetadataTrustError("JWKS key must be designated for signatures")
+        if key.get("alg", "RS256") != "RS256":
+            raise MetadataTrustError("Only RS256 signing keys are accepted")
+
+        private_parameters = {"d", "p", "q", "dp", "dq", "qi", "oth"}
+        if private_parameters.intersection(key):
+            raise MetadataTrustError("JWKS must not contain private key parameters")
+
+        if not isinstance(key.get("n"), str) or not key["n"]:
+            raise MetadataTrustError("RSA key modulus is missing")
+        if not isinstance(key.get("e"), str) or not key["e"]:
+            raise MetadataTrustError("RSA key exponent is missing")
+
+    return document
+
+==============================================================================
+MODULE: app.entra_http_transport
+FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_http_transport.py
+==============================================================================
+
+SIGNATURE: fetch_json_document (url: 'str', *, trusted_hosts: 'set[str]', timeout_seconds: 'float' = 3.0, max_response_bytes: 'int' = 1048576, client_factory: 'Callable[..., Any]' = <class 'httpx.Client'>) -> 'dict[str, Any]'
+
+--- SOURCE: entra_http_transport.py ---
+"""Bounded HTTPS JSON transport for trusted identity metadata.
+
+This module is intentionally not wired into production authentication.
+Only fixed, caller-approved hosts may be contacted. Redirects are disabled.
+"""
+
+from __future__ import annotations
+
+import json
+from typing import Any, Callable
+from urllib.parse import urlparse
+
+import httpx
+
+from app.entra_metadata_client import MetadataTrustError
+
+
+DEFAULT_MAX_RESPONSE_BYTES = 1_048_576
+
+
+def fetch_json_document(
+    url: str,
+    *,
+    trusted_hosts: set[str],
+    timeout_seconds: float = 3.0,
+    max_response_bytes: int = DEFAULT_MAX_RESPONSE_BYTES,
+    client_factory: Callable[..., Any] = httpx.Client,
+) -> dict[str, Any]:
+    """Fetch a bounded JSON object from an approved HTTPS host.
+
+    TLS verification remains enabled. Environment proxy configuration is not
+    inherited. Redirects are rejected rather than followed. The caller must
+    supply a fixed, approved metadata URL, never a URL from a token.
+    """
+    if not isinstance(url, str) or not url.strip():
+        raise MetadataTrustError("Request URL must be a non-empty string")
+
+    try:
+        parsed = urlparse(url)
+        hostname = parsed.hostname
+        port = parsed.port
+    except ValueError as exc:
+        raise MetadataTrustError("Request URL is malformed") from exc
+
+    if parsed.scheme.lower() != "https" or not hostname:
+        raise MetadataTrustError("Request URL must use HTTPS and include a hostname")
+    if port not in (None, 443):
+        raise MetadataTrustError("Request URL must use the standard HTTPS port 443")
+    if parsed.username or parsed.password or parsed.fragment:
+        raise MetadataTrustError("Request URL credentials and fragments are not allowed")
+
+    if not isinstance(timeout_seconds, (int, float)) or isinstance(timeout_seconds, bool):
+        raise MetadataTrustError("Timeout must be numeric")
+    if not 0 < timeout_seconds <= 10:
+        raise MetadataTrustError("Timeout must be greater than 0 and at most 10 seconds")
+
+    if not isinstance(max_response_bytes, int) or isinstance(max_response_bytes, bool):
+        raise MetadataTrustError("Response-size limit must be an integer")
+    if not 1 <= max_response_bytes <= 4 * 1024 * 1024:
+        raise MetadataTrustError("Response-size limit must be between 1 byte and 4 MiB")
+
+    if not isinstance(trusted_hosts, set) or not trusted_hosts:
+        raise MetadataTrustError("Trusted host allowlist must be a non-empty set")
+
+    host = parsed.hostname.lower().rstrip(".")
+    allowed = {
+        item.lower().rstrip(".")
+        for item in trusted_hosts
+        if isinstance(item, str) and item.strip()
+    }
+    if host not in allowed:
+        raise MetadataTrustError("Request hostname is not in the approved allowlist")
+
+    try:
+        with client_factory(
+            timeout=httpx.Timeout(timeout_seconds),
+            follow_redirects=False,
+            verify=True,
+            trust_env=False,
+        ) as client:
+            with client.stream("GET", url, headers={"Accept": "application/json"}) as response:
+                if response.status_code != 200:
+                    raise MetadataTrustError(
+                        f"Metadata endpoint returned unexpected HTTP status {response.status_code}"
+                    )
+
+                content_type = response.headers.get("content-type", "")
+                media_type = content_type.split(";", 1)[0].strip().lower()
+                if media_type != "application/json" and not (
+                    media_type.startswith("application/") and media_type.endswith("+json")
+                ):
+                    raise MetadataTrustError("Metadata endpoint did not return JSON content")
+
+                declared_length = response.headers.get("content-length")
+                if declared_length is not None:
+                    try:
+                        length = int(declared_length)
+                    except (TypeError, ValueError) as exc:
+                        raise MetadataTrustError("Invalid response Content-Length") from exc
+                    if length < 0 or length > max_response_bytes:
+                        raise MetadataTrustError("Metadata response exceeds the size limit")
+
+                chunks: list[bytes] = []
+                total = 0
+                for chunk in response.iter_bytes():
+                    total += len(chunk)
+                    if total > max_response_bytes:
+                        raise MetadataTrustError("Metadata response exceeds the size limit")
+                    chunks.append(chunk)
+
+                raw = b"".join(chunks)
+
+    except MetadataTrustError:
+        raise
+    except httpx.HTTPError as exc:
+        raise MetadataTrustError("Trusted metadata HTTPS request failed") from exc
+    except (OSError, TimeoutError) as exc:
+        raise MetadataTrustError("Trusted metadata transport failed") from exc
+
+    try:
+        document = json.loads(raw)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise MetadataTrustError("Metadata response is not valid JSON") from exc
+
+    if not isinstance(document, dict):
+        raise MetadataTrustError("Metadata response must be a JSON object")
+
+    return document
+
+
+
+
+==============================================================================
+MODULE: app.security
+FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\security.py
+==============================================================================
+
+SIGNATURE: AuthenticationRequired (unavailable)
+
+SIGNATURE: AuthorizationDenied (unavailable)
+
+SIGNATURE: Principal (subject: str, roles: FrozenSet[str]) -> None
+  METHOD: __delattr__ (self, name)
+  METHOD: __eq__ (self, other)
+  METHOD: __hash__ (self)
+  METHOD: __init__ (self, subject: str, roles: FrozenSet[str]) -> None
+  METHOD: __repr__ (self)
+  METHOD: __setattr__ (self, name, value)
+
+SIGNATURE: authorize (principal: app.security.Principal | None, permission: str) -> bool
+
+SIGNATURE: validate_principal (principal: app.security.Principal | None) -> app.security.Principal
+
+--- SOURCE: security.py ---
+"""RBAC policy foundation for CIRT DFIR Professional.
+
+This module authorizes an already authenticated principal.
+It does not authenticate users or validate OIDC tokens.
+Do not treat a caller-created Principal as proof of identity.
+"""
+
+from dataclasses import dataclass
+from typing import FrozenSet
+
+
+ROLE_ADMINISTRATOR = "Administrator"
+ROLE_ANALYST = "DFIR Analyst"
+ROLE_VIEWER = "Viewer"
+
+KNOWN_ROLES: FrozenSet[str] = frozenset({
+    ROLE_ADMINISTRATOR,
+    ROLE_ANALYST,
+    ROLE_VIEWER,
+})
+
+PERMISSIONS = {
+    "cases:read": frozenset({
+        ROLE_ADMINISTRATOR,
+        ROLE_ANALYST,
+        ROLE_VIEWER,
+    }),
+    "cases:update": frozenset({
+        ROLE_ADMINISTRATOR,
+        ROLE_ANALYST,
+    }),
+    "users:manage": frozenset({
+        ROLE_ADMINISTRATOR,
+    }),
+    "audit:read": frozenset({
+        ROLE_ADMINISTRATOR,
+    }),
+}
+
+
+@dataclass(frozen=True)
+class Principal:
+    """Identity and roles supplied by a trusted authentication layer."""
+    subject: str
+    roles: FrozenSet[str]
+
+
+class AuthenticationRequired(PermissionError):
+    """Raised when no authenticated principal is available."""
+
+
+class AuthorizationDenied(PermissionError):
+    """Raised when the principal lacks the required permission."""
+
+
+def validate_principal(principal: Principal | None) -> Principal:
+    if principal is None:
+        raise AuthenticationRequired("Authentication is required.")
+    if not isinstance(principal, Principal):
+        raise AuthenticationRequired("A trusted principal is required.")
+    if not isinstance(principal.subject, str) or not principal.subject.strip():
+        raise AuthenticationRequired("Principal subject is missing.")
+    if not principal.roles:
+        raise AuthorizationDenied("Principal has no assigned roles.")
+    if not principal.roles.issubset(KNOWN_ROLES):
+        raise AuthorizationDenied("Principal contains an unknown role.")
+    return principal
+
+
+def authorize(principal: Principal | None, permission: str) -> bool:
+    """Authorize a trusted principal for a named permission.
+
+    The caller must obtain the principal from a verified authentication
+    mechanism, such as validated OIDC claims. Never build it from request
+    fields supplied by the client.
+    """
+    trusted = validate_principal(principal)
+    allowed_roles = PERMISSIONS.get(permission)
+    if allowed_roles is None:
+        raise AuthorizationDenied("Unknown permission.")
+    if trusted.roles.isdisjoint(allowed_roles):
+        raise AuthorizationDenied("Permission denied.")
+    return True
+
+
+==============================================================================
+AUTHENTICATION CONFIGURATION
+==============================================================================
+Environment variable values intentionally omitted.

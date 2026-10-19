@@ -1,0 +1,28 @@
+﻿Phase 6A - Database Schema Design and Validation
+Timestamp: 2026-10-15 23:22:51
+Schema: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\phase6_schema.sql
+Validator: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\validate_schema.py
+
+Scope: Design and validation only.
+Case table: identifiers, title, severity, status, timestamps, creator and version.
+Audit table: case reference, event type, actor, time, JSON details and optional hash fields.
+Audit events: database triggers reject ordinary update and delete operations.
+Test data: synthetic values in an in-memory SQLite database.
+Persistent database created: No
+Production collector executed: No
+Evidence accessed: No
+Existing backend source changed: No
+
+Validation output:
+[PASS] Required tables: Found ['audit_events', 'cases', 'sqlite_sequence']
+[PASS] Lookup indexes: Found expected indexes: ['idx_audit_case_time', 'idx_cases_severity', 'idx_cases_status', 'sqlite_autoindex_cases_1']
+[PASS] Synthetic insert and relationship: cases=1; audit_events=1
+[PASS] Audit update protection: Update was rejected by append-only trigger
+[PASS] Audit delete protection: Delete was rejected by append-only trigger
+[PASS] Severity constraint: Invalid severity rejected
+
+Checks passed: 6/6
+Database mode: in-memory SQLite; no persistent database created.
+
+Validator exit code: 0
+Overall result: PASS

@@ -1,0 +1,32 @@
+﻿CIRT-DFIR - PHASE 8B178
+Entra Integration Contract Verification
+Timestamp: 2026-10-19 09:33:07
+Mode: TEST ONLY; NO APPLICATION CODE CHANGES
+
+Test files selected:
+ - tests/test_entra_authenticator.py
+ - tests/test_entra_bearer_adapter.py
+ - tests/test_entra_config_preflight.py
+ - tests/test_entra_end_to_end_offline.py
+ - tests/test_entra_http_transport.py
+ - tests/test_entra_jwks.py
+ - tests/test_entra_jwks_cache.py
+ - tests/test_entra_jwks_cache_hardening.py
+ - tests/test_entra_metadata_client.py
+ - tests/test_entra_principal.py
+ - tests/test_entra_principal_authorization.py
+ - tests/test_entra_token_verifier.py
+ - tests/test_entra_verifier_jwks_integration.py
+ - tests/test_api_auth_gate.py
+ - tests/test_api_oidc_fail_closed.py
+
+........................................................................ [ 31%]
+........................................................................ [ 63%]
+........................................................................ [ 94%]
+............                                                             [100%]
+228 passed in 4.03s
+
+Pytest exit code: 0
+RESULT: PASS
+Authentication wiring changed: No
+Environment variables changed: No

@@ -1,0 +1,33 @@
+﻿CIRT DFIR PROFESSIONAL - PHASE 8B.124
+Authorization Regression Review
+Timestamp: 20261017_184057
+Pytest exit code: 0
+Live Entra authentication enabled: No
+Application servers started: No
+Network requests issued: No
+Application source intentionally modified: No
+
+Test files:
+ - tests\test_security.py
+ - tests\test_api_auth_gate.py
+ - tests\test_api_oidc_fail_closed.py
+ - tests\test_entra_principal_authorization.py
+ - tests\test_synthetic_role_mapping.py
+
+========== PYTEST STDOUT ==========
+.............................................                            [100%]
+============================== warnings summary ===============================
+.venv\Lib\site-packages\fastapi\testclient.py:1
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+45 passed, 1 warning in 0.29s
+
+========== PYTEST STDERR ==========
+
+========== REVIEW NOTES ==========
+A passing suite validates only the cases covered by these tests.
+Synthetic test principals do not establish live Entra integration.
+No deployment or production-security approval is implied.
+RESULT: PASS - focused authorization tests succeeded.

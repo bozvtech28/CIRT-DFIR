@@ -1,0 +1,94 @@
+CIRT DFIR PROFESSIONAL — PHASE 8B.4
+Identity Provider Discovery and Security Readiness
+Generated UTC: 2026-10-15T16:16:36.351398+00:00
+Read-only inspection. No secrets or environment-variable values are printed.
+
+FOUND | platform/backend/app/main.py | SHA256=86959092ee271ff72414cf3bf9d5ce75905551454c8ca17ad66e23870245854f
+FOUND | platform/backend/app/security.py | SHA256=0022274ba349e8b72a26590814909d3a327403bad44c63a200e8b1807584ab28
+FOUND | platform/backend/app/case_store.py | SHA256=775ff3334ccd2d401b2392d0e96bcb87e7a2bbd90b76379f104e2e01651eebe8
+FOUND | platform/backend/requirements.txt | SHA256=79c0260b05030c247e0d1b2d625828fe846de9c21059b2a21ab2866813d54ab6
+FOUND | platform/backend/tests/test_security.py | SHA256=c498a420c97de213cb0b29e92950845018aef3345b25ec8823bae103a4af9d5f
+FOUND | platform/frontend/package.json | SHA256=059a6e005f889183e5c0089d19c3eaba36148449cc16b793d482fc5f696cb864
+FOUND | platform/frontend/vite.config.ts | SHA256=44ce89930b6e9d5b32679a5401000c6353dde6cf453ae5f3d1adb73eb81862a0
+FOUND | README.md | SHA256=7bc3f882f6325ee86536541c5f700edb7553f78dffdd7a2c8666d5dab727ba31
+FOUND | docs/Architecture.md | SHA256=0a6ba94fd7bdaf323eb72bdbb4218814b22af33cafebf77d6d681e613249ed5a
+FOUND | docs/Requirements.md | SHA256=465a2d43462e16b864b0a67fb41c9f15c6d073880b74c604840eea251f8e80f7
+
+========================================================================
+1. CURRENT API AND RBAC STATUS
+========================================================================
+ROUTE | GET /api/v1/health | handler=health | line=57
+ROUTE | PATCH /api/v1/cases/{case_id} | handler=update_case_endpoint | line=64
+ROUTE | GET /api/v1/demo/cases | handler=get_demo_cases | line=103
+RBAC module found: True
+RBAC permission definitions found: True
+OIDC token validation references in RBAC module: False
+Note: RBAC policy code alone does not establish user identity.
+
+========================================================================
+2. IDENTITY PROVIDER CONFIGURATION MARKERS
+========================================================================
+Microsoft Entra / Azure AD: no markers found
+OIDC issuer / discovery: matching markers found (OIDC)
+OAuth client configuration: no markers found
+Keycloak: no markers found
+OIDC/JWT library references: no markers found
+
+========================================================================
+3. SAFE ENVIRONMENT CONFIGURATION CHECK
+========================================================================
+OIDC_ISSUER_URL: not set in this shell
+OIDC_CLIENT_ID: not set in this shell
+OIDC_CLIENT_SECRET: not set in this shell
+OIDC_REDIRECT_URI: not set in this shell
+OIDC_AUDIENCE: not set in this shell
+OIDC_SCOPES: not set in this shell
+ENTRA_TENANT_ID: not set in this shell
+ENTRA_CLIENT_ID: not set in this shell
+ENTRA_CLIENT_SECRET: not set in this shell
+KEYCLOAK_URL: not set in this shell
+KEYCLOAK_REALM: not set in this shell
+KEYCLOAK_CLIENT_ID: not set in this shell
+Environment values are intentionally withheld.
+No .env file contents or credential values were read or printed.
+
+========================================================================
+4. DEPENDENCY READINESS
+========================================================================
+Installed fastapi: 0.143.2
+Installed pydantic: 2.14.1
+Installed uvicorn: 0.54.0
+Installed pytest: 8.4.2
+Installed authlib: NOT INSTALLED
+Installed PyJWT: NOT INSTALLED
+Installed python-jose: NOT INSTALLED
+Installed cryptography: NOT INSTALLED
+Installed httpx: 0.28.1
+Declared requirements:
+  fastapi>=0.115,<1.0
+  uvicorn[standard]>=0.34,<1.0
+  pydantic>=2.10,<3.0
+  pytest>=8.3,<9.0
+  httpx>=0.28,<1.0
+
+========================================================================
+5. OIDC CONFIGURATION REQUIREMENTS
+========================================================================
+- Choose one approved identity provider and obtain its official issuer/discovery URL.
+- Register a confidential server-side web application or appropriate API client with the provider.
+- Register exact redirect URIs for the actual deployment; do not use broad wildcard redirects.
+- Validate token signature using provider metadata/JWKS, issuer, audience, expiry, and permitted algorithms.
+- Map roles only from trusted, validated claims or a server-controlled role store.
+- Keep client secrets in an approved secret store or protected environment configuration, never source code.
+- Use HTTPS for non-local deployments and secure session/cookie settings where applicable.
+- Enforce RBAC inside every protected API endpoint and test denied requests.
+
+========================================================================
+6. SAFETY AND NEXT GATE
+========================================================================
+No source files were changed.
+No packages were installed.
+No server was started and no network requests were made.
+No database, collector, or evidence files were accessed.
+This discovery report does not authenticate users and does not activate the RBAC policy.
+Next gate: choose and configure the actual identity provider before implementation.

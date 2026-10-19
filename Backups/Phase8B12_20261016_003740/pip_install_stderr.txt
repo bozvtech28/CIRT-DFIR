@@ -1,0 +1,3 @@
+﻿WARNING: Connection interrupted while downloading.
+WARNING: Attempting to resume incomplete download (0 bytes/33 kB, attempt 1)
+

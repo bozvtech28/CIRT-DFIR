@@ -1,0 +1,45 @@
+﻿CIRT-DFIR - PHASE 8B170
+Controlled Dependency Manifest Remediation
+Timestamp: 2026-10-17 20:18:15
+Requirements: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\requirements.txt
+Trial Python: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\.venv_phase8b166\Scripts\python.exe
+Already declared: False
+Backup: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\requirements.txt.phase8b170_backup_20261017_201813
+
+fastapi>=0.115,<1.0
+uvicorn[standard]>=0.34,<1.0
+pydantic>=2.10,<3.0
+pytest>=8.3,<9.0
+httpx>=0.28,<1.0
+PyJWT==2.15.1
+
+# Phase 8B.48 - versions verified in the project virtual environment
+cryptography==50.0.2
+httpx2==2.13.1
+
+====================================================================
+TRIAL DEPENDENCY INTEGRITY
+====================================================================
+No broken requirements found.
+EXIT_CODE=0
+
+====================================================================
+TESTCLIENT WARNING PROBE
+====================================================================
+TestClient import succeeded.
+EXIT_CODE=0
+
+====================================================================
+FULL TEST SUITE
+====================================================================
+........................................................................ [ 24%]
+........................................................................ [ 49%]
+........................................................................ [ 74%]
+........................................................................ [ 99%]
+..                                                                       [100%]
+290 passed in 3.61s
+EXIT_CODE=0
+
+PHASE 8B170 RESULT: PASS
+Test driver exit code: 0
+Manifest change retained after successful trial verification.

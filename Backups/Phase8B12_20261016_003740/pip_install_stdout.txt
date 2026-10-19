@@ -1,0 +1,18 @@
+﻿Collecting PyJWT<3,>=2.10 (from PyJWT[crypto]<3,>=2.10)
+  Downloading pyjwt-2.15.1-py3-none-any.whl.metadata (3.5 kB)
+Collecting cryptography>=3.4.0 (from PyJWT[crypto]<3,>=2.10)
+  Downloading cryptography-50.0.2-cp311-abi3-win_amd64.whl.metadata (4.4 kB)
+Collecting cffi>=2.0.0 (from cryptography>=3.4.0->PyJWT[crypto]<3,>=2.10)
+  Downloading cffi-2.1.1-cp312-cp312-win_amd64.whl.metadata (2.6 kB)
+Collecting pycparser (from cffi>=2.0.0->cryptography>=3.4.0->PyJWT[crypto]<3,>=2.10)
+  Using cached pycparser-3.11-py3-none-any.whl.metadata (8.2 kB)
+Downloading pyjwt-2.15.1-py3-none-any.whl (33 kB)
+Downloading pyjwt-2.15.1-py3-none-any.whl (33 kB)
+Downloading cryptography-50.0.2-cp311-abi3-win_amd64.whl (3.8 MB)
+   ---------------------------------------- 3.8/3.8 MB 19.1 MB/s  0:00:00
+Downloading cffi-2.1.1-cp312-cp312-win_amd64.whl (185 kB)
+Using cached pycparser-3.11-py3-none-any.whl (51 kB)
+Installing collected packages: PyJWT, pycparser, cffi, cryptography
+
+Successfully installed PyJWT-2.15.1 cffi-2.1.1 cryptography-50.0.2 pycparser-3.11
+

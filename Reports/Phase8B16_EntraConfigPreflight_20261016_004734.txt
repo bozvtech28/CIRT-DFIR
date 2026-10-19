@@ -1,0 +1,47 @@
+﻿CIRT DFIR PROFESSIONAL - PHASE 8B.16
+Timestamp: 2026-10-16T00:47:34.8094277+08:00
+Purpose: Microsoft Entra ID configuration preflight
+Mode: Read-only; environment values and secrets are never displayed
+No server started. No Microsoft endpoint contacted. No source changed.
+
+=== REQUIRED FILES ===
+platform\backend\app\auth_dependencies.py: PRESENT
+platform\backend\app\oidc_claims.py: PRESENT
+platform\backend\app\security.py: PRESENT
+platform\backend\app\main.py: PRESENT
+platform\backend\requirements.txt: PRESENT
+docs\Phase8B13_Microsoft_Entra_ID_Integration_Plan.md: PRESENT
+
+=== ENVIRONMENT VARIABLE PRESENCE ===
+AZURE_TENANT_ID: NOT SET
+ENTRA_TENANT_ID: NOT SET
+CIRT_ENTRA_TENANT_ID: NOT SET
+AZURE_CLIENT_ID: NOT SET
+ENTRA_CLIENT_ID: NOT SET
+CIRT_ENTRA_CLIENT_ID: NOT SET
+CIRT_ENTRA_ISSUER: NOT SET
+CIRT_ENTRA_AUDIENCE: NOT SET
+
+=== LOCAL CONFIGURATION FILE PRESENCE ===
+.env: NOT FOUND
+.env.local: NOT FOUND
+platform\backend\.env: NOT FOUND
+platform\backend\.env.local: NOT FOUND
+platform\frontend\.env: NOT FOUND
+platform\frontend\.env.local: NOT FOUND
+
+=== AUTHENTICATION READINESS MARKERS ===
+Fail-closed authentication gate: CONFIRMED
+Protected case-read route: REFERENCE FOUND
+Protected case-update route: REFERENCE FOUND
+PyJWT requirement declared: YES
+
+=== DECISION ===
+Tenant ID variable detected: False
+API client ID variable detected: False
+Next: obtain the approved tenant ID and API client ID from your Entra administrator, then configure them through an approved secure configuration process.
+Production OIDC verification: NOT IMPLEMENTED
+Role mapping from trusted Entra claims: NOT IMPLEMENTED
+Deployment remains blocked pending verified authentication and authorization tests.
+
+Report contains configuration presence only; no environment values or secrets were recorded.

@@ -1,0 +1,8 @@
+﻿Phase 8B.3 RBAC backup manifest
+Timestamp: 20261016_001455
+Project: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional
+
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\security.py | did not exist before change
+
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_security.py | did not exist before change
+

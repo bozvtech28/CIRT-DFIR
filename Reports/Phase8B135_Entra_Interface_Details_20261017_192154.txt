@@ -1,0 +1,17 @@
+﻿
+==============================================================================
+MODULE: app.entra_bearer_adapter
+FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_bearer_adapter.py
+==============================================================================
+
+SIGNATURE: BearerAuthenticationError (unavailable)
+
+SIGNATURE: principal_from_authorization_header (authorization: str | None, *, trusted_key_resolver, expected_issuer: str, expected_audience: str, expected_tenant_id: str, approved_role_map: collections.abc.Mapping[str, str]) -> app.security.Principal
+
+--- SOURCE: entra_bearer_adapter.py ---
+Traceback (most recent call last):
+  File "<stdin>", line 49, in <module>
+  File "C:\Users\BOZVLENOVO7\AppData\Local\Programs\Python\Python312\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\ufeff' in position 0: character maps to <undefined>

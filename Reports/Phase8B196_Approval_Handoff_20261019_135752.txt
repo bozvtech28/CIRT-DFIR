@@ -1,0 +1,63 @@
+﻿CIRT-DFIR - PHASE 8B196
+Entra approval handoff and final blocker inventory
+Timestamp: 2026-10-19 13:57:52
+
+=== REGRESSION BASELINE ===
+Last reported full suite: 290 passed
+Last reported pip check: clean
+Baseline source: Phase8B195 console output
+This phase does not rerun tests.
+
+=== AUTHENTICATION WIRING ===
+Authentication dependency found: YES
+Fail-closed markers detected: True
+Permission dependency markers detected: True
+Direct Entra authenticator markers in main.py: False
+
+=== CONFIGURATION TEMPLATE ===
+CIRT_DFIR_ENTRA_TENANT_ID : PASS - placeholder or empty
+CIRT_DFIR_ENTRA_EXPECTED_ISSUER : PASS - placeholder or empty
+CIRT_DFIR_ENTRA_AUDIENCE : PASS - placeholder or empty
+
+Current process environment variable presence:
+CIRT_DFIR_ENTRA_TENANT_ID : NOT SET
+CIRT_DFIR_ENTRA_EXPECTED_ISSUER : NOT SET
+CIRT_DFIR_ENTRA_AUDIENCE : NOT SET
+
+=== DOCUMENTATION ===
+README exists: YES
+Security guidance checks: True
+.gitignore contains .env ignore rule: True
+.gitignore contains .env.example exception: True
+
+=== GIT REPOSITORY STATUS ===
+Git executable: FOUND
+Repository found: NO
+Git ignore behavior: NOT VERIFIED
+Repository initialization performed: NO
+
+=== APPROVAL CHECKLIST ===
+[ ] Identity owner confirms approved tenant ID.
+[ ] Identity owner confirms exact expected issuer.
+[ ] API owner confirms expected audience.
+[ ] Security owner approves metadata and JWKS host allowlists.
+[ ] Security owner approves application roles and permission mapping.
+[ ] Invalid, expired, wrong-issuer, wrong-audience and invalid-signature token tests are approved.
+[ ] Audit identity and role logging requirements are approved.
+[ ] Application owner and security owner approve integration.
+[ ] Intended Git repository and secret-exclusion behavior are confirmed.
+
+=== FINAL STATUS ===
+Safe template checks: PASS
+Fail-closed source markers: DETECTED
+Permission dependency markers: DETECTED
+README security guidance: PASS
+Git ignore rules in file: PASS - FILE CONTENT ONLY
+Entra authenticator wired in main.py: False
+Application source modified: NO
+Environment variables modified: NO
+Authentication wiring modified: NO
+Git repository initialized: NO
+
+OVERALL: APPROVAL HANDOFF ONLY
+Do not enable Entra authentication until approved configuration, integration tests, and security sign-off are complete.

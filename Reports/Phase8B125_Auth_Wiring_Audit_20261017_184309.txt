@@ -1,0 +1,240 @@
+﻿CIRT DFIR PROFESSIONAL - PHASE 8B.125
+Authentication Wiring Gap Audit
+Timestamp: 20261017_184309
+Mode: Read-only source inspection
+Servers started: No
+Network requests intentionally issued by audit: No
+Application source modified: No
+
+IMPORTANT: Text matches are indicators, not proof of secure runtime behavior.
+
+============================================================
+FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\main.py
+============================================================
+STATUS: PRESENT
+Line 6: from app.auth_dependencies import require_permission
+Line 68: principal = Depends(require_permission("cases:update")),
+Line 104: @app.get("/api/v1/demo/cases", response_model=list[DemoCase], dependencies=[Depends(require_permission("cases:read"))])
+
+============================================================
+FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\auth_dependencies.py
+============================================================
+STATUS: PRESENT
+Line 5: Never trust roles supplied by a browser or request body.
+Line 11: AuthorizationDenied,
+Line 16: def get_current_principal() -> Principal:
+Line 24: def require_permission(permission: str):
+Line 26: def dependency(principal: Principal = Depends(get_current_principal)) -> Principal:
+Line 35: except AuthorizationDenied as exc:
+
+============================================================
+FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_bearer_adapter.py
+============================================================
+STATUS: PRESENT
+Line 3: This module does not fetch metadata or JWKS and is not wired into FastAPI.
+Line 15: from app.entra_token_verifier import verify_entra_access_token
+Line 23: def principal_from_authorization_header(
+Line 24: authorization: str | None,
+Line 26: trusted_key_resolver,
+Line 27: expected_issuer: str,
+Line 28: expected_audience: str,
+Line 29: expected_tenant_id: str,
+Line 30: approved_role_map: Mapping[str, str],
+Line 32: """Validate a Bearer header, verify its JWT, and map verified roles.
+Line 35: untrusted JWKS data or configuration supplied by a browser/request body.
+Line 37: if not isinstance(authorization, str):
+Line 38: raise BearerAuthenticationError("A Bearer authorization header is required.")
+Line 40: scheme, separator, raw_token = authorization.partition(" ")
+Line 49: raise BearerAuthenticationError("The authorization header is malformed.")
+Line 52: claims = verify_entra_access_token(
+Line 54: trusted_key_resolver=trusted_key_resolver,
+Line 55: expected_issuer=expected_issuer,
+Line 56: expected_audience=expected_audience,
+Line 57: expected_tenant_id=expected_tenant_id,
+Line 61: approved_role_map=approved_role_map,
+Line 65: "Bearer token validation or role mapping failed."
+
+============================================================
+FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_token_verifier.py
+============================================================
+STATUS: PRESENT
+Line 6: OpenID Connect metadata/JWKS, with HTTPS and safe key-rotation handling.
+Line 8: - Never use this verifier until tenant, issuer, and audience are approved.
+Line 19: def verify_entra_access_token(
+Line 22: trusted_key_resolver: TrustedKeyResolver,
+Line 23: expected_issuer: str,
+Line 24: expected_audience: str,
+Line 25: expected_tenant_id: str,
+Line 30: trusted JWKS source. This function deliberately performs no network access.
+Line 36: ("expected_issuer", expected_issuer),
+Line 37: ("expected_audience", expected_audience),
+Line 38: ("expected_tenant_id", expected_tenant_id),
+Line 43: if not callable(trusted_key_resolver):
+Line 46: # The key resolver must select a key from a trusted JWKS source.
+Line 48: signing_key = trusted_key_resolver(token)
+Line 56: issuer=expected_issuer,
+Line 57: audience=expected_audience,
+Line 73: if claims.get("tid") != expected_tenant_id:
+Line 74: raise InvalidTokenError("The token tenant does not match the configured tenant.")
+
+============================================================
+FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_metadata_client.py
+============================================================
+STATUS: PRESENT
+Line 1: """Provider-neutral Entra metadata/JWKS client primitives.
+Line 5: approved tenant, issuer, discovery endpoint, and JWKS URI.
+Line 19: """Raised when discovery metadata or JWKS data is not trusted."""
+Line 24: issuer: str
+Line 25: jwks_uri: str
+Line 49: expected_issuer: str,
+Line 50: allowed_jwks_hosts: set[str],
+Line 61: if not isinstance(expected_issuer, str) or not expected_issuer.strip():
+Line 62: raise MetadataTrustError("Expected issuer is not configured")
+Line 64: issuer = document.get("issuer")
+Line 65: jwks_uri = document.get("jwks_uri")
+Line 67: if not isinstance(issuer, str) or issuer != expected_issuer:
+Line 68: raise MetadataTrustError("Discovery issuer does not match configuration")
+Line 70: _require_https_url(issuer, "issuer")
+Line 71: _require_https_url(jwks_uri, "jwks_uri")
+Line 73: parsed_jwks = urlparse(jwks_uri)
+Line 76: for host in allowed_jwks_hosts
+Line 80: if (parsed_jwks.hostname or "").lower().rstrip(".") not in allowed_hosts:
+Line 81: raise MetadataTrustError("JWKS hostname is not in the approved allowlist")
+Line 83: if parsed_jwks.query:
+Line 84: raise MetadataTrustError("JWKS URI query parameters are not allowed")
+Line 85: if parsed_jwks.fragment:
+Line 86: raise MetadataTrustError("JWKS URI fragments are not allowed")
+Line 88: return TrustedMetadata(issuer=issuer, jwks_uri=jwks_uri)
+Line 127: def validate_jwks_document(document: Any) -> dict[str, Any]:
+Line 128: """Perform structural checks before the existing offline JWKS resolver."""
+Line 131: raise MetadataTrustError("JWKS document must be a JSON object")
+Line 135: raise MetadataTrustError("JWKS must contain a non-empty keys array")
+Line 141: raise MetadataTrustError("Each JWKS key must be a JSON object")
+Line 145: raise MetadataTrustError("Each JWKS key must have a non-empty kid")
+Line 148: raise MetadataTrustError("JWKS contains duplicate key IDs")
+Line 154: raise MetadataTrustError("JWKS key must be designated for signatures")
+Line 160: raise MetadataTrustError("JWKS must not contain private key parameters")
+
+============================================================
+FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_jwks.py
+============================================================
+STATUS: PRESENT
+Line 1: """Offline JWKS key selector for the Entra verifier prototype.
+Line 3: No HTTP calls are made by this module. The JWKS document must come from a
+Line 14: def build_jwks_resolver(jwks: Mapping[str, Any]):
+Line 15: """Build a resolver from a supplied JWKS document.
+Line 18: does not establish that the supplied JWKS document is authentic.
+Line 20: if not isinstance(jwks, Mapping):
+Line 21: raise ValueError("JWKS must be a mapping.")
+Line 23: keys = jwks.get("keys")
+Line 25: raise ValueError("JWKS must contain a non-empty keys array.")
+Line 31: raise ValueError("Every JWKS key must be an object.")
+Line 35: raise ValueError("Every JWKS key must have a non-empty kid.")
+Line 44: raise ValueError("JWKS key use must be sig.")
+Line 47: raise ValueError("Only RS256 JWKS keys are supported.")
+Line 49: # A public JWKS must not include RSA private-key parameters.
+Line 74: raise InvalidTokenError("JWT kid was not found in the trusted JWKS set.")
+
+============================================================
+FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_jwks_cache.py
+============================================================
+STATUS: PRESENT
+Line 1: """Bounded in-memory JWKS cache with explicit refresh.
+Line 20: validate_jwks_document,
+Line 24: class JWKSCacheError(RuntimeError):
+Line 25: """Raised when trusted JWKS data cannot be loaded or validated."""
+Line 28: class JWKSCache:
+Line 29: """Thread-safe in-memory JWKS cache with bounded TTL."""
+Line 59: validated = validate_jwks_document(document)
+Line 63: raise JWKSCacheError("Loaded JWKS failed validation") from exc
+Line 65: raise JWKSCacheError("JWKS loader failed") from exc
+
+============================================================
+FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\entra_principal.py
+============================================================
+STATUS: PRESENT
+Line 1: """Map verified Entra application-role claims to internal CIRT DFIR roles.
+Line 4: Only pass the claims returned by verify_entra_access_token after successful
+Line 5: cryptographic and issuer/audience/tenant validation. This module does not
+Line 8: approved_role_map must come from trusted server-side configuration. Never
+Line 9: accept it, the claims, or role assignments from browser-controlled input.
+Line 14: from app.security import KNOWN_ROLES, Principal
+Line 24: approved_role_map: Mapping[str, str],
+Line 26: """Create an internal Principal from verified claims and an explicit role map."""
+Line 34: if not isinstance(approved_role_map, Mapping) or not approved_role_map:
+Line 35: raise PrincipalMappingError("An explicit server-side role map is required.")
+Line 37: for app_role, internal_role in approved_role_map.items():
+Line 38: if not isinstance(app_role, str) or not app_role.strip():
+Line 39: raise PrincipalMappingError("Role-map keys must be non-empty strings.")
+Line 40: if not isinstance(internal_role, str) or internal_role not in KNOWN_ROLES:
+Line 41: raise PrincipalMappingError("Role map contains an unrecognized internal role.")
+Line 43: raw_roles = claims.get("roles")
+Line 44: if not isinstance(raw_roles, list) or not raw_roles:
+Line 45: raise PrincipalMappingError("A non-empty roles array is required.")
+Line 47: if any(not isinstance(role, str) or not role.strip() for role in raw_roles):
+Line 48: raise PrincipalMappingError("Every application role must be a non-empty string.")
+Line 50: if len(set(raw_roles)) != len(raw_roles):
+Line 51: raise PrincipalMappingError("Duplicate application roles are not accepted.")
+Line 53: unknown_roles = [role for role in raw_roles if role not in approved_role_map]
+Line 54: if unknown_roles:
+Line 55: raise PrincipalMappingError("Claims contain an unapproved application role.")
+Line 57: internal_roles = frozenset(approved_role_map[role] for role in raw_roles)
+Line 58: if not internal_roles:
+Line 59: raise PrincipalMappingError("No approved internal roles were resolved.")
+Line 61: return Principal(subject=subject.strip(), roles=internal_roles)
+
+============================================================
+FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\auth\entraConfig.ts
+============================================================
+STATUS: PRESENT
+Line 3: const tenantId = (import.meta.env.VITE_ENTRA_TENANT_ID ?? "").trim();
+Line 4: const clientId = (import.meta.env.VITE_ENTRA_CLIENT_ID ?? "").trim();
+Line 5: const apiScope = (import.meta.env.VITE_ENTRA_API_SCOPE ?? "").trim();
+Line 6: const redirectUri = (import.meta.env.VITE_ENTRA_REDIRECT_URI ?? "").trim();
+Line 11: value.includes("YOUR_TENANT") ||
+Line 21: if (isPlaceholder(tenantId) || !isGuid(tenantId)) {
+Line 22: entraConfigurationErrors.push("An approved Entra tenant ID is required.");
+Line 67: authority: `https://login.microsoftonline.com/${tenantId}`,
+
+============================================================
+FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\auth\entraToken.ts
+============================================================
+STATUS: PRESENT
+Line 6: * This helper never accepts a token or role from caller-controlled input.
+Line 19: const result = await instance.acquireTokenSilent({
+
+============================================================
+FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\src\auth\authenticatedFetch.ts
+============================================================
+STATUS: PRESENT
+Line 7: * No browser-supplied role or identity is treated as authorization.
+Line 9: export async function authenticatedFetch(
+Line 16: headers.set("Authorization", `Bearer ${token}`);
+Line 18: return fetch(input, { ...init, headers });
+
+============================================================
+FILE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\frontend\.env.example
+============================================================
+STATUS: PRESENT
+Line 5: VITE_ENTRA_TENANT_ID=REPLACE_WITH_APPROVED_TENANT_ID
+Line 6: VITE_ENTRA_CLIENT_ID=REPLACE_WITH_APPROVED_SPA_CLIENT_ID
+Line 7: VITE_ENTRA_API_SCOPE=REPLACE_WITH_APPROVED_API_SCOPE
+Line 8: VITE_ENTRA_REDIRECT_URI=http://localhost:5173/
+Line 9: VITE_API_BASE_URL=/api
+
+============================================================
+ROUTE AUTHORIZATION DECORATORS
+============================================================
+Line 57: @app.get("/api/v1/health", response_model=HealthResponse)
+Line 64: @app.patch("/api/v1/cases/{case_id}", response_model=DemoCase)
+Line 68: principal = Depends(require_permission("cases:update")),
+Line 104: @app.get("/api/v1/demo/cases", response_model=list[DemoCase], dependencies=[Depends(require_permission("cases:read"))])
+
+============================================================
+AUDIT LIMITATIONS
+============================================================
+This audit does not validate JWT signatures or contact identity endpoints.
+This audit does not prove that every route is protected.
+This audit does not validate tenant registration or app-role configuration.
+Missing text matches may reflect indirect wiring; review source context.
+Do not enable live authentication based on this report alone.

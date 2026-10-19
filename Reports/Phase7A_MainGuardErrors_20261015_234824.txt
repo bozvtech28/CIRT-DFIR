@@ -1,0 +1,39 @@
+test_audit_event_cannot_be_deleted (test_case_repository.RepositoryTests.test_audit_event_cannot_be_deleted) ... ok
+test_audit_event_cannot_be_updated (test_case_repository.RepositoryTests.test_audit_event_cannot_be_updated) ... ok
+test_create_and_retrieve_case (test_case_repository.RepositoryTests.test_create_and_retrieve_case) ... ok
+test_creation_records_audit_event (test_case_repository.RepositoryTests.test_creation_records_audit_event) ... ok
+test_duplicate_case_id_is_rejected (test_case_repository.RepositoryTests.test_duplicate_case_id_is_rejected) ... ok
+test_empty_actor_is_rejected (test_case_repository.RepositoryTests.test_empty_actor_is_rejected) ... ok
+test_invalid_severity_is_rejected (test_case_repository.RepositoryTests.test_invalid_severity_is_rejected) ... ok
+test_list_cases (test_case_repository.RepositoryTests.test_list_cases) ... ok
+test_missing_case_returns_none (test_case_repository.RepositoryTests.test_missing_case_returns_none) ... ok
+test_update_case_records_before_and_after_audit (test_case_repository.RepositoryTests.test_update_case_records_before_and_after_audit) ... ERROR
+test_update_missing_case_returns_none (test_case_repository.RepositoryTests.test_update_missing_case_returns_none) ... ok
+test_update_rejects_empty_actor (test_case_repository.RepositoryTests.test_update_rejects_empty_actor) ... ok
+test_update_rejects_invalid_status (test_case_repository.RepositoryTests.test_update_rejects_invalid_status) ... ok
+test_update_rejects_no_change (test_case_repository.RepositoryTests.test_update_rejects_no_change) ... FAIL
+
+======================================================================
+ERROR: test_update_case_records_before_and_after_audit (test_case_repository.RepositoryTests.test_update_case_records_before_and_after_audit)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\test_case_repository.py", line 108, in test_update_case_records_before_and_after_audit
+    updated = update_case(
+              ^^^^^^^^^^^^
+  File "C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py", line 110, in update_case
+    raise ValueError("Update contains no case changes.")
+ValueError: Update contains no case changes.
+
+======================================================================
+FAIL: test_update_rejects_no_change (test_case_repository.RepositoryTests.test_update_rejects_no_change)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\test_case_repository.py", line 164, in test_update_rejects_no_change
+    with self.assertRaises(ValueError):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+----------------------------------------------------------------------
+Ran 14 tests in 0.582s
+
+FAILED (failures=1, errors=1)

@@ -1,0 +1,70 @@
+CIRT DFIR PROFESSIONAL — PHASE 8B.2
+Proposed Access-Control Design
+Generated UTC: 2026-10-15T16:12:37.812121+00:00
+DESIGN ONLY — application source and database are not modified.
+
+1. CURRENT API ROUTES
+GET /api/v1/demo/cases -> get_demo_cases
+GET /api/v1/health -> health
+PATCH /api/v1/cases/{case_id} -> update_case_endpoint
+
+2. PROPOSED ROLE MATRIX
+Route / Capability | Public | Viewer | DFIR Analyst | Administrator
+GET /api/v1/health | ALLOW | ALLOW | ALLOW | ALLOW
+GET /api/v1/demo/cases | DENY | ALLOW | ALLOW | ALLOW
+PATCH /api/v1/cases/{case_id} | DENY | DENY | ALLOW | ALLOW
+User/role administration (future) | DENY | DENY | DENY | ALLOW
+Audit review (future dedicated endpoint) | DENY | DENY | ALLOW* | ALLOW
+*Whether analysts may read audit history must be confirmed by the project owner.
+
+3. AUTHENTICATION DESIGN OPTIONS
+Preferred initial direction: a documented identity and session strategy chosen for the actual deployment environment.
+If deployed as a browser-based application, evaluate secure server-managed sessions with HttpOnly, Secure, and appropriate SameSite cookies, plus CSRF protection for state-changing requests.
+If deployed as an API for multiple clients, evaluate a supported identity provider or a carefully implemented token-based design with expiry, issuer/audience validation, and secure key management.
+Do not store plaintext passwords, tokens, signing keys, or credentials in source code.
+Use a maintained password-hashing implementation such as Argon2id if local password storage is selected; do not implement password hashing manually.
+Do not add authentication dependencies until the deployment model and identity source are confirmed.
+
+4. REQUIRED AUTHORIZATION BEHAVIOR
+- Authentication must be enforced server-side, not only by hiding frontend controls.
+- Every protected route must reject missing or invalid credentials.
+- Valid users with insufficient permissions must be denied.
+- Case updates must continue validating allowed status/severity values.
+- Record the authenticated actor identity in audit events; do not trust a client-supplied actor ID.
+- Do not permit unauthenticated user registration or privilege escalation.
+- Keep health endpoint output minimal and avoid exposing secrets or environment details.
+
+5. SECURITY TEST PLAN
+- Unauthenticated request to protected case-list endpoint is rejected.
+- Unauthenticated PATCH request is rejected and does not mutate a case.
+- Viewer PATCH request is rejected and does not mutate a case.
+- Analyst PATCH request succeeds for an authorized synthetic case.
+- Administrator can access explicitly approved administrative actions.
+- Invalid, expired, or malformed credentials are rejected.
+- Audit actor identity comes from the authenticated principal.
+- CSRF defenses are tested if cookie-based authentication is chosen.
+- Existing health behavior and frontend build remain compatible.
+- All tests use temporary SQLite databases and synthetic records.
+
+6. DEPENDENCY DECLARATION CHECK
+requirements.txt SHA256: 79c0260b05030c247e0d1b2d625828fe846de9c21059b2a21ab2866813d54ab6
+Requirements entries (BOM-safe read):
+  fastapi>=0.115,<1.0
+  uvicorn[standard]>=0.34,<1.0
+  pydantic>=2.10,<3.0
+  pytest>=8.3,<9.0
+  httpx>=0.28,<1.0
+FastAPI declaration detected: True
+
+7. IMPLEMENTATION GATES
+Gate 1: Confirm intended deployment: local single-user, trusted internal network, or multi-user deployment.
+Gate 2: Confirm identity source: existing organizational identity provider or locally managed accounts.
+Gate 3: Approve roles and permissions, especially audit-history access.
+Gate 4: Select session/token strategy and required dependencies.
+Gate 5: Back up sources, implement authentication, and test using synthetic data.
+Gate 6: Run repository tests, API security tests, and frontend production build.
+
+8. SAFETY
+This report is a proposal, not implemented access control.
+No application source, database, collector, or evidence files were modified.
+No server was started, no packages were installed, and no network requests were made.

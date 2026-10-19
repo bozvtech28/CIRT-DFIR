@@ -1,0 +1,242 @@
+﻿Phase 6C - Pre-Integration Inspection
+Timestamp: 2026-10-15 23:29:38
+Project root: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional
+Backup directory: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\Phase6C_PreIntegration_20261015_232938
+Production collector executed: No
+Evidence accessed: No
+API server started: No
+Source changes made by this script: No
+
+SOURCE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\app\main.py
+BACKUP: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\Phase6C_PreIntegration_20261015_232938\main.py
+SHA256: AC7CD440ABBE6BEE0DBC7E2B0DC2FF47F71D1AA9E5A28DD249B9CFA017EFE342
+Backup verification: PASS
+
+SOURCE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\tests\test_api.py
+BACKUP: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\Phase6C_PreIntegration_20261015_232938\test_api.py
+SHA256: 7B7B85EC609832CB89147FD0D49BCCD151E42B208FB96DA2F6EFA2F986D0E4AA
+Backup verification: PASS
+
+SOURCE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\case_repository.py
+BACKUP: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\Phase6C_PreIntegration_20261015_232938\case_repository.py
+SHA256: A30B3039420A01B3567D29357C388BF329AD78A679918F63B45C1C62984F374A
+Backup verification: PASS
+
+SOURCE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\test_case_repository.py
+BACKUP: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\Phase6C_PreIntegration_20261015_232938\test_case_repository.py
+SHA256: 2A39E6ADBCDB27667D5D200D293042B48891BC0F775EBB5AF62894127363DE84
+Backup verification: PASS
+
+SOURCE: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\database-design\phase6_schema.sql
+BACKUP: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\Phase6C_PreIntegration_20261015_232938\phase6_schema.sql
+SHA256: D8249EAFE4986EB970B7A50CCC6E97BDFF86D56D50AC1C8A73FDB0EF34272426
+Backup verification: PASS
+
+=== BACKEND API SOURCE ===
+from fastapi import FastAPI
+from pydantic import BaseModel
+
+app = FastAPI(
+    title="CIRT DFIR Platform API",
+    version="0.1.0",
+    description="Development scaffold only. Synthetic data; no evidence intake.",
+)
+
+
+class HealthResponse(BaseModel):
+    status: str
+    mode: str
+
+
+class DemoCase(BaseModel):
+    case_id: str
+    title: str
+    severity: str
+    status: str
+
+
+DEMO_CASES = [
+    DemoCase(
+        case_id="DEMO-2026-001",
+        title="Endpoint Alert Review",
+        severity="High",
+        status="Investigating",
+    ),
+    DemoCase(
+        case_id="DEMO-2026-002",
+        title="Suspicious Login Review",
+        severity="Medium",
+        status="Triage",
+    ),
+    DemoCase(
+        case_id="DEMO-2026-003",
+        title="Mailbox Rule Assessment",
+        severity="Medium",
+        status="Evidence review",
+    ),
+]
+
+
+@app.get("/api/v1/health", response_model=HealthResponse)
+def health() -> HealthResponse:
+    return HealthResponse(status="ok", mode="development-scaffold")
+
+
+@app.get("/api/v1/demo/cases", response_model=list[DemoCase])
+def list_demo_cases() -> list[DemoCase]:
+    return DEMO_CASES
+
+
+=== BACKEND API TEST SOURCE ===
+from fastapi.testclient import TestClient
+
+from app.main import app
+
+client = TestClient(app)
+
+
+def test_health_endpoint() -> None:
+    response = client.get("/api/v1/health")
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
+    assert response.json()["mode"] == "development-scaffold"
+
+
+def test_demo_cases_are_synthetic() -> None:
+    response = client.get("/api/v1/demo/cases")
+    assert response.status_code == 200
+    cases = response.json()
+    assert len(cases) == 3
+    assert all(item["case_id"].startswith("DEMO-") for item in cases)
+
+
+=== REPOSITORY SOURCE ===
+import json
+import sqlite3
+from pathlib import Path
+from typing import Any
+
+
+def connect(database_path: str | Path) -> sqlite3.Connection:
+    connection = sqlite3.connect(str(database_path))
+    connection.row_factory = sqlite3.Row
+    connection.execute("PRAGMA foreign_keys = ON")
+    return connection
+
+
+def initialize(database_path: str | Path, schema_path: str | Path) -> None:
+    schema = Path(schema_path).read_text(encoding="utf-8")
+    db = connect(database_path)
+    try:
+        db.executescript(schema)
+        db.commit()
+    finally:
+        db.close()
+
+
+def create_case(
+    db: sqlite3.Connection,
+    *,
+    case_id: str,
+    title: str,
+    severity: str,
+    status: str,
+    actor_id: str,
+    timestamp: str,
+) -> dict[str, Any]:
+    if not all(isinstance(value, str) and value.strip() for value in (
+        case_id, title, severity, status, actor_id, timestamp
+    )):
+        raise ValueError("Case fields, actor, and timestamp must be non-empty strings.")
+
+    details = json.dumps(
+        {"synthetic": True, "action": "case_created"},
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+
+    with db:
+        db.execute(
+            """INSERT INTO cases
+               (case_id, title, severity, status, created_at, updated_at, created_by)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (case_id, title, severity, status, timestamp, timestamp, actor_id),
+        )
+        db.execute(
+            """INSERT INTO audit_events
+               (case_id, event_type, actor_id, event_time, details_json)
+               VALUES (?, ?, ?, ?, ?)""",
+            (case_id, "CASE_CREATED", actor_id, timestamp, details),
+        )
+
+    return get_case(db, case_id)
+
+
+def get_case(db: sqlite3.Connection, case_id: str) -> dict[str, Any] | None:
+    row = db.execute(
+        """SELECT case_id, title, severity, status, created_at,
+                  updated_at, created_by, version
+           FROM cases WHERE case_id = ?""",
+        (case_id,),
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def list_cases(db: sqlite3.Connection) -> list[dict[str, Any]]:
+    rows = db.execute(
+        """SELECT case_id, title, severity, status, created_at,
+                  updated_at, created_by, version
+           FROM cases ORDER BY created_at, case_id"""
+    ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def list_audit_events(
+    db: sqlite3.Connection, case_id: str
+) -> list[dict[str, Any]]:
+    rows = db.execute(
+        """SELECT event_id, case_id, event_type, actor_id,
+                  event_time, details_json, previous_hash, event_hash
+           FROM audit_events
+           WHERE case_id = ?
+           ORDER BY event_id""",
+        (case_id,),
+    ).fetchall()
+    return [dict(row) for row in rows]
+
+=== TEST RESULTS ===
+Backend API test exit code: 5
+Backend stdout: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase6C_BackendTests_stdout_20261015_232938.txt
+Backend stderr: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase6C_BackendTests_stderr_20261015_232938.txt
+Repository test exit code: 0
+Repository stdout: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase6C_RepositoryTests_stdout_20261015_232938.txt
+Repository stderr: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase6C_RepositoryTests_stderr_20261015_232938.txt
+
+=== BACKEND TEST OUTPUT ===
+C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+  from starlette.testclient import TestClient as TestClient  # noqa
+
+----------------------------------------------------------------------
+Ran 0 tests in 0.000s
+
+NO TESTS RAN
+
+
+=== REPOSITORY TEST OUTPUT ===
+test_audit_event_cannot_be_deleted (test_case_repository.RepositoryTests.test_audit_event_cannot_be_deleted) ... ok
+test_audit_event_cannot_be_updated (test_case_repository.RepositoryTests.test_audit_event_cannot_be_updated) ... ok
+test_create_and_retrieve_case (test_case_repository.RepositoryTests.test_create_and_retrieve_case) ... ok
+test_creation_records_audit_event (test_case_repository.RepositoryTests.test_creation_records_audit_event) ... ok
+test_duplicate_case_id_is_rejected (test_case_repository.RepositoryTests.test_duplicate_case_id_is_rejected) ... ok
+test_empty_actor_is_rejected (test_case_repository.RepositoryTests.test_empty_actor_is_rejected) ... ok
+test_invalid_severity_is_rejected (test_case_repository.RepositoryTests.test_invalid_severity_is_rejected) ... ok
+test_list_cases (test_case_repository.RepositoryTests.test_list_cases) ... ok
+test_missing_case_returns_none (test_case_repository.RepositoryTests.test_missing_case_returns_none) ... ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 0.366s
+
+OK
+
+
+Overall result: FAIL - investigate test failures before integration

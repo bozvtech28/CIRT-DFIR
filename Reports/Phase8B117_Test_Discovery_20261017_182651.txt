@@ -1,0 +1,89 @@
+﻿CIRT DFIR PROFESSIONAL - PHASE 8B.117
+Timestamp: 20261017_182651
+Mode: Test discovery, backup, and read-only review
+Application source changes: None
+Network requests: None
+Servers started: None
+
+========== BACKUP ==========
+BACKED UP: platform\backend\app\main.py
+BACKED UP: platform\backend\app\auth_dependencies.py
+BACKED UP: platform\backend\app\case_repository.py
+BACKED UP: platform\backend\tests\conftest.py
+BACKED UP: platform\backend\tests\test_api_auth_gate.py
+
+Backup directory: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\Phase8B117_20261017_182651
+
+========== EXISTING TEST FILES ==========
+platform\backend\tests\__pycache__\conftest.cpython-312-pytest-8.4.2.pyc | 1429 bytes
+platform\backend\tests\__pycache__\test_api.cpython-312.pyc | 1511 bytes
+platform\backend\tests\__pycache__\test_api.cpython-312-pytest-8.4.2.pyc | 4936 bytes
+platform\backend\tests\__pycache__\test_api_auth_gate.cpython-312-pytest-8.4.2.pyc | 7325 bytes
+platform\backend\tests\__pycache__\test_api_oidc_fail_closed.cpython-312-pytest-8.4.2.pyc | 4101 bytes
+platform\backend\tests\__pycache__\test_entra_bearer_adapter.cpython-312-pytest-8.4.2.pyc | 12119 bytes
+platform\backend\tests\__pycache__\test_entra_end_to_end_offline.cpython-312-pytest-8.4.2.pyc | 10128 bytes
+platform\backend\tests\__pycache__\test_entra_http_transport.cpython-312-pytest-8.4.2.pyc | 20193 bytes
+platform\backend\tests\__pycache__\test_entra_jwks.cpython-312-pytest-8.4.2.pyc | 11822 bytes
+platform\backend\tests\__pycache__\test_entra_jwks_cache.cpython-312-pytest-8.4.2.pyc | 24209 bytes
+platform\backend\tests\__pycache__\test_entra_jwks_cache_hardening.cpython-312-pytest-8.4.2.pyc | 21276 bytes
+platform\backend\tests\__pycache__\test_entra_metadata_client.cpython-312-pytest-8.4.2.pyc | 12533 bytes
+platform\backend\tests\__pycache__\test_entra_principal.cpython-312-pytest-8.4.2.pyc | 9893 bytes
+platform\backend\tests\__pycache__\test_entra_principal_authorization.cpython-312-pytest-8.4.2.pyc | 3326 bytes
+platform\backend\tests\__pycache__\test_entra_token_verifier.cpython-312-pytest-8.4.2.pyc | 8952 bytes
+platform\backend\tests\__pycache__\test_entra_verifier_jwks_integration.cpython-312-pytest-8.4.2.pyc | 11662 bytes
+platform\backend\tests\__pycache__\test_oidc_claims.cpython-312-pytest-8.4.2.pyc | 4575 bytes
+platform\backend\tests\__pycache__\test_security.cpython-312-pytest-8.4.2.pyc | 5490 bytes
+platform\backend\tests\__pycache__\test_synthetic_jwt_harness.cpython-312-pytest-8.4.2.pyc | 8437 bytes
+platform\backend\tests\__pycache__\test_synthetic_role_mapping.cpython-312-pytest-8.4.2.pyc | 9837 bytes
+platform\backend\tests\__pycache__\test_synthetic_rs256_harness.cpython-312-pytest-8.4.2.pyc | 9573 bytes
+platform\backend\tests\conftest.py | 655 bytes
+platform\backend\tests\test_api.py | 584 bytes
+platform\backend\tests\test_api_auth_gate.py | 2284 bytes
+platform\backend\tests\test_api_oidc_fail_closed.py | 1063 bytes
+platform\backend\tests\test_entra_bearer_adapter.py | 5219 bytes
+platform\backend\tests\test_entra_end_to_end_offline.py | 4688 bytes
+platform\backend\tests\test_entra_http_transport.py | 7341 bytes
+platform\backend\tests\test_entra_jwks.py | 4632 bytes
+platform\backend\tests\test_entra_jwks_cache.py | 5400 bytes
+platform\backend\tests\test_entra_jwks_cache_hardening.py | 5124 bytes
+platform\backend\tests\test_entra_metadata_client.py | 5463 bytes
+platform\backend\tests\test_entra_principal.py | 3743 bytes
+platform\backend\tests\test_entra_principal_authorization.py | 2031 bytes
+platform\backend\tests\test_entra_token_verifier.py | 5078 bytes
+platform\backend\tests\test_entra_verifier_jwks_integration.py | 6262 bytes
+platform\backend\tests\test_oidc_claims.py | 2780 bytes
+platform\backend\tests\test_security.py | 2508 bytes
+platform\backend\tests\test_synthetic_jwt_harness.py | 3623 bytes
+platform\backend\tests\test_synthetic_role_mapping.py | 2191 bytes
+platform\backend\tests\test_synthetic_rs256_harness.py | 4271 bytes
+
+========== TEST REFERENCES TO CASE UPDATE ==========
+platform\backend\tests\conftest.py:15: app.dependency_overrides[get_current_principal] = lambda: Principal(
+platform\backend\tests\conftest.py:16: subject="synthetic-test-analyst",
+platform\backend\tests\conftest.py:20: app.dependency_overrides.clear()
+platform\backend\tests\test_api_auth_gate.py:11: app.dependency_overrides.clear()
+platform\backend\tests\test_api_auth_gate.py:17: app.dependency_overrides.clear()
+platform\backend\tests\test_api_auth_gate.py:20: app.dependency_overrides.clear()
+platform\backend\tests\test_api_auth_gate.py:23: "/api/v1/cases/DEMO-2026-001",
+platform\backend\tests\test_api_auth_gate.py:28: app.dependency_overrides.clear()
+platform\backend\tests\test_api_auth_gate.py:30: def test_viewer_cannot_update_case():
+platform\backend\tests\test_api_auth_gate.py:31: app.dependency_overrides[get_current_principal] = lambda: Principal(
+platform\backend\tests\test_api_auth_gate.py:37: "/api/v1/cases/DEMO-2026-001",
+platform\backend\tests\test_api_auth_gate.py:42: app.dependency_overrides.clear()
+platform\backend\tests\test_api_auth_gate.py:52: test_app.dependency_overrides[get_current_principal] = lambda: Principal(
+platform\backend\tests\test_api_oidc_fail_closed.py:11: app.dependency_overrides.clear()
+platform\backend\tests\test_api_oidc_fail_closed.py:16: app.dependency_overrides.clear()
+platform\backend\tests\test_api_oidc_fail_closed.py:20: app.dependency_overrides.clear()
+platform\backend\tests\test_api_oidc_fail_closed.py:28: app.dependency_overrides.clear()
+platform\backend\tests\test_api_oidc_fail_closed.py:32: app.dependency_overrides.clear()
+platform\backend\tests\test_api_oidc_fail_closed.py:35: "/api/v1/cases/DEMO-2026-001",
+platform\backend\tests\test_api_oidc_fail_closed.py:40: app.dependency_overrides.clear()
+
+========== IMPLEMENTATION PLAN ==========
+1. Keep auth_dependencies.py fail-closed.
+2. Inject the existing permission-checked Principal into the PATCH endpoint.
+3. Derive audit actor from principal.subject, never from request data.
+4. Add a test that verifies the persisted audit actor for a synthetic authorized principal.
+5. Retain unauthenticated 401 and Viewer 403 tests.
+6. Run the focused tests before the full backend suite.
+7. Do not enable live Entra authentication in this phase.

@@ -1,0 +1,32 @@
+﻿CIRT-DFIR - PHASE 8B195
+Final regression and readiness gate
+Timestamp: 2026-10-19 13:55:59
+
+=== DEPENDENCY CONSISTENCY ===
+No broken requirements found.
+pip check exit code: 0
+
+=== FULL TEST SUITE ===
+........................................................................ [ 24%]
+........................................................................ [ 49%]
+........................................................................ [ 74%]
+........................................................................ [ 99%]
+..                                                                       [100%]
+290 passed in 4.11s
+pytest exit code: 0
+
+=== AUTHENTICATION READINESS ===
+Authentication dependency exists: YES
+Fail-closed 401 behavior detected: True
+Permission dependency used in main.py: True
+Entra authenticator direct reference in main.py: False
+Configuration template exists: True
+
+Application source modified: NO
+Environment variables modified: NO
+Authentication wiring modified: NO
+Git repository initialized: NO
+
+Regression result: PASS
+Dependency result: PASS
+FINAL STATUS: REGRESSION PASS; AUTHENTICATION APPROVAL STILL SEPARATE

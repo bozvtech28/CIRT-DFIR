@@ -1,0 +1,92 @@
+import json
+import sqlite3
+from pathlib import Path
+from typing import Any
+
+
+def connect(database_path: str | Path) -> sqlite3.Connection:
+    connection = sqlite3.connect(str(database_path))
+    connection.row_factory = sqlite3.Row
+    connection.execute("PRAGMA foreign_keys = ON")
+    return connection
+
+
+def initialize(database_path: str | Path, schema_path: str | Path) -> None:
+    schema = Path(schema_path).read_text(encoding="utf-8")
+    db = connect(database_path)
+    try:
+        db.executescript(schema)
+        db.commit()
+    finally:
+        db.close()
+
+
+def create_case(
+    db: sqlite3.Connection,
+    *,
+    case_id: str,
+    title: str,
+    severity: str,
+    status: str,
+    actor_id: str,
+    timestamp: str,
+) -> dict[str, Any]:
+    if not all(isinstance(value, str) and value.strip() for value in (
+        case_id, title, severity, status, actor_id, timestamp
+    )):
+        raise ValueError("Case fields, actor, and timestamp must be non-empty strings.")
+
+    details = json.dumps(
+        {"synthetic": True, "action": "case_created"},
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+
+    with db:
+        db.execute(
+            """INSERT INTO cases
+               (case_id, title, severity, status, created_at, updated_at, created_by)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (case_id, title, severity, status, timestamp, timestamp, actor_id),
+        )
+        db.execute(
+            """INSERT INTO audit_events
+               (case_id, event_type, actor_id, event_time, details_json)
+               VALUES (?, ?, ?, ?, ?)""",
+            (case_id, "CASE_CREATED", actor_id, timestamp, details),
+        )
+
+    return get_case(db, case_id)
+
+
+def get_case(db: sqlite3.Connection, case_id: str) -> dict[str, Any] | None:
+    row = db.execute(
+        """SELECT case_id, title, severity, status, created_at,
+                  updated_at, created_by, version
+           FROM cases WHERE case_id = ?""",
+        (case_id,),
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def list_cases(db: sqlite3.Connection) -> list[dict[str, Any]]:
+    rows = db.execute(
+        """SELECT case_id, title, severity, status, created_at,
+                  updated_at, created_by, version
+           FROM cases ORDER BY created_at, case_id"""
+    ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def list_audit_events(
+    db: sqlite3.Connection, case_id: str
+) -> list[dict[str, Any]]:
+    rows = db.execute(
+        """SELECT event_id, case_id, event_type, actor_id,
+                  event_time, details_json, previous_hash, event_hash
+           FROM audit_events
+           WHERE case_id = ?
+           ORDER BY event_id""",
+        (case_id,),
+    ).fetchall()
+    return [dict(row) for row in rows]

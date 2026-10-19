@@ -1,0 +1,63 @@
+﻿CIRT DFIR PROFESSIONAL - PHASE 8B.56
+Timestamp: 2026-10-16T01:56:48.4862974+08:00
+Scope: read-only source review and readiness inventory
+Source files changed: NO
+Packages installed: NO
+Application server started: NO
+Network requests made: NO
+Microsoft endpoints contacted: NO
+Production authentication gate changed: NO
+
+=== REQUIRED FILE INVENTORY ===
+PRESENT | app\entra_metadata_client.py | 5738 bytes
+PRESENT | app\entra_jwks_cache.py | 3707 bytes
+PRESENT | app\entra_token_verifier.py | 2691 bytes
+PRESENT | app\entra_jwks.py | 2737 bytes
+PRESENT | app\oidc_claims.py | 2634 bytes
+PRESENT | app\auth_dependencies.py | 1522 bytes
+PRESENT | app\security.py | 2530 bytes
+PRESENT | tests\test_entra_metadata_client.py | 5463 bytes
+PRESENT | tests\test_entra_jwks_cache.py | 5400 bytes
+PRESENT | tests\test_entra_jwks_cache_hardening.py | 5124 bytes
+PRESENT | tests\test_api_auth_gate.py | 2284 bytes
+
+=== STATIC SECURITY INDICATORS ===
+INDICATOR FOUND | HTTPS enforcement | app\entra_metadata_client.py, app\entra_token_verifier.py
+INDICATOR FOUND | Issuer validation | app\entra_metadata_client.py, app\entra_token_verifier.py, app\oidc_claims.py
+INDICATOR FOUND | Audience validation | app\entra_token_verifier.py, app\oidc_claims.py
+INDICATOR FOUND | JWT signature verification indicator | app\entra_metadata_client.py, app\entra_token_verifier.py, app\entra_jwks.py
+INDICATOR FOUND | Algorithm restriction indicator | app\entra_metadata_client.py, app\entra_token_verifier.py, app\entra_jwks.py
+INDICATOR FOUND | Token expiration validation indicator | app\entra_metadata_client.py, app\entra_jwks_cache.py, app\entra_token_verifier.py, app\oidc_claims.py
+INDICATOR FOUND | Not-before validation indicator | app\entra_token_verifier.py, app\oidc_claims.py
+INDICATOR FOUND | JWKS cache / expiry | app\entra_jwks_cache.py
+INDICATOR FOUND | Role / permission handling | app\oidc_claims.py, app\auth_dependencies.py, app\security.py
+INDICATOR FOUND | Fail-closed authentication status | app\auth_dependencies.py
+INDICATOR FOUND | Bearer challenge indicator | app\entra_token_verifier.py, app\auth_dependencies.py
+
+=== AUTHENTICATION GATE REVIEW ===
+PASS - Explicit HTTP 401 fail-closed pattern detected
+PASS - Auth gate does not import the reviewed Entra cache/client/verifier modules
+
+=== FULL BACKEND REGRESSION ===
+........................................................................ [ 44%]
+........................................................................ [ 88%]
+...................                                                      [100%]
+============================== warnings summary ===============================
+.venv\Lib\site-packages\fastapi\testclient.py:1
+  C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+163 passed, 1 warning in 2.31s
+Backend test exit code: 0
+Backend regression: PASS
+
+=== READINESS DECISION ===
+This scan checks source indicators only; it does not prove cryptographic correctness.
+Do not enable production authentication based only on passing unit tests.
+Before production: validate tenant-specific issuer and audience, cryptographic signature,
+algorithm allowlist, exp/nbf, key selection and rotation, trusted HTTPS retrieval,
+redirect handling, role mapping, audit actor attribution, frontend token flow,
+TLS deployment, CORS/CSRF requirements, and security review.
+
+Overall result: PASS - READ-ONLY REVIEW COMPLETED; PRODUCTION READINESS NOT CERTIFIED

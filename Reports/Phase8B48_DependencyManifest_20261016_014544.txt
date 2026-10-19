@@ -1,0 +1,17 @@
+﻿CIRT DFIR PROFESSIONAL - PHASE 8B.48
+Timestamp: 2026-10-16T01:45:46.3820249+08:00
+Mode: BACKEND DEPENDENCY MANIFEST RECONCILIATION
+Installed PyJWT version: 
+Installed cryptography version: 
+PyJWT already declared before this phase: True
+cryptography already declared before this phase: False
+Manifest additions made: 1
+PyJWT exact pin verified: False
+cryptography exact pin verified: True
+Original manifest backup: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\Phase8B48_20261016_014544
+Packages installed: NO
+Server started: NO
+Microsoft endpoints contacted: NO
+Authentication gate changed: NO
+Production authentication enabled: NO
+Overall result: FAIL - REVIEW REQUIRED

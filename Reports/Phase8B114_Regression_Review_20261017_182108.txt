@@ -1,0 +1,113 @@
+﻿CIRT DFIR PROFESSIONAL - PHASE 8B.114
+Timestamp: 20261017_182108
+Mode: Source inspection and regression testing
+Application servers started: No
+External identity requests: None
+Production source modifications: None
+
+========== BACKUP ==========
+PASS: HTTP transport source backed up.
+PASS: API entry point backed up.
+Backup directory: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Backups\Phase8B114_20261017_182108
+
+========== HTTP TRANSPORT SOURCE REVIEW ==========
+TRANSPORT L1: """Bounded HTTPS JSON transport for trusted identity metadata.
+TRANSPORT L4: Only fixed, caller-approved hosts may be contacted. Redirects are disabled.
+TRANSPORT L7: from __future__ import annotations
+TRANSPORT L9: import json
+TRANSPORT L10: from typing import Any, Callable
+TRANSPORT L11: from urllib.parse import urlparse
+TRANSPORT L13: import httpx
+TRANSPORT L15: from app.entra_metadata_client import MetadataTrustError
+TRANSPORT L21: def fetch_json_document(
+TRANSPORT L25: timeout_seconds: float = 3.0,
+TRANSPORT L29: """Fetch a bounded JSON object from an approved HTTPS host.
+TRANSPORT L32: inherited. Redirects are rejected rather than followed. The caller must
+TRANSPORT L36: raise MetadataTrustError("Request URL must be a non-empty string")
+TRANSPORT L40: hostname = parsed.hostname
+TRANSPORT L41: port = parsed.port
+TRANSPORT L43: raise MetadataTrustError("Request URL is malformed") from exc
+TRANSPORT L45: if parsed.scheme.lower() != "https" or not hostname:
+TRANSPORT L46: raise MetadataTrustError("Request URL must use HTTPS and include a hostname")
+TRANSPORT L47: if port not in (None, 443):
+TRANSPORT L48: raise MetadataTrustError("Request URL must use the standard HTTPS port 443")
+TRANSPORT L50: raise MetadataTrustError("Request URL credentials and fragments are not allowed")
+TRANSPORT L52: if not isinstance(timeout_seconds, (int, float)) or isinstance(timeout_seconds, bool):
+TRANSPORT L53: raise MetadataTrustError("Timeout must be numeric")
+TRANSPORT L54: if not 0 < timeout_seconds <= 10:
+TRANSPORT L55: raise MetadataTrustError("Timeout must be greater than 0 and at most 10 seconds")
+TRANSPORT L58: raise MetadataTrustError("Response-size limit must be an integer")
+TRANSPORT L60: raise MetadataTrustError("Response-size limit must be between 1 byte and 4 MiB")
+TRANSPORT L63: raise MetadataTrustError("Trusted host allowlist must be a non-empty set")
+TRANSPORT L65: host = parsed.hostname.lower().rstrip(".")
+TRANSPORT L72: raise MetadataTrustError("Request hostname is not in the approved allowlist")
+TRANSPORT L76: timeout=httpx.Timeout(timeout_seconds),
+TRANSPORT L77: follow_redirects=False,
+TRANSPORT L78: verify=True,
+TRANSPORT L79: trust_env=False,
+TRANSPORT L82: if response.status_code != 200:
+TRANSPORT L83: raise MetadataTrustError(
+TRANSPORT L84: f"Metadata endpoint returned unexpected HTTP status {response.status_code}"
+TRANSPORT L87: content_type = response.headers.get("content-type", "")
+TRANSPORT L92: raise MetadataTrustError("Metadata endpoint did not return JSON content")
+TRANSPORT L99: raise MetadataTrustError("Invalid response Content-Length") from exc
+TRANSPORT L101: raise MetadataTrustError("Metadata response exceeds the size limit")
+TRANSPORT L108: raise MetadataTrustError("Metadata response exceeds the size limit")
+TRANSPORT L114: raise
+TRANSPORT L116: raise MetadataTrustError("Trusted metadata HTTPS request failed") from exc
+TRANSPORT L117: except (OSError, TimeoutError) as exc:
+TRANSPORT L118: raise MetadataTrustError("Trusted metadata transport failed") from exc
+TRANSPORT L123: raise MetadataTrustError("Metadata response is not valid JSON") from exc
+TRANSPORT L126: raise MetadataTrustError("Metadata response must be a JSON object")
+
+========== API AUDIT ATTRIBUTION REVIEW ==========
+API L6: from app.auth_dependencies import require_permission
+API L57: @app.get("/api/v1/health", response_model=HealthResponse)
+API L64: @app.patch("/api/v1/cases/{case_id}", response_model=DemoCase, dependencies=[Depends(require_permission("cases:update"))])
+API L65: def update_case_endpoint(
+API L83: actor_id="DEVELOPMENT-API",
+API L103: @app.get("/api/v1/demo/cases", response_model=list[DemoCase], dependencies=[Depends(require_permission("cases:read"))])
+
+========== BACKEND REGRESSION ==========
+Backend pytest exit code: 0
+Backend stdout log: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase8B114_Logs_20261017_182108\backend_pytest_stdout.txt
+Backend stderr log: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase8B114_Logs_20261017_182108\backend_pytest_stderr.txt
+PASS: Backend pytest completed successfully.
+PYTEST: ........................................................................ [ 28%]
+PYTEST: ........................................................................ [ 56%]
+PYTEST: ........................................................................ [ 84%]
+PYTEST: .......................................                                  [100%]
+PYTEST: ============================== warnings summary ===============================
+PYTEST: .venv\Lib\site-packages\fastapi\testclient.py:1
+PYTEST:   C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+PYTEST:     from starlette.testclient import TestClient as TestClient  # noqa
+PYTEST: 
+PYTEST: -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+PYTEST: 255 passed, 1 warning in 3.57s
+
+========== FRONTEND BUILD ==========
+Frontend build exit code: 0
+Frontend stdout log: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase8B114_Logs_20261017_182108\frontend_build_stdout.txt
+Frontend stderr log: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\Reports\Phase8B114_Logs_20261017_182108\frontend_build_stderr.txt
+PASS: Frontend production build completed successfully.
+BUILD: 
+BUILD: > cirt-dfir-platform-frontend@0.1.0 build
+BUILD: > tsc -b && vite build
+BUILD: 
+BUILD: [36mvite v7.3.7 [32mbuilding client environment for production...[36m[39m
+BUILD: transforming...
+BUILD: [32mâœ“[39m 200 modules transformed.
+BUILD: rendering chunks...
+BUILD: computing gzip size...
+BUILD: [2mdist/[22m[32mindex.html                 [39m[1m[2m  0.45 kB[22m[1m[22m[2m â”‚ gzip:   0.30 kB[22m
+BUILD: [2mdist/[22m[35massets/index-BPJY-tX1.css  [39m[1m[2m  4.87 kB[22m[1m[22m[2m â”‚ gzip:   1.64 kB[22m
+BUILD: [2mdist/[22m[36massets/index-CIqGSHiu.js   [39m[1m[2m496.33 kB[22m[1m[22m[2m â”‚ gzip: 140.28 kB[22m
+BUILD: [32mâœ“ built in 1.71s[39m
+
+========== REVIEW DECISION ==========
+No application source was changed by this phase.
+A missing literal redirect option is not, by itself, proof of a vulnerability.
+Review the actual transport implementation and its tests before changing it.
+Keep live Entra authentication disabled pending approved configuration.
+Keep DEVELOPMENT-API audit attribution flagged until a verified identity is available.
+This report is not a production-readiness certification.

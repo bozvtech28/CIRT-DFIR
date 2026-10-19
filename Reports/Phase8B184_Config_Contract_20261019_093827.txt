@@ -1,0 +1,166 @@
+﻿CIRT-DFIR - PHASE 8B184
+Configuration contract and integration review
+READ ONLY - no environment values or credentials are read.
+
+==============================================================================
+FILE: auth_dependencies.py
+EXISTS: True
+==============================================================================
+DECLARATION line 16: get_current_principal
+DECLARATION line 24: require_permission
+1: """Fail-closed authentication gate pending approved OIDC integration.
+16: def get_current_principal() -> Principal:
+24: def require_permission(permission: str):
+26: def dependency(principal: Principal = Depends(get_current_principal)) -> Principal:
+TOTAL LINES: 41
+
+==============================================================================
+FILE: entra_config_preflight.py
+EXISTS: True
+==============================================================================
+DECLARATION line 21: validate_entra_config
+1: """Offline preflight validation for Microsoft Entra configuration.
+14: "tenant_id",
+15: "expected_issuer",
+16: "expected_audience",
+17: "approved_role_map",
+32: tenant_id = config.get("tenant_id")
+33: if not isinstance(tenant_id, str) or not tenant_id.strip():
+34: errors.append("tenant_id must be a non-empty string")
+37: UUID(tenant_id)
+39: errors.append("tenant_id must be a valid UUID")
+41: issuer = config.get("expected_issuer")
+43: errors.append("expected_issuer must be a non-empty string")
+61: "expected_issuer must be a fixed HTTPS URL without credentials, "
+65: audience = config.get("expected_audience")
+67: errors.append("expected_audience must be a non-empty string")
+69: role_map = config.get("approved_role_map")
+71: errors.append("approved_role_map must be a non-empty mapping")
+TOTAL LINES: 89
+
+==============================================================================
+FILE: entra_authenticator.py
+EXISTS: True
+==============================================================================
+DECLARATION line 54: EntraAuthConfig
+  FIELD line 57: tenant_id
+  FIELD line 58: expected_issuer
+  FIELD line 59: expected_audience
+  FIELD line 60: discovery_url
+  FIELD line 61: trusted_metadata_hosts
+  FIELD line 62: allowed_jwks_hosts
+  FIELD line 63: approved_role_map
+  FIELD line 64: jwks_ttl_seconds
+  FIELD line 65: timeout_seconds
+  FIELD line 66: max_response_bytes
+DECLARATION line 160: EntraAuthenticator
+DECLARATION line 199: create_entra_authenticator
+3: This module is deliberately NOT wired into FastAPI. Configuration must be
+54: class EntraAuthConfig:
+57: tenant_id: str
+58: expected_issuer: str
+59: expected_audience: str
+60: discovery_url: str
+61: trusted_metadata_hosts: frozenset[str]
+62: allowed_jwks_hosts: frozenset[str]
+63: approved_role_map: Mapping[str, str]
+70: "tenant_id",
+71: "expected_issuer",
+72: "expected_audience",
+73: "discovery_url",
+80: issuer = urlparse(self.expected_issuer)
+83: raise ValueError("expected_issuer is malformed") from exc
+94: raise ValueError("expected_issuer must be a fixed, safe HTTPS URL")
+97: parsed = urlparse(self.discovery_url)
+100: raise ValueError("discovery_url is malformed") from exc
+111: raise ValueError("discovery_url must be a fixed, safe HTTPS URL")
+114: self.trusted_metadata_hosts, "trusted_metadata_hosts"
+117: self.allowed_jwks_hosts, "allowed_jwks_hosts"
+121: raise ValueError("discovery_url host is not in trusted_metadata_hosts")
+123: if not isinstance(self.approved_role_map, Mapping) or not self.approved_role_map:
+124: raise ValueError("approved_role_map must be a non-empty mapping")
+127: for app_role, internal_role in self.approved_role_map.items():
+155: object.__setattr__(self, "trusted_metadata_hosts", metadata_hosts)
+156: object.__setattr__(self, "allowed_jwks_hosts", jwks_hosts)
+157: object.__setattr__(self, "approved_role_map", MappingProxyType(role_map))
+165: config: EntraAuthConfig,
+192: expected_issuer=self._config.expected_issuer,
+193: expected_audience=self._config.expected_audience,
+194: expected_tenant_id=self._config.tenant_id,
+195: approved_role_map=self._config.approved_role_map,
+199: def create_entra_authenticator(
+200: config: EntraAuthConfig,
+207: expected_issuer, and its JWKS hostname must be in allowed_jwks_hosts.
+228: config.discovery_url, config.trusted_metadata_hosts
+232: expected_issuer=config.expected_issuer,
+233: allowed_jwks_hosts=set(config.allowed_jwks_hosts),
+237: return fetch_document(metadata.jwks_uri, config.allowed_jwks_hosts)
+TOTAL LINES: 240
+
+==============================================================================
+FILE: entra_token_verifier.py
+EXISTS: True
+==============================================================================
+DECLARATION line 19: verify_entra_access_token
+23: expected_issuer: str,
+24: expected_audience: str,
+25: expected_tenant_id: str,
+36: ("expected_issuer", expected_issuer),
+37: ("expected_audience", expected_audience),
+38: ("expected_tenant_id", expected_tenant_id),
+56: issuer=expected_issuer,
+57: audience=expected_audience,
+73: if claims.get("tid") != expected_tenant_id:
+TOTAL LINES: 76
+
+==============================================================================
+FILE: entra_bearer_adapter.py
+EXISTS: True
+==============================================================================
+3: This module does not fetch metadata or JWKS and is not wired into FastAPI.
+27: expected_issuer: str,
+28: expected_audience: str,
+29: expected_tenant_id: str,
+30: approved_role_map: Mapping[str, str],
+55: expected_issuer=expected_issuer,
+56: expected_audience=expected_audience,
+57: expected_tenant_id=expected_tenant_id,
+61: approved_role_map=approved_role_map,
+TOTAL LINES: 66
+
+==============================================================================
+FILE: main.py
+EXISTS: True
+==============================================================================
+6: from app.auth_dependencies import require_permission
+57: @app.get("/api/v1/health", response_model=HealthResponse)
+64: @app.patch("/api/v1/cases/{case_id}", response_model=DemoCase)
+68: principal = Depends(require_permission("cases:update")),
+104: @app.get("/api/v1/demo/cases", response_model=list[DemoCase], dependencies=[Depends(require_permission("cases:read"))])
+TOTAL LINES: 108
+
+==============================================================================
+FILE: .gitignore
+EXISTS: True
+==============================================================================
+1: .env
+2: .env.*
+3: !.env.example
+TOTAL LINES: 3
+
+==============================================================================
+FILE: README.md
+EXISTS: True
+==============================================================================
+No selected contract markers found.
+TOTAL LINES: 19
+
+==============================================================================
+REVIEW CONCLUSION
+==============================================================================
+This is a source inspection, not an authentication integration test.
+Do not infer that environment values are loaded merely because fields exist.
+Do not create production configuration from guessed tenant, issuer, audience,
+metadata host, JWKS host, or role-mapping values.
+Authentication must remain fail-closed pending approved configuration and sign-off.
+STATUS: REVIEW ONLY

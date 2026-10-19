@@ -1,0 +1,104 @@
+﻿CIRT DFIR PROFESSIONAL
+MICROSOFT ENTRA ID CONFIGURATION REQUEST
+
+Purpose:
+Configure approved authentication for the CIRT DFIR Professional SPA and API.
+
+Please have the organization's Microsoft Entra administrator complete
+or approve the following settings.
+
+1. TENANT AND TOKEN VALIDATION
+Tenant ID:
+[ENTER APPROVED TENANT ID]
+
+Token version:
+[ENTER APPROVED TOKEN VERSION]
+
+Exact expected issuer URL:
+[ENTER VERIFIED ISSUER URL]
+
+API audience / Application ID URI:
+[ENTER APPROVED API AUDIENCE]
+
+Approved discovery metadata URL:
+[ENTER APPROVED HTTPS DISCOVERY URL]
+
+Approved JWKS hostname:
+[ENTER APPROVED HOSTNAME]
+
+2. APPLICATION REGISTRATIONS
+SPA application client ID:
+[ENTER APPROVED SPA CLIENT ID]
+
+API application client ID:
+[ENTER APPROVED API CLIENT ID]
+
+API Application ID URI:
+[ENTER APPROVED APPLICATION ID URI]
+
+Delegated API scope:
+[ENTER APPROVED API SCOPE]
+
+SPA redirect URI for local development:
+http://localhost:5173/
+
+Approved production SPA redirect URI:
+[ENTER APPROVED HTTPS REDIRECT URI]
+
+3. APPLICATION ROLES
+Provide the exact configured role values and confirm their assignment policy.
+
+Viewer role value:
+[ENTER EXACT ROLE VALUE]
+
+DFIR Analyst role value:
+[ENTER EXACT ROLE VALUE]
+
+Administrator role value:
+[ENTER EXACT ROLE VALUE]
+
+Confirm the approved role-to-permission mapping:
+Viewer: cases:read
+DFIR Analyst: cases:read, cases:update
+Administrator: cases:read, cases:update, users:manage, audit:read
+
+The administrator must confirm that these role values and permissions
+match the organization's actual application registration and policy.
+
+4. SECURITY APPROVAL
+Approved by:
+[ENTER APPROVER OR TEAM]
+
+Approved deployment origins:
+[ENTER APPROVED ORIGINS]
+
+Token audience and issuer verified:
+[YES / NO]
+
+Application roles reviewed:
+[YES / NO]
+
+JWKS trust and key-rotation behavior reviewed:
+[YES / NO]
+
+Authentication integration authorized:
+[YES / NO]
+
+5. IMPORTANT SECURITY NOTES
+- Do not provide client secrets in this template.
+- Do not place client secrets in VITE_ frontend environment variables.
+- Share configuration through the organization's approved secure process.
+- Do not invent tenant IDs, client IDs, audiences, scopes, or role values.
+- Keep the API fail-closed until integration and security tests pass.
+- Unauthenticated requests must receive HTTP 401.
+- Authenticated requests lacking permission must receive HTTP 403.
+- Audit attribution must use the verified principal subject.
+- This request does not authorize production deployment.
+
+CURRENT PROJECT STATUS
+Offline bearer adapter: implemented and tested.
+Offline authentication tests: passed in Phase 8B.95.
+Phase 8B.98 backend tests: passed.
+Phase 8B.98 frontend build: passed.
+Live Entra authentication: not configured.
+FastAPI adapter integration: pending approved configuration.

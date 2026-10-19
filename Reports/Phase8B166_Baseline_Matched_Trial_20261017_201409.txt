@@ -1,0 +1,8 @@
+﻿CIRT-DFIR - PHASE 8B166
+Baseline-Matched httpx2 Compatibility Trial
+Timestamp: 2026-10-17 20:14:10
+Original environment: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\.venv\Scripts\python.exe
+Trial environment: C:\Users\BOZVLENOVO7\Desktop\PROJECT\CIRT_DFIR_Professional\platform\backend\.venv_phase8b166
+Original environment will not be modified.
+
+STOP: trial path already exists. No environment files changed.
