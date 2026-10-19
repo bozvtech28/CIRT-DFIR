@@ -54,6 +54,18 @@ DEMO_CASES = [
 ]
 
 
+@app.get("/", include_in_schema=False)
+def api_root() -> dict[str, str]:
+    """Expose API entry points without implying protected access is available."""
+    return {
+        "service": "CIRT DFIR Platform API",
+        "mode": "development-scaffold",
+        "health": "/api/v1/health",
+        "docs": "/docs",
+        "authentication": "not-configured",
+    }
+
+
 @app.get("/api/v1/health", response_model=HealthResponse)
 def health() -> HealthResponse:
     return HealthResponse(status="ok", mode="development-scaffold")
