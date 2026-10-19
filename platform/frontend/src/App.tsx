@@ -133,7 +133,7 @@ function App() {
   const selectedCase = cases.find((item) => item.case_id === selectedCaseId) ?? null;
   const authenticationRequired =
     /authentication|sign.?in|access token|unauthorized|forbidden|not configured/i.test(error) ||
-    /API returned HTTP (401|403)\\b/.test(error);
+    /API returned HTTP (401|403)\b/.test(error);
   const apiState = loading
     ? "Loading"
     : usingFallback
