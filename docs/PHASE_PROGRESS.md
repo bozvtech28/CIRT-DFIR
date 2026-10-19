@@ -4,7 +4,8 @@
 **Branch authority:** `main` only  
 **Baseline:** `c5c5dbdc08304c7396cd865528364f4ff81ef3d3`  
 **Reviewed:** 2026-10-19  
-**Ledger status:** Initial source-grounded inventory; not a claim that every historical phase has passed acceptance.
+**Latest main re-review:** `c53aa773e3d95bfff81df10d58cdc714e36fc1df`  
+**Ledger status:** Source-grounded priority update; open release blockers remain open.
 
 ## Purpose
 
@@ -29,15 +30,24 @@ The currently active phase documents available under `docs/` range from Phase 8B
 
 | Priority | Workstream | Status | Evidence / acceptance condition |
 |---|---|---|---|
-| P0 | Case Manager filesystem containment | **OPEN — RELEASE BLOCKER** | `Reports/Baseline_Report_20261015_223611.txt` records a parent-junction path acceptance. Requires independently reviewed remediation and traversal, junction/reparse point, race/concurrency, cleanup and finalization tests. |
-| P0 | Live API authentication and authorization | **BLOCKED — APPROVED CONFIGURATION REQUIRED** | `platform/backend/app/auth_dependencies.py` always raises 401. `entra_authenticator.py` and `entra_bearer_adapter.py` state they are not wired into FastAPI. Need approved issuer, tenant, audience, metadata/JWKS hosts, app roles, role mapping, deployment origins and identity/security approval before wiring. |
-| P0 | Evidence intake and custody | **NOT IMPLEMENTED / RELEASE BLOCKER** | Requirements call for bounded authenticated upload, hash verification, preservation of originals, provenance and custody. No production ingest pipeline/storage service is active. |
+| P0-A | Case Manager filesystem containment | **OPEN — RELEASE BLOCKER / SOURCE NOT LOCATED IN ACTIVE TREE** | `Reports/Baseline_Report_20261015_223611.txt` records a parent-junction path acceptance. A full recursive path inventory of the reviewed `main` tree (`c53aa773e3d95bfff81df10d58cdc714e36fc1df`, 11,124 entries, not truncated) found no active path matching Case Manager, junction, reparse, containment, evidence-intake, or safe-path terms outside generated/vendor trees. Locate the authoritative implementation and provenance before patching; do not promote backups. Then add independent traversal, junction/reparse-point, race/concurrency, cleanup and finalization tests. |
+| P0-B | Live API authentication and authorization | **BLOCKED — APPROVED CONFIGURATION REQUIRED** | The current screenshot confirms the frontend correctly displays `Auth required` and does not show protected case data. `platform/backend/app/auth_dependencies.py` always raises 401; `entra_authenticator.py` and `entra_bearer_adapter.py` explicitly are not wired into FastAPI. The 2026-10-17 configuration-readiness report says tenant ID, expected issuer and API audience were unset. Need approved issuer, tenant, audience, metadata/JWKS hosts, SPA client/scope/redirect URI, app roles, role mapping and identity/security approval before wiring. Keep fail-closed behavior. |
+| P0-C | Evidence intake and custody | **NOT IMPLEMENTED / RELEASE BLOCKER** | Requirements call for bounded authenticated upload, hash verification, preservation of originals, provenance and custody. No production ingest pipeline/storage service is active. Remains blocked on P0-A containment remediation/review and P0-B approved identity integration. |
 | P1 | Production identity integration | **PARTIAL / BLOCKED** | Isolated JWT verifier, metadata and JWKS primitives plus synthetic tests exist. Need approved configuration and reviewed FastAPI integration with actual dependency-level tests; no live Entra integration is verified. |
 | P1 | Frontend production workflow | **PARTIAL** | React/MSAL bootstrap and bearer fetch exist. The app labels demo/synthetic data; Dashboard/Cases only have list/filter/read-only detail, and other navigation items are placeholders. |
 | P1 | Database and operational recovery | **DEVELOPMENT ONLY** | SQLite case store and audit-event schema exist. PostgreSQL/object storage, production migrations, encryption, backup and restoration have not been verified. |
 | P2 | Workspace hygiene and provenance | **REVIEW REQUIRED** | Tree includes tracked dependency directories, backend virtual environments and many timestamped backups. Do not bulk-delete without impact/reference review. |
 
 **Release decision:** Not production-ready. Keep auth fail-closed and do not accept real evidence packages until the P0 security gates are independently resolved.
+
+### Latest main review and local verification evidence (2026-10-19)
+
+- **Repository/source review:** main was re-resolved at `c53aa773e3d95bfff81df10d58cdc714e36fc1df`. The recursive tree inventory contained 11,124 entries and was not truncated. No active source path for the documented Case Manager/junction containment implementation was discoverable outside dependency/generated trees. This is a source/provenance blocker, not proof the defect is fixed or absent.
+- **Frontend build:** user-provided PowerShell output reports `npm run build` passed (`tsc -b && vite build`; 200 modules transformed; Vite completed in 1.73 seconds). This is user-reported local evidence, not a run executed by this connector.
+- **Backend regression:** user-provided PowerShell output reports `python -m pytest` completed with 291 passed in 4.19 seconds. This does not establish live Entra sign-in or filesystem-junction safety.
+- **Rendered UI:** the latest user screenshot confirms the compact Entra setup notice, explicit `AUTH DISABLED` label, `Auth required` API state, and no protected case records shown. Review is based on the user-provided screenshot; no independent browser-control tool was available.
+- **Reprioritization:** P0-A active source identification and filesystem containment first; P0-B approved Entra configuration and secure FastAPI wiring second; P0-C evidence intake/custody third (gated on A/B). UI polish is secondary; the current auth-related empty state is expected until approved configuration and integration exist.
+- **Status limits:** no hosted CI or runners were used. No new local build or pytest run was performed by the GitHub connector session.
 
 ## Phase inventory: active documents
 
@@ -113,12 +123,12 @@ A future run should append only concise, verified entries:
 
 ## Safe next-action order
 
-1. **P0-A — filesystem containment:** find the current Case Manager implementation and tests from the baseline inventory; trace parent-junction acceptance; design and test safe root containment before production integration. Use only synthetic temporary roots.
-2. **P0-B — identity approval:** obtain actual tenant, exact issuer, API audience, discovery/JWKS allowlists, SPA client ID, API scope, redirect URIs and exact role values from an authorized identity administrator. Do not invent them.
-3. **P0-C — wire identity only after approval:** integrate the existing bearer adapter with FastAPI dependency; preserve fail-closed behavior on missing/invalid config, network/key failures, invalid claims and unknown roles. Add FastAPI-level allow/deny/audit tests before enabling.
-4. **P0-D — evidence intake:** after independent containment review and auth gates, implement bounded streaming, private staging, strict archive/path handling, preservation of existing files, server-side hashes and atomic finalization.
+1. **P0-A — locate and fix active filesystem containment:** identify the canonical Case Manager source and its repository provenance; current active tree path search did not find it. Trace the reported parent-junction acceptance before editing. Add failing synthetic temp-root tests first, then correct containment and verify traversal, junction/reparse points, races, cleanup and atomic finalization. Independent security review required.
+2. **P0-B — obtain approved identity configuration:** an authorized identity administrator must provide the tenant, exact issuer, API audience, discovery/JWKS allowlists, SPA client ID, API scope, redirect URIs, role values and written approval. Current missing values are not to be guessed.
+3. **P0-B — secure FastAPI wiring after approval only:** integrate the existing bearer adapter/authenticator using trusted server-side config; preserve 401/403 behavior for absent/invalid configuration, token, issuer, audience, signature/key, claims and unknown roles. Add API dependency-level allow/deny/audit tests before any enablement.
+4. **P0-C — evidence intake:** only after A and B gates close, implement bounded streaming, quotas/deadlines, private staging, strict archive/path handling, preservation of existing files, server-side hashes and atomic finalization/custody.
 5. **P1 — operational deployment:** production database/object store, migrations, encryption, backup/restore, monitoring and signed scanner distribution.
-6. **P1 — UI modules:** implement asset/scanning, findings, evidence, response, reports and administration only when backend contracts and permissions exist. Keep unsupported screens explicitly labelled as scaffold.
+6. **P1 — UI modules:** implement assets/scanning, findings, evidence, response, reports and administration only when backend contracts and permissions exist. Keep unsupported screens explicitly labelled as scaffold.
 7. Reassess and continue while meaningful, safe work remains; never create an endless loop.
 
 ## Safety and authority
