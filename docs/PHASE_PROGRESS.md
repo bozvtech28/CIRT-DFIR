@@ -131,3 +131,24 @@ A future run should append only concise, verified entries:
 - Do not claim P0 filesystem containment is fixed without independent review and acceptance tests.
 - Do not commit when the remaining validation gap makes the change materially unsafe.
 - Update this ledger only from observed main/source/test evidence.
+
+
+## Roadmap checkpoints and web UI test timing
+
+This roadmap orders work by release risk, not by the highest numbered historical backup. Phase 1–3 acceptance evidence is not reconstructed in one canonical active phase document; Phase 4–7 reports/backups show historical development and are not sufficient to declare those phases passed.
+
+| Order | Status on current main | Exit evidence / dependency |
+|---|---|---|
+| R0 — Repository/build baseline | PARTIAL | README/UI entry corrected; local commands documented. Need fresh local environment verification and ensure generated `dist`, dependency folders and virtual environments are treated correctly. |
+| R1 — First UI test | READY NOW, synthetic only | Open `apps/web-prototype/index.html`; separately launch Vite + FastAPI for the React UI using the README commands. Capture pass/fail evidence locally. |
+| R2 — P0 filesystem containment | BLOCKED ON ACTIVE SOURCE IDENTIFICATION | Identify the canonical Case Manager source from the baseline inventory and provenance; reproduce the parent-junction failure in synthetic temp roots; implement and test root containment, traversal, reparse/junction behavior, race handling, cleanup ownership and atomic finalization; independent security review required. |
+| R3 — Backend regression baseline | NOT RUN HERE | Run focused and full local pytest in the supported Python environment. Preserve unauthenticated/malformed-token 401 behavior. |
+| R4 — Entra approval + server wiring | BLOCKED_APPROVAL | An authorized identity/security owner supplies tenant ID, exact issuer, audience, discovery/JWKS allowlists, SPA ID/scope/redirect URIs, app roles and role-to-permission mapping. Only then integrate validated tokens into the FastAPI dependency, with fail-closed errors and API-level tests. |
+| R5 — React/API functional integration | PARTIAL | Replace only proven contract gaps; test loading/error/empty states, search/filter/refresh and truthful API state. No fake success or synthetic runtime identity. |
+| R6 — Evidence intake and custody | NOT IMPLEMENTED; GATED | Bounded streaming, quotas/deadlines, private staging, safe paths, hashes, atomic finalization, custody/audit, cleanup and failure recovery, after R2 and R4 gates. |
+| R7 — Durable production services | NOT IMPLEMENTED / DESIGN TARGET | PostgreSQL/migrations, private object storage, encryption/key management, monitoring, operational deployment and verified backup/restore. |
+| R8 — DFIR workflow modules | PARTIAL SCAFFOLD | Build assets/scans, findings, evidence, controlled response, reports and administration against reviewed backend contracts/permissions. Response actions require policy and approval controls. |
+| R9 — Enterprise hardening and release | NOT READY | Local unit/API/UI/security testing, browser and accessibility review, signed scanner/release supply chain, threat review, restore drill, documentation, operational runbooks and application/security owner acceptance. |
+
+**First browser test:** start with R1 now, using fictional data. The React + FastAPI UI may be smoke-tested before live auth, but protected case-list/API success is expected to remain unavailable until R4. Do not test real evidence or operational response actions until the security gates are closed. No local runtime test was executed in this connector session.
+
