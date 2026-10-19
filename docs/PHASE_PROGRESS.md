@@ -84,6 +84,18 @@ Earlier phase artefacts are distributed through timestamped `Backups/` snapshots
 | Phase 7 | Repository/schema/audit/test-fix backups exist | HISTORICAL SNAPSHOTS — establish present behavior from current source and tests |
 | Phase 8B milestones | Active docs from 8B.7 to 8B.84 and backups above 8B.100 | PARTIAL/BLOCKED as noted; highest numbered backup is history, not proof every intermediate milestone passed |
 
+## Latest verified patch — synthetic identity test isolation
+
+**Status:** PATCH VERIFIED BY SOURCE INSPECTION, TEST EXECUTION NOT AVAILABLE
+
+- Finding: `platform/backend/tests/conftest.py` previously installed a synthetic analyst principal through an `autouse=True` fixture for the entire backend suite. This allowed legacy tests to exercise protected endpoints without declaring that they needed a synthetic identity and could mask the intended fail-closed default.
+- Change: the shared fixture now clears dependency overrides before/after each test without creating an identity. `platform/backend/tests/test_api.py::test_demo_cases_are_synthetic` now installs its synthetic analyst only for the successful demo-list test and clears the override afterward.
+- Production source unchanged: `platform/backend/app/auth_dependencies.py` still denies protected requests by default.
+- Auth-gate regression: existing `test_api_auth_gate.py` and `test_api_oidc_fail_closed.py` retain assertions for HTTP 401 on unauthenticated or malformed-token requests.
+- Commits: `99d2cfe8e22d2bac7b994c5d1502248c7c64ce87` (fixture), `da92dfdd645adc88ae3110dff14d98590e7c8fb4` (explicit test override), and `873db9b6da3c52afb27faa5cca521fa8c6b41fe6` (finding record).
+- Validation: modified files and existing negative tests were re-fetched from GitHub and inspected. Pytest was **not run** because this execution environment has no local checkout/confirmed dependencies. Do not mark the backend suite passed until `python -m pytest` is executed locally.
+- Remaining risk: full test ordering and regression behavior remain unverified at runtime.
+
 ## Verification checklist for automation runs
 
 A future run should append only concise, verified entries:
