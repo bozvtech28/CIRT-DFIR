@@ -107,13 +107,22 @@ export default function AuthRoot() {
   if (!isEntraConfigured) {
     return (
       <>
-        <section role="status" style={{ padding: 16, borderBottom: "1px solid #d5dce5" }}>
-          <strong>Authentication not configured</strong>
-          <ul>
-            {entraConfigurationErrors.map((message) => <li key={message}>{message}</li>)}
-          </ul>
-          <p>Live Entra sign-in is disabled until approved settings are supplied.</p>
-          <p>Do not treat demonstration data as authenticated incident data.</p>
+        <section className="auth-setup-banner" role="status" aria-labelledby="auth-setup-title">
+          <div className="auth-setup-copy">
+            <div className="auth-setup-heading">
+              <span className="auth-setup-indicator" aria-hidden="true" />
+              <strong id="auth-setup-title">Sign-in setup required</strong>
+              <span className="auth-setup-pill">AUTH DISABLED</span>
+            </div>
+            <p>Protected case data is unavailable until the identity and security owners approve and configure Microsoft Entra.</p>
+            <details>
+              <summary>Configuration required ({entraConfigurationErrors.length} items)</summary>
+              <ul>
+                {entraConfigurationErrors.map((message) => <li key={message}>{message}</li>)}
+              </ul>
+            </details>
+            <p className="auth-setup-footnote">Do not enter real case or evidence data in this development scaffold.</p>
+          </div>
         </section>
         <App />
       </>
