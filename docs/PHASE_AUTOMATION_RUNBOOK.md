@@ -116,3 +116,18 @@ These conditions prevent unsafe automatic completion until evidence changes:
 6. Commit directly to `main` only if the change is safe, reviewed, validated to an appropriate level, and repository rules permit it.
 
 This runbook defines a process; it does not itself assert that any phase is complete.
+
+## P0-A Source Gap Confirmation
+
+**Current disposition: BLOCKED pending canonical-source decision.**
+
+The 2026-10-22 read-only provenance review found no authoritative Case Manager or evidence-ingestion implementation in the inspected active paths, and the reviewed candidate filenames were not found by the targeted Git-history search. Because the search was bounded, do not interpret this result as proof that no related implementation exists elsewhere.
+
+Before implementation:
+
+1. Confirm the canonical module location, maintainers, and intended API contract.
+2. Design the shared containment policy and the platform-specific Windows and Linux enforcement adapters.
+3. Write adversarial tests against real temporary filesystem objects before adding an evidence-intake endpoint.
+4. Include traversal, absolute paths, symlinks/junctions/reparse points, concurrent path replacement, partial writes, cleanup ownership, preservation of existing files, atomic finalization, resource limits, and server-computed hashes.
+5. Run the relevant tests on native Windows and Linux and inspect actual filesystem outcomes.
+6. Keep evidence intake disabled. Do not wire recovered prototypes into the application. P0-B must independently pass before P0-C can proceed.

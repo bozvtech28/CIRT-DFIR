@@ -162,3 +162,20 @@ This roadmap orders work by release risk, not by the highest numbered historical
 
 **First browser test:** start with R1 now, using fictional data. The React + FastAPI UI may be smoke-tested before live auth, but protected case-list/API success is expected to remain unavailable until R4. Do not test real evidence or operational response actions until the security gates are closed. No local runtime test was executed in this connector session.
 
+
+## P0-A Source Gap Confirmation
+
+**Status: OPEN — release blocker.**
+
+The read-only source-provenance review on 2026-10-22 confirmed that the active backend is a development scaffold and that no authoritative evidence-ingestion or Case Manager containment implementation was identified in the inspected active source paths. The reviewed candidate filenames were not located in the searched Git history on `origin/main`. This is a bounded finding, not proof that no related implementation ever existed under another name or in an unexamined external location.
+
+**Required next actions**
+
+1. Identify and approve the intended canonical implementation location and ownership.
+2. Define a shared filesystem-containment contract and separate Windows/Linux enforcement requirements before implementing evidence intake.
+3. Add deterministic adversarial tests for traversal, absolute paths, symlink/junction/reparse-point escape, path replacement races, partial writes, cleanup ownership, pre-existing-file preservation, and atomic finalization.
+4. Verify actual filesystem effects and failure behavior on native Windows and Linux environments. Mock-only tests are insufficient.
+5. Require bounded resource handling and server-computed integrity hashes in the acceptance criteria.
+6. Keep evidence intake disabled until P0-A and the separate P0-B authentication gate are independently accepted.
+
+Historical candidates, backups, and hash records are provenance evidence only; they are not authority to restore or promote code. No historical candidate was executed or promoted by this review.
